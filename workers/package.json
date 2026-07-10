@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "build": "tsc -b",
+    "start:whoop-sync": "node dist/whoopSync.js",
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
     "@moodsync/ai": "*",
     "@moodsync/database": "*",
+    "@moodsync/integration-hue": "*",
+    "@moodsync/integration-whoop": "*",
     "@moodsync/shared": "*"
   },
   "devDependencies": {

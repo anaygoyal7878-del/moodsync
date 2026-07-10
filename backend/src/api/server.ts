@@ -7,6 +7,8 @@ import authenticatePlugin from './plugins/authenticate.js';
 import healthRoutes from './routes/health.js';
 import authRoutes from './routes/auth.js';
 import meRoutes from './routes/me.js';
+import whoopRoutes from './routes/integrations/whoop.js';
+import hueRoutes from './routes/integrations/hue.js';
 
 export async function buildServer() {
   const app = Fastify({ loggerInstance: logger, trustProxy: true });
@@ -35,6 +37,8 @@ export async function buildServer() {
   await app.register(healthRoutes, { prefix: '/api' });
   await app.register(authRoutes, { prefix: '/api' });
   await app.register(meRoutes, { prefix: '/api' });
+  await app.register(whoopRoutes, { prefix: '/api' });
+  await app.register(hueRoutes, { prefix: '/api' });
 
   return app;
 }

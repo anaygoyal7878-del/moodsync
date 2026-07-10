@@ -24,6 +24,12 @@ const envSchema = z.object({
       message: 'OAUTH_TOKEN_ENCRYPTION_KEY must be a base64-encoded 32-byte key (openssl rand -base64 32)',
     }),
 
+  // Signs the short-lived state parameter used across every provider's
+  // OAuth authorize->callback round trip (CSRF protection + carries the
+  // PKCE code_verifier). Deliberately separate from the session JWT
+  // secrets — a state token is a different trust category.
+  OAUTH_STATE_SECRET: z.string().min(32, 'OAUTH_STATE_SECRET must be at least 32 characters'),
+
   WHOOP_CLIENT_ID: z.string().optional(),
   WHOOP_CLIENT_SECRET: z.string().optional(),
   WHOOP_REDIRECT_URI: z.string().optional(),

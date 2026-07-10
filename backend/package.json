@@ -15,6 +15,8 @@
     "@fastify/cors": "^10.0.2",
     "@fastify/sensible": "^6.0.2",
     "@moodsync/database": "*",
+    "@moodsync/integration-hue": "*",
+    "@moodsync/integration-whoop": "*",
     "@moodsync/shared": "*",
     "@node-rs/argon2": "^2.0.2",
     "fastify": "^5.2.1",

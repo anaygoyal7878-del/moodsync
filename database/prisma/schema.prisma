@@ -89,6 +89,13 @@ model OAuthToken {
   accessTokenNonce       Bytes
   refreshTokenCiphertext Bytes?
   refreshTokenNonce      Bytes?
+  /// Generic slot for a third encrypted secret some providers issue
+  /// alongside the OAuth pair — e.g. Philips Hue's long-lived
+  /// `hue-application-key`, which functions as a credential and gets the
+  /// same encryption-at-rest treatment as the access/refresh tokens
+  /// rather than living in a connection's plaintext `metadata` JSON.
+  providerSecretCiphertext Bytes?
+  providerSecretNonce      Bytes?
   scope                  String
   expiresAt              DateTime
   createdAt              DateTime @default(now())

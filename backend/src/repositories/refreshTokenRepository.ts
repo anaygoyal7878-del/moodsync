@@ -1,5 +1,4 @@
-import { prisma } from '@moodsync/database';
-import { hashToken } from '../lib/crypto.js';
+import { prisma, hashToken } from '@moodsync/database';
 
 export const refreshTokenRepository = {
   async store(params: {

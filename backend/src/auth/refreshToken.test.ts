@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 
 beforeAll(() => {
   process.env.OAUTH_TOKEN_ENCRYPTION_KEY ??= Buffer.alloc(32, 7).toString('base64');
+  process.env.OAUTH_STATE_SECRET ??= 'c'.repeat(32);
   process.env.JWT_ACCESS_SECRET ??= 'a'.repeat(32);
   process.env.JWT_REFRESH_SECRET ??= 'b'.repeat(32);
   process.env.DATABASE_URL ??= 'postgresql://user:pass@localhost:5432/db';

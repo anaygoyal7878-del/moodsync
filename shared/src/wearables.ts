@@ -10,20 +10,20 @@ export interface NormalizedBiometricReading {
   userId: string;
   /** ISO 8601 */
   timestamp: string;
-  heartRate?: number;
-  restingHeartRate?: number;
+  heartRate?: number | undefined;
+  restingHeartRate?: number | undefined;
   /** 0-100, provider-normalized */
-  sleepScore?: number;
+  sleepScore?: number | undefined;
   /** 0-100. WHOOP-native ("Recovery"); no Google Health equivalent today. */
-  recoveryScore?: number;
+  recoveryScore?: number | undefined;
   /** 0-100. No confirmed WHOOP or Google Health equivalent today — only
    * populated once a provider that exposes it (e.g. Garmin's native
    * stress score) is actually integrated. */
-  stressLevel?: number;
+  stressLevel?: number | undefined;
   /** 0-100, normalized from steps/strain/whatever the source provider has. */
-  activityLevel?: number;
-  steps?: number;
-  calories?: number;
+  activityLevel?: number | undefined;
+  steps?: number | undefined;
+  calories?: number | undefined;
 }
 
 export type WearableProviderId = 'whoop' | 'google_health' | 'garmin';

@@ -42,34 +42,48 @@ the ground everything else stands on.
 
 ---
 
-## Milestone 2 — WHOOP integration 📋
+## Milestone 2 — WHOOP integration ✅
 
 **Why first**: the only wearable with a fully open, self-serve developer
 program and no discretionary approval gate (see
 `docs/INTEGRATIONS_RESEARCH.md`). Fastest path to an end-to-end biometric
 signal flowing through the system.
 
-- `integrations/whoop`: OAuth 2.0 client (authorization-code flow against
-  the verified `api.prod.whoop.com` endpoints), typed API client for
-  recovery/sleep/cycles/workout endpoints
-- Token exchange + storage through the encrypted `OAuthToken` model
-- `workers`: a WHOOP sync job (poll on a schedule; webhook support is a
-  later optimization, not required for v1) that normalizes WHOOP
-  responses into `NormalizedBiometricReading` and writes
-  `BiometricReading` rows
-- Integration + contract tests against WHOOP's documented response shapes
+- `integrations/whoop`: OAuth 2.0 + PKCE client against the verified
+  `api.prod.whoop.com` endpoints, typed client for the recovery/sleep/
+  workout/profile v2 endpoints (cursor pagination, `WhoopApiError`)
+- `normalizeWhoopData`: merges recovery + matching sleep + same-day
+  workout into one `NormalizedBiometricReading` per day. Deliberately
+  leaves `heartRate`/`steps`/`calories` unset — WHOOP's endpoints don't
+  expose a generic current-heart-rate or step-count field; approximating
+  them from workout data would misrepresent what the number means
+- Backend: `/api/integrations/whoop/{authorize,callback,sync}`, transparent
+  access-token refresh (5-minute-early buffer) so syncs keep working past
+  the first token lifetime, not just at connection time
+- `workers/src/whoopSync.ts`: standalone entrypoint (run via external
+  scheduler, not an in-process poll loop) syncing every active connection,
+  isolating one user's failure from the rest
+- 14 unit tests (normalization edge cases, OAuth state round-trip, PKCE)
 
-## Milestone 3 — Philips Hue integration 📋
+## Milestone 3 — Philips Hue integration ✅
 
 **Why second**: the only smart home platform with a fully open, self-serve
 program — pairs with WHOOP to prove a complete "biometric signal →
 automated action" loop before investing in the more gated integrations.
 
-- `integrations/hue`: OAuth v2 client against the Hue Remote API
-  (`api.meethue.com`), typed client for light/group/scene state
-- `ConnectedDevice` sync (pull the user's actual lights/rooms after
-  connecting)
-- Action execution: brightness, color, scene, color temperature
+- `integrations/hue`: OAuth v2 + PKCE client, typed CLIP v2 client for
+  light/scene state (`api.meethue.com/route/clip/v2/resource/...`,
+  confirmed against real production code — see
+  `docs/INTEGRATIONS_RESEARCH.md`)
+- `ConnectedDevice` sync via `POST /integrations/hue/sync-devices`; light
+  control via `PUT /integrations/hue/devices/:deviceId/state`
+- Action support: on/off, brightness, xy color, color temperature
+- Same transparent token-refresh treatment as WHOOP
+- One flagged, honestly-documented gap: `createHueApplicationKey` adapts
+  Hue's well-documented v1 bridge-pairing pattern to the confirmed
+  `/route/` remote prefix, but isn't independently confirmed for CLIP v2
+  remote specifically — spot-check against a live Hue developer account
+  before this integration's first real end-to-end test
 
 ## Milestone 4 — Decision engine v2: actions + automation history 📋
 

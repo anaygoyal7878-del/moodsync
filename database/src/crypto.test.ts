@@ -1,13 +1,7 @@
 import { describe, expect, it, beforeAll } from 'vitest';
 
-// OAUTH_TOKEN_ENCRYPTION_KEY is validated by config/env.ts at import time,
-// so it must be set before that module (transitively imported by
-// lib/crypto.ts) loads.
 beforeAll(() => {
   process.env.OAUTH_TOKEN_ENCRYPTION_KEY ??= Buffer.alloc(32, 7).toString('base64');
-  process.env.JWT_ACCESS_SECRET ??= 'a'.repeat(32);
-  process.env.JWT_REFRESH_SECRET ??= 'b'.repeat(32);
-  process.env.DATABASE_URL ??= 'postgresql://user:pass@localhost:5432/db';
 });
 
 describe('encryptSecret / decryptSecret', () => {
@@ -22,8 +16,8 @@ describe('encryptSecret / decryptSecret', () => {
     const { encryptSecret } = await import('./crypto.js');
     const a = encryptSecret('same-plaintext');
     const b = encryptSecret('same-plaintext');
-    expect(a.nonce.equals(b.nonce)).toBe(false);
-    expect(a.ciphertext.equals(b.ciphertext)).toBe(false);
+    expect(Buffer.from(a.nonce).equals(Buffer.from(b.nonce))).toBe(false);
+    expect(Buffer.from(a.ciphertext).equals(Buffer.from(b.ciphertext))).toBe(false);
   });
 
   it('fails to decrypt if the ciphertext has been tampered with', async () => {
