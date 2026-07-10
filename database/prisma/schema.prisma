@@ -1,0 +1,285 @@
+// MoodSync data model.
+//
+// Scale notes: `biometric_readings` is the table that grows unbounded with
+// user count and wearable sync frequency. In production this is a strong
+// candidate for time-based partitioning (e.g. pg_partman by month) and a
+// retention/rollup policy that ages raw readings out into `insights` after
+// N days — that's an operational migration, not a Prisma schema change, so
+// it isn't modeled here, but `@@index([userId, timestamp])` is chosen with
+// that partitioning key in mind.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String?
+  timezone     String   @default("UTC")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  refreshTokens         RefreshToken[]
+  wearableConnections   WearableConnection[]
+  smartHomeConnections  SmartHomeConnection[]
+  automationRules       AutomationRule[]
+  biometricReadings     BiometricReading[]
+  insights              Insight[]
+  recommendations       Recommendation[]
+  automationLogs        AutomationExecutionLog[]
+  preferences           UserPreferences?
+
+  @@map("users")
+}
+
+/// Our own session refresh tokens (JWT auth), unrelated to third-party
+/// OAuth tokens below. Only a hash is ever stored — the raw token exists
+/// only in the client's possession.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  userAgent String?
+  ipAddress String?
+  revokedAt DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+enum WearableProvider {
+  WHOOP
+  GOOGLE_HEALTH
+  GARMIN
+}
+
+enum SmartHomeProvider {
+  HUE
+  SPOTIFY
+  ECOBEE
+}
+
+enum ConnectionStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+  ERROR
+  NOT_YET_AVAILABLE
+}
+
+/// Third-party OAuth credentials. Access/refresh tokens are AES-256-GCM
+/// encrypted at the application layer (backend/src/lib/crypto.ts) before
+/// insert — this table only ever holds ciphertext + nonce, never plaintext.
+/// One row belongs to exactly one connection (wearable XOR smart home),
+/// enforced by the unique FK on each connection table rather than a
+/// polymorphic reverse relation.
+model OAuthToken {
+  id                     String   @id @default(uuid())
+  accessTokenCiphertext  Bytes
+  accessTokenNonce       Bytes
+  refreshTokenCiphertext Bytes?
+  refreshTokenNonce      Bytes?
+  scope                  String
+  expiresAt              DateTime
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  wearableConnection  WearableConnection?
+  smartHomeConnection SmartHomeConnection?
+
+  @@map("oauth_tokens")
+}
+
+model WearableConnection {
+  id             String           @id @default(uuid())
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider       WearableProvider
+  providerUserId String?
+  status         ConnectionStatus @default(ACTIVE)
+  oauthTokenId   String?          @unique
+  oauthToken     OAuthToken?      @relation(fields: [oauthTokenId], references: [id], onDelete: SetNull)
+  lastSyncedAt   DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([userId, provider])
+  @@index([provider, status])
+  @@map("wearable_connections")
+}
+
+model SmartHomeConnection {
+  id                 String            @id @default(uuid())
+  userId             String
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider           SmartHomeProvider
+  providerAccountId  String?
+  status             ConnectionStatus  @default(ACTIVE)
+  oauthTokenId       String?           @unique
+  oauthToken         OAuthToken?       @relation(fields: [oauthTokenId], references: [id], onDelete: SetNull)
+  /// Provider-specific non-secret metadata, e.g. { "bridgeId": "..." } for
+  /// Hue or { "activeDeviceId": "..." } for Spotify.
+  metadata           Json              @default("{}")
+  lastSyncedAt       DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  connectedDevices ConnectedDevice[]
+
+  @@unique([userId, provider])
+  @@index([provider, status])
+  @@map("smart_home_connections")
+}
+
+model ConnectedDevice {
+  id                     String              @id @default(uuid())
+  smartHomeConnectionId  String
+  smartHomeConnection    SmartHomeConnection @relation(fields: [smartHomeConnectionId], references: [id], onDelete: Cascade)
+  externalDeviceId       String
+  name                   String
+  deviceType             String
+  room                   String?
+  isOnline               Boolean             @default(true)
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  @@unique([smartHomeConnectionId, externalDeviceId])
+  @@map("connected_devices")
+}
+
+/// One row per normalized reading per provider sync. See
+/// shared/src/wearables.ts for the field-availability-by-provider notes —
+/// every metric field here is nullable because no provider fills all of
+/// them.
+model BiometricReading {
+  id               String           @id @default(uuid())
+  userId           String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider         WearableProvider
+  timestamp        DateTime
+  heartRate        Float?
+  restingHeartRate Float?
+  sleepScore       Float?
+  recoveryScore    Float?
+  stressLevel      Float?
+  activityLevel    Float?
+  steps            Int?
+  calories         Float?
+  createdAt        DateTime         @default(now())
+
+  @@index([userId, timestamp])
+  @@map("biometric_readings")
+}
+
+model AutomationRule {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  enabled         Boolean  @default(true)
+  /// RuleCondition[] from shared/src/automation.ts, ANDed together
+  conditions      Json
+  /// AutomationAction[] from shared/src/automation.ts
+  actions         Json
+  cooldownMinutes Int      @default(30)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  executionLogs AutomationExecutionLog[]
+
+  @@index([userId, enabled])
+  @@map("automation_rules")
+}
+
+enum ExecutionOutcome {
+  EXECUTED
+  SKIPPED_COOLDOWN
+  SKIPPED_DISABLED
+  FAILED
+}
+
+model AutomationExecutionLog {
+  id               String           @id @default(uuid())
+  userId           String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ruleId           String
+  rule             AutomationRule   @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  triggerReadingId String?
+  outcome          ExecutionOutcome
+  failureReason    String?
+  executedAt       DateTime         @default(now())
+
+  @@index([userId, executedAt])
+  @@index([ruleId, executedAt])
+  @@map("automation_execution_logs")
+}
+
+enum InsightPeriod {
+  DAILY
+  WEEKLY
+}
+
+model Insight {
+  id          String        @id @default(uuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  period      InsightPeriod
+  /// e.g. "sleepScore", "recoveryScore", "automationEffectiveness"
+  metric      String
+  periodStart DateTime
+  periodEnd   DateTime
+  value       Float
+  /// Signed delta vs. the prior comparable period
+  trend       Float?
+  summary     String?
+  createdAt   DateTime      @default(now())
+
+  @@index([userId, period, periodStart])
+  @@map("insights")
+}
+
+enum RecommendationStatus {
+  PENDING
+  ACCEPTED
+  DISMISSED
+  EXPIRED
+}
+
+model Recommendation {
+  id               String                @id @default(uuid())
+  userId           String
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title            String
+  description      String
+  /// AutomationAction[] this recommendation would create if accepted
+  suggestedActions Json
+  status           RecommendationStatus  @default(PENDING)
+  createdAt        DateTime              @default(now())
+  respondedAt      DateTime?
+
+  @@index([userId, status])
+  @@map("recommendations")
+}
+
+model UserPreferences {
+  userId               String   @id
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quietHoursStart      String?
+  quietHoursEnd        String?
+  notificationsEnabled Boolean  @default(true)
+  automationsEnabled   Boolean  @default(true)
+  preferredUnits       String   @default("imperial")
+  updatedAt            DateTime @updatedAt
+
+  @@map("user_preferences")
+}

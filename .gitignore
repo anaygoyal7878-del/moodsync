@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+.npm-cache/
+web/.npm-cache/
+
+# Machine-local npm cache override (sandbox workaround, not project config)
+.npmrc
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment / secrets — never commit real credentials
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Prisma
+database/prisma/migrations/dev.db*
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Claude Code local session settings (personal, not project config)
+.claude/settings.local.json
+
+# Test artifacts
+coverage/
+
+# Vite (existing web prototype)
+web/dist/
+web/.npm-cache/
+web/.npmrc
+
+# Swift Package Manager (existing native MoodSyncCore package)
+.build/
+.swiftpm/
+*.xcodeproj
+
