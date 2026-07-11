@@ -60,6 +60,50 @@ work targets its replacement, the Google Health API, instead.
   user-facing product it replaces, but the client targets Google Health
   API endpoints).
 
+#### REST implementation details (verified for Milestone 7a)
+
+Confirmed directly against `developers.google.com/health/*` (scopes,
+data-types, and REST/RPC reference pages) and the live Discovery document
+at `https://health.googleapis.com/$discovery/rest?version=v4`:
+
+- **Base URL**: `https://health.googleapis.com`
+- **Resource path**: `users/{user}/dataTypes/{dataType}/dataPoints`,
+  `{dataType}` is kebab-case. Confirmed IDs used here: `heart-rate`,
+  `daily-resting-heart-rate`, `sleep`, `steps`, `total-calories`.
+- **Aggregation** (`steps`, `heart-rate`, `total-calories`): `POST
+  /v4/users/{user}/dataTypes/{dataType}/dataPoints:dailyRollUp` with body
+  `{ range: { start: CivilDateTime, end: CivilDateTime }, windowSizeDays }`.
+  Response: `{ rollupDataPoints: [{ civilStartTime, civilEndTime, steps?:
+  { countSum }, heartRate?: { bpmMin, bpmMax, bpmAvg }, totalCalories?:
+  { kcalSum } }] }`. `CivilDateTime` is `{ year, month, day, hour, minute,
+  second, nanos }`. Field casing (snake_case in the proto reference →
+  lowerCamelCase in JSON) follows protobuf's standard JSON mapping, which
+  is universal across all Google APIs, not something specific to this one.
+- **Daily granularity, no rollup needed** (`daily-resting-heart-rate`):
+  `GET /v4/users/{user}/dataTypes/daily-resting-heart-rate/dataPoints` —
+  each point's `data.dailyRestingHeartRate` is `{ date, beatsPerMinute }`.
+- **Sleep** (`sleep`): `GET .../dataTypes/sleep/dataPoints` — each point's
+  `data.sleep` is `{ startTime, endTime, duration, sleepType,
+  sleepStages[], sleepSummary: { stageSummary: [{ sleepStageType:
+  'AWAKE'|'LIGHT'|'DEEP'|'REM', totalDuration }] }, ... }`. **There is no
+  single sleep score/efficiency field** in this API (unlike WHOOP's
+  `sleep_performance_percentage`) — `sleepScore` is computed here as
+  sleep efficiency (`1 - awakeDuration/totalDuration`, ×100), a standard
+  published sleep-medicine metric, not an invented one; see
+  `integrations/fitbit/src/normalize.ts`.
+- **Uncertain, flagged rather than assumed**: the exact `filter` query
+  string field path for `list` requests on `daily-resting-heart-rate` and
+  `sleep` (only one worked filter example was found in the docs, for
+  `exercise`: `exercise.interval.civil_start_time >= "..."`). This
+  integration follows that same `{dataType}.{field} {op} {value}` pattern
+  by inference — worth a live-sandbox-account spot check before trusting
+  non-default page sizes or tight date windows in production, same
+  caveat style as WHOOP's pagination note above.
+- **`providerUserId`**: not populated for this connection. Google Health
+  exposes `users.getProfile`/`users.getIdentity`, but their response
+  shapes weren't independently confirmed and the field is optional
+  downstream — not worth guessing at for a value nothing depends on.
+
 ### WHOOP — build this first
 
 - **Registration**: self-serve at developer.whoop.com, free. Requires the

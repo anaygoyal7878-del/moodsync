@@ -183,7 +183,7 @@ Hue light automatically** — the core product loop, end to end.
   connections/biometrics/rules/history data to check layout and
   interactive elements (dropdowns, action-type-dependent form fields)
 
-## Milestone 7 — Google Health API integration (Fitbit) 📋
+## Milestone 7 — Google Health API integration (Fitbit) ✅ (7a) / ⏳ (7b)
 
 **Why after WHOOP/Hue, not before**: buildable self-serve today, but
 production traffic requires Google's OAuth consent screen verification
@@ -192,14 +192,40 @@ compliance line item (cost + lead time) that should be kicked off in
 parallel with engineering work, not discovered at launch. This milestone
 has two tracked halves:
 
-- 7a — Engineering: OAuth client, data normalization, sync worker
-  (buildable and testable now, against up to 100 sandbox users)
-  Google's own docs also flag the API as "actively evolving" pre-GA —
-  expect to revisit this integration as Google's schema stabilizes.
-- 7b — Compliance: initiate Google's restricted-scope verification +
+- 7a — Engineering ✅: `integrations/fitbit` (kept named for the brand;
+  the client targets Google Health API endpoints — `oauth.ts`,
+  `client.ts`, `normalize.ts`, `sync.ts`, mirroring the WHOOP package's
+  shape), `backend/src/services/fitbitService.ts` + routes at
+  `/api/integrations/google-health/*` (authorize/callback/sync/disconnect,
+  same pattern as WHOOP/Hue), `workers/src/fitbitSync.ts`, and a Fitbit
+  card in the dashboard's Connections section
+- Every endpoint, scope, and schema field used was independently verified
+  against `developers.google.com/health` and the live Discovery document
+  (`https://health.googleapis.com/$discovery/rest?version=v4`) — not
+  assumed from the Milestone 1 research pass, which only had the OAuth
+  endpoints and scope names. Full details in
+  docs/INTEGRATIONS_RESEARCH.md's "REST implementation details" section,
+  including two things deliberately left unresolved rather than guessed:
+  the exact `list` filter syntax for `daily-resting-heart-rate`/`sleep`
+  (inferred from the one confirmed `exercise` filter example), and
+  `Sleep.startTime`/`endTime`'s wire shape (a `ObservationSampleTime`
+  message whose JSON representation wasn't found in the docs) — sleep
+  data is normalized from `sleepSummary.stageSummary` only, which does
+  have confirmed field names
+- `sleepScore` for this provider is computed as sleep efficiency (time
+  asleep ÷ time in bed) since Google Health has no single score field
+  like WHOOP's `sleep_performance_percentage` — a standard published
+  sleep-medicine metric, not an invented one. `recoveryScore` and
+  `stressLevel` are left unset, same as WHOOP: no equivalent exists
+- Google's own docs flag the API as "actively evolving" pre-GA — expect
+  to revisit this integration as the schema stabilizes, particularly the
+  two unresolved items above
+- 7b — Compliance ⏳: initiate Google's restricted-scope verification +
   CASA assessment. **This has an external timeline MoodSync doesn't
-  control — do not commit to a production launch date until 7b's actual
-  turnaround is known.**
+  control and is a real-world business process, not an engineering task —
+  do not commit to a production launch date until 7b's actual turnaround
+  is known.** Until then this integration works for up to 100 sandbox
+  users, which is sufficient for a beta.
 
 ## Milestone 8 — Spotify integration 📋
 

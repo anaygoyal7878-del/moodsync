@@ -4,13 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 
-export function SyncButton() {
+export function SyncButton({ provider }: { provider: "whoop" | "google-health" }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "loading" | "error">("idle");
 
   async function handleSync() {
     setState("loading");
-    const response = await fetch("/api/integrations/whoop/sync", { method: "POST" });
+    const response = await fetch(`/api/integrations/${provider}/sync`, { method: "POST" });
     setState(response.ok ? "idle" : "error");
     router.refresh();
   }

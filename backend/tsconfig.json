@@ -11,6 +11,7 @@
     { "path": "../database" },
     { "path": "../ai" },
     { "path": "../integrations/whoop" },
-    { "path": "../integrations/hue" }
+    { "path": "../integrations/hue" },
+    { "path": "../integrations/fitbit" }
   ]
 }

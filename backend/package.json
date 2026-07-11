@@ -16,6 +16,7 @@
     "@fastify/sensible": "^6.0.2",
     "@moodsync/ai": "*",
     "@moodsync/database": "*",
+    "@moodsync/integration-fitbit": "*",
     "@moodsync/integration-hue": "*",
     "@moodsync/integration-whoop": "*",
     "@moodsync/shared": "*",

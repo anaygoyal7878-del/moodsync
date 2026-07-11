@@ -1,6 +1,6 @@
 import { proxyToBackend } from "@/lib/proxy";
 
-const DISCONNECTABLE_PROVIDERS = ["whoop", "hue"] as const;
+const DISCONNECTABLE_PROVIDERS = ["whoop", "hue", "google-health"] as const;
 type DisconnectableProvider = (typeof DISCONNECTABLE_PROVIDERS)[number];
 
 function isDisconnectable(value: string): value is DisconnectableProvider {

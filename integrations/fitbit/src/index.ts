@@ -18,3 +18,19 @@ export const fitbitIntegrationStatus: IntegrationStatus = {
   displayName: 'Fitbit (via Google Health)',
   availability: 'available',
 };
+
+export {
+  GOOGLE_HEALTH_SCOPES,
+  buildGoogleHealthAuthorizationUrl,
+  exchangeGoogleHealthAuthorizationCode,
+  refreshGoogleHealthToken,
+  GoogleHealthOAuthError,
+  type GoogleHealthOAuthConfig,
+  type GoogleHealthTokenResponse,
+} from './oauth.js';
+
+export { GoogleHealthClient, GoogleHealthApiError } from './client.js';
+
+export { normalizeGoogleHealthData } from './normalize.js';
+
+export { fetchAndNormalizeGoogleHealthData } from './sync.js';
