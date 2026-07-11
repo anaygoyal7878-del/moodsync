@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.js';
 import meRoutes from './routes/me.js';
 import whoopRoutes from './routes/integrations/whoop.js';
 import hueRoutes from './routes/integrations/hue.js';
+import automationRuleRoutes from './routes/automationRules.js';
 
 export async function buildServer() {
   const app = Fastify({ loggerInstance: logger, trustProxy: true });
@@ -39,6 +40,7 @@ export async function buildServer() {
   await app.register(meRoutes, { prefix: '/api' });
   await app.register(whoopRoutes, { prefix: '/api' });
   await app.register(hueRoutes, { prefix: '/api' });
+  await app.register(automationRuleRoutes, { prefix: '/api' });
 
   return app;
 }

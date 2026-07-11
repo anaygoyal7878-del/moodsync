@@ -1,5 +1,6 @@
 import { wearableConnectionRepository, oauthTokenRepository, biometricReadingRepository } from '@moodsync/database';
 import { fetchAndNormalizeWhoopData, refreshWhoopToken, type WhoopOAuthConfig } from '@moodsync/integration-whoop';
+import { dispatchForReading } from '@moodsync/ai';
 
 /**
  * Standalone entrypoint (not a long-running poll loop): syncs every active
@@ -68,6 +69,12 @@ async function main() {
 
       const inserted = await biometricReadingRepository.bulkInsert(readings);
       await wearableConnectionRepository.markSynced(connection.id);
+
+      if (inserted > 0) {
+        const latest = await biometricReadingRepository.findLatestNormalized(connection.userId);
+        if (latest) await dispatchForReading(latest.reading, latest.id);
+      }
+
       console.log(`[whoop-sync] user=${connection.userId} inserted=${inserted}`);
       succeeded++;
     } catch (error) {

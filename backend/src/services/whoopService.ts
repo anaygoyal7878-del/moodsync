@@ -10,6 +10,7 @@ import { env } from '../config/env.js';
 import { generatePkcePair } from '../lib/pkce.js';
 import { createOAuthState, verifyOAuthState } from '../lib/oauthState.js';
 import { wearableConnectionRepository, oauthTokenRepository, biometricReadingRepository } from '@moodsync/database';
+import { dispatchForReading } from '@moodsync/ai';
 
 export class WhoopNotConfiguredError extends Error {
   constructor() {
@@ -106,6 +107,16 @@ export const whoopService = {
     const readings = await fetchAndNormalizeWhoopData({ accessToken, userId, sinceDays: days });
     const inserted = await biometricReadingRepository.bulkInsert(readings);
     await wearableConnectionRepository.markSynced(connection.id);
+
+    // Automations react to the user's *current* state, not backfilled
+    // history — dispatching once per historical reading in the sync
+    // window would fire the same rule repeatedly for old data. Only the
+    // latest reading after this sync triggers evaluation.
+    if (inserted > 0) {
+      const latest = await biometricReadingRepository.findLatestNormalized(userId);
+      if (latest) await dispatchForReading(latest.reading, latest.id);
+    }
+
     return inserted;
   },
 };

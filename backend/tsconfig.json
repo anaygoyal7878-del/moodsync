@@ -9,6 +9,7 @@
   "references": [
     { "path": "../shared" },
     { "path": "../database" },
+    { "path": "../ai" },
     { "path": "../integrations/whoop" },
     { "path": "../integrations/hue" }
   ]

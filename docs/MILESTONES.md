@@ -85,15 +85,35 @@ automated action" loop before investing in the more gated integrations.
   remote specifically — spot-check against a live Hue developer account
   before this integration's first real end-to-end test
 
-## Milestone 4 — Decision engine v2: actions + automation history 📋
+## Milestone 4 — Decision engine v2: actions + automation history ✅
 
-- Wire `ai/` rule evaluation to real actions: on each new
-  `BiometricReading`, evaluate the user's `AutomationRule`s, enforce
-  per-rule cooldown (query `AutomationExecutionLog`), dispatch matching
-  actions to the relevant integration package, write the outcome back to
-  `AutomationExecutionLog`
-- This is the first milestone where WHOOP recovery data can actually
-  change a Hue light automatically — the core product loop
+**This is the milestone where WHOOP recovery data can actually change a
+Hue light automatically** — the core product loop, end to end.
+
+- `ai/src/dispatch.ts`: `dispatchForReading` — evaluates a user's enabled
+  rules against one biometric reading (`evaluateRules`, already unit
+  tested from Milestone 1), skips any rule still in cooldown
+  (`isWithinCooldown`, pure and unit tested), executes matching actions,
+  and records every outcome (executed, skipped, *and* failed — not just
+  successes) to `AutomationExecutionLog`
+- `ai/src/hueActionExecutor.ts`: executes `hue.set_scene`,
+  `hue.set_brightness`, `hue.set_color_temperature` with per-action-type
+  param validation and the same transparent token-refresh treatment as
+  the rest of the Hue integration. Spotify/notification actions fail
+  loudly with "not yet implemented" rather than silently no-op'ing
+- Only reacts to a connection's *latest* reading after a sync, not every
+  historical reading in a backfill window — otherwise reconnecting a
+  wearable would replay days of rule firings at once
+- Wired into both the backend's manual "sync now" endpoint and the
+  standalone `workers/src/whoopSync.ts`, so scheduled and on-demand syncs
+  drive automation identically
+- Automation rules CRUD (`/api/automation-rules`) and history
+  (`/api/automation-history`) endpoints, backend-owned Zod validation for
+  every condition field/operator and action type
+- `database`: `automationRuleRepository` and
+  `automationExecutionLogRepository`, ownership-safe updates/deletes
+  (`updateMany`/`deleteMany` scoped to `{id, userId}`, not a
+  check-then-trust pattern)
 
 ## Milestone 5 — Frontend foundation 📋
 

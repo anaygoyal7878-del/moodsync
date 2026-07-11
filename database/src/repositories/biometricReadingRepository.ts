@@ -1,8 +1,8 @@
 import { prisma } from '../prismaClient.js';
 import type { WearableProvider } from '@prisma/client';
-import type { NormalizedBiometricReading } from '@moodsync/shared';
+import type { NormalizedBiometricReading, WearableProviderId } from '@moodsync/shared';
 
-function toProviderEnum(provider: NormalizedBiometricReading['provider']): WearableProvider {
+function toProviderEnum(provider: WearableProviderId): WearableProvider {
   switch (provider) {
     case 'whoop':
       return 'WHOOP';
@@ -11,6 +11,21 @@ function toProviderEnum(provider: NormalizedBiometricReading['provider']): Weara
     case 'garmin':
       return 'GARMIN';
   }
+}
+
+function toProviderId(provider: WearableProvider): WearableProviderId {
+  switch (provider) {
+    case 'WHOOP':
+      return 'whoop';
+    case 'GOOGLE_HEALTH':
+      return 'google_health';
+    case 'GARMIN':
+      return 'garmin';
+  }
+}
+
+async function findLatest(userId: string) {
+  return prisma.biometricReading.findFirst({ where: { userId }, orderBy: { timestamp: 'desc' } });
 }
 
 export const biometricReadingRepository = {
@@ -39,7 +54,30 @@ export const biometricReadingRepository = {
     return result.count;
   },
 
-  async findLatest(userId: string) {
-    return prisma.biometricReading.findFirst({ where: { userId }, orderBy: { timestamp: 'desc' } });
+  findLatest,
+
+  /** Same as `findLatest` but converted back to the domain shape — what
+   * the decision engine (`@moodsync/ai`) consumes after a sync run, so it
+   * never has to know about Prisma's enum/null representation. */
+  async findLatestNormalized(userId: string): Promise<{ id: string; reading: NormalizedBiometricReading } | null> {
+    const row = await findLatest(userId);
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      reading: {
+        provider: toProviderId(row.provider),
+        userId: row.userId,
+        timestamp: row.timestamp.toISOString(),
+        heartRate: row.heartRate ?? undefined,
+        restingHeartRate: row.restingHeartRate ?? undefined,
+        sleepScore: row.sleepScore ?? undefined,
+        recoveryScore: row.recoveryScore ?? undefined,
+        stressLevel: row.stressLevel ?? undefined,
+        activityLevel: row.activityLevel ?? undefined,
+        steps: row.steps ?? undefined,
+        calories: row.calories ?? undefined,
+      },
+    };
   },
 };
