@@ -261,12 +261,72 @@ Same two-track structure as Milestone 7:
   the practical ceiling for the foreseeable future, not a temporary
   formality.
 
-## Milestone 9 — Insights & analytics 📋
+## Milestone 9 — Insights & analytics ✅
 
-Daily/weekly insight generation (`Insight` model already exists from
-Milestone 1) — trend computation over `BiometricReading` history,
-automation-effectiveness scoring (did a triggered automation correlate
-with an improved subsequent reading), surfaced in the dashboard.
+- `GET /api/insights` (`backend/src/api/routes/dashboard.ts`): computed
+  live from real `BiometricReading`/`AutomationRule`/`AutomationExecutionLog`
+  data on each request — not a scheduled job writing into the `Insight`
+  model. No cron/worker scheduler exists yet to populate that table on a
+  cadence, and adding one just to cache a value that's cheap to compute
+  live would be premature infrastructure; revisit if computing insights
+  live ever becomes a real cost at scale.
+- `ai/src/insights.ts` (pure, unit-tested — mirrors `ruleEngine.ts`'s
+  shape): `computeTrends` splits a reading window in half by count and
+  compares per-metric averages (skips a metric missing from either half
+  rather than fabricating a trend from partial data). `computeAutomationEffectiveness`
+  compares each `EXECUTED` rule firing's trigger reading against the next
+  reading afterward for the rule's primary condition field, classifying
+  "improvement" by the condition's own operator (a `lt` rule wanted the
+  value to rise, a `gt` rule wanted it to fall). Explicitly presented as
+  correlation, not a controlled experiment — the UI says so.
+- `database`: `biometricReadingRepository.listRecentNormalizedWithId`
+  (same window as the existing history query, but keeps row ids and
+  returns oldest-first — what effectiveness scoring needs to look up a
+  trigger reading and find the next one chronologically).
+- Dashboard: new `InsightsSection` — trend cards with a direction arrow,
+  and a per-rule effectiveness bar. Shows a real "not enough data yet"
+  empty state rather than sample numbers when there's no history.
+
+## Post-milestone polish pass ✅
+
+Not a numbered milestone — a focused reliability/UX pass across what M1-9
+had already built, prompted by a request to make the product feel
+production-ready. Scoped down from a much larger ask (new unresearched
+integrations, a fake-data "demo mode" mixed into the real dashboard) that
+would have violated this project's own rules; see the scoping conversation
+for what was deliberately left out and why.
+
+- **Fixed a real bug**: OAuth connect failures redirected to
+  `/dashboard?error={provider}_unavailable`, but nothing read that query
+  param — the error was silently dropped. Added `ConnectErrorBanner`.
+- **Connection status UX**: `ConnectionsSection` only ever distinguished
+  ACTIVE vs. not before. Now shows EXPIRED/ERROR/REVOKED distinctly (via
+  `ConnectionStatusBadge`) with a "Reconnect" CTA for EXPIRED/ERROR
+  (same OAuth flow, different fix) vs. a plain "Connect" for REVOKED.
+- **UI polish**: landing-page entrance animation (`prefers-reduced-motion`-
+  aware, pure CSS), corrected stale copy (Garmin/Ecobee said "Coming
+  soon" — now "Blocked upstream," matching how the rest of this doc
+  describes them; integration/user counts updated to reflect Fitbit and
+  Spotify actually shipping), a `dashboard/loading.tsx` skeleton for the
+  page's parallel backend fetches, shared `metrics.ts` label/unit helpers
+  (removes duplication between `BiometricsSection` and `InsightsSection`).
+- **`/demo` route**: a self-contained, clearly-labeled-simulated public
+  page (`components/demo/DemoExperience.tsx`) animating the one scenario
+  this product actually supports today — a WHOOP recovery drop matching
+  a rule, dimming Hue lights, switching a Spotify playlist, and logging
+  the result — via plain CSS transitions and React state, no video/canvas
+  library. Deliberately kept separate from the authenticated dashboard,
+  which stays 100% real-data-only per this project's rule since
+  Milestone 5 ("a beautiful frontend with nothing real to display isn't
+  a demo, it's a mockup"). Auto-advances but respects
+  `prefers-reduced-motion` and offers manual pause/back/next controls.
+- **Explicitly out of scope for this pass** (flagged rather than
+  attempted): Apple Health, Oura, and a live Garmin integration — none
+  are research-verified against this codebase's standards, and Garmin's
+  developer program is still documented as blocked. Battery-percentage
+  display for connected devices — not confirmed as exposed by any of the
+  four integrated APIs' verified endpoints; would need its own research
+  pass before being added, not assumed to exist.
 
 ## Blocked / revisit later ⏳
 

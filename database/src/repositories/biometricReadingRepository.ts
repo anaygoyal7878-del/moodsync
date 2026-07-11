@@ -94,4 +94,20 @@ export const biometricReadingRepository = {
     });
     return rows.map(toNormalized);
   },
+
+  /** Same window as `listRecentNormalized`, but keeps each row's id and
+   * returns oldest-first — what automation-effectiveness scoring needs to
+   * look up a rule execution's trigger reading and find the next reading
+   * chronologically after it (see `ai/src/insights.ts`). */
+  async listRecentNormalizedWithId(
+    userId: string,
+    sinceDays: number,
+  ): Promise<Array<{ id: string; reading: NormalizedBiometricReading }>> {
+    const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
+    const rows = await prisma.biometricReading.findMany({
+      where: { userId, timestamp: { gte: since } },
+      orderBy: { timestamp: 'asc' },
+    });
+    return rows.map((row) => ({ id: row.id, reading: toNormalized(row) }));
+  },
 };

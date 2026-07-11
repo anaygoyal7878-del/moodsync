@@ -11,19 +11,22 @@ export function Nav() {
         </Link>
 
         <nav className="hidden items-center gap-8 text-sm text-ink-secondary sm:flex" aria-label="Primary">
-          <Link href="#features" className="hover:text-ink">
+          <Link href="#features" className="transition-colors hover:text-ink">
             Features
           </Link>
-          <Link href="#integrations" className="hover:text-ink">
+          <Link href="#integrations" className="transition-colors hover:text-ink">
             Integrations
           </Link>
-          <Link href="#pricing" className="hover:text-ink">
+          <Link href="#pricing" className="transition-colors hover:text-ink">
             Pricing
+          </Link>
+          <Link href="/demo" className="transition-colors hover:text-ink">
+            Demo
           </Link>
         </nav>
 
         <div className="flex items-center gap-3">
-          <Link href="/login" className="text-sm font-medium text-ink-secondary hover:text-ink">
+          <Link href="/login" className="text-sm font-medium text-ink-secondary transition-colors hover:text-ink">
             Log in
           </Link>
           <Link href="/signup">

@@ -44,3 +44,26 @@ export interface AutomationHistoryEntry {
 }
 
 export type { AutomationRuleDefinition };
+
+export interface TrendResult {
+  metric: string;
+  current: number;
+  previous: number;
+  delta: number;
+  direction: "up" | "down" | "flat";
+}
+
+export interface AutomationEffectivenessResult {
+  ruleId: string;
+  ruleName: string;
+  metric: string;
+  executedCount: number;
+  comparableCount: number;
+  improvedCount: number;
+  effectivenessRate: number | null;
+}
+
+export interface InsightsResponse {
+  trends: TrendResult[];
+  automationEffectiveness: AutomationEffectivenessResult[];
+}

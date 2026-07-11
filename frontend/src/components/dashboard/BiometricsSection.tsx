@@ -1,15 +1,16 @@
 import { Card } from "@/components/ui/Card";
+import { metricLabel, METRIC_UNITS } from "@/lib/metrics";
 import type { NormalizedBiometricReading } from "@moodsync/shared";
 
-const METRICS: Array<{ key: keyof NormalizedBiometricReading; label: string; unit: string }> = [
-  { key: "recoveryScore", label: "Recovery", unit: "" },
-  { key: "sleepScore", label: "Sleep", unit: "" },
-  { key: "heartRate", label: "Heart rate", unit: "bpm" },
-  { key: "restingHeartRate", label: "Resting HR", unit: "bpm" },
-  { key: "stressLevel", label: "Stress", unit: "" },
-  { key: "activityLevel", label: "Activity", unit: "" },
-  { key: "steps", label: "Steps", unit: "" },
-  { key: "calories", label: "Calories", unit: "kcal" },
+const METRIC_ORDER: Array<keyof NormalizedBiometricReading> = [
+  "recoveryScore",
+  "sleepScore",
+  "heartRate",
+  "restingHeartRate",
+  "stressLevel",
+  "activityLevel",
+  "steps",
+  "calories",
 ];
 
 export function BiometricsSection({
@@ -24,20 +25,19 @@ export function BiometricsSection({
       <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Today&apos;s biometrics</h2>
 
       {!latest ? (
-        <Card>
-          <p className="text-sm text-ink-secondary">
-            No biometric data yet. Connect a wearable and sync to see readings here.
-          </p>
+        <Card className="flex flex-col items-start gap-1.5 py-6">
+          <p className="text-sm font-medium text-ink">No biometric data yet</p>
+          <p className="text-sm text-ink-secondary">Connect a wearable and sync to see readings here.</p>
         </Card>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {METRICS.filter((m) => latest[m.key] !== undefined).map((m) => (
-              <Card key={m.key} className="py-4">
-                <p className="text-xs uppercase tracking-wide text-ink-muted">{m.label}</p>
+            {METRIC_ORDER.filter((key) => latest[key] !== undefined).map((key) => (
+              <Card key={key} className="py-4 transition-colors hover:bg-surface-hover">
+                <p className="text-xs uppercase tracking-wide text-ink-muted">{metricLabel(key)}</p>
                 <p className="mt-1 text-2xl font-semibold tabular-nums">
-                  {String(latest[m.key])}
-                  {m.unit && <span className="ml-1 text-sm font-normal text-ink-secondary">{m.unit}</span>}
+                  {String(latest[key])}
+                  {METRIC_UNITS[key] && <span className="ml-1 text-sm font-normal text-ink-secondary">{METRIC_UNITS[key]}</span>}
                 </p>
               </Card>
             ))}
