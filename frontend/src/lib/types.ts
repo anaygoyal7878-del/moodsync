@@ -7,6 +7,13 @@ export interface WearableConnectionSummary {
   provider: "WHOOP" | "GOOGLE_HEALTH" | "GARMIN";
   status: ConnectionStatus;
   lastSyncedAt: string | null;
+  /** Only populated for providers whose API exposes it — confirmed
+   * present for Fitbit (Google Health's `pairedDevices` resource),
+   * confirmed absent from WHOOP's public API. Always null otherwise,
+   * not a loading/unknown state. */
+  deviceName: string | null;
+  batteryLevel: number | null;
+  batteryStatus: string | null;
 }
 
 export interface DeviceSummary {

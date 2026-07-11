@@ -9,14 +9,18 @@
 const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
-/** Three scope bundles cover every metric this integration reads (steps
+/** Four scope bundles cover every metric this integration reads (steps
  * under activity_and_fitness, heart rate under health_metrics_and_measurements,
- * sleep under its own dedicated bundle) — see docs/INTEGRATIONS_RESEARCH.md
- * for the full 15-scope list this was narrowed down from. */
+ * sleep under its own dedicated bundle, device battery/name under
+ * settings — confirmed as `pairedDevices.list`'s specific required scope,
+ * not bundled with any of the other three) — see
+ * docs/INTEGRATIONS_RESEARCH.md for the full 15-scope list this was
+ * narrowed down from. */
 export const GOOGLE_HEALTH_SCOPES = [
   'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
   'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
   'https://www.googleapis.com/auth/googlehealth.sleep.readonly',
+  'https://www.googleapis.com/auth/googlehealth.settings.readonly',
 ] as const;
 
 export interface GoogleHealthOAuthConfig {

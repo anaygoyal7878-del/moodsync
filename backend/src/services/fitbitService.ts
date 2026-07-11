@@ -3,6 +3,8 @@ import {
   exchangeGoogleHealthAuthorizationCode,
   refreshGoogleHealthToken,
   fetchAndNormalizeGoogleHealthData,
+  GoogleHealthClient,
+  pickPrimaryDevice,
   type GoogleHealthOAuthConfig,
 } from '@moodsync/integration-fitbit';
 import { env } from '../config/env.js';
@@ -98,6 +100,7 @@ export const fitbitService = {
     const readings = await fetchAndNormalizeGoogleHealthData({ accessToken, userId, sinceDays: days });
     const inserted = await biometricReadingRepository.bulkInsert(readings);
     await wearableConnectionRepository.markSynced(connection.id);
+    await syncDeviceInfo(connection.id, accessToken);
 
     if (inserted > 0) {
       const latest = await biometricReadingRepository.findLatestNormalized(userId);
@@ -107,3 +110,26 @@ export const fitbitService = {
     return inserted;
   },
 };
+
+/** Best-effort: a device-info failure shouldn't fail the whole sync (the
+ * biometric readings are the part that matters for automations) — logged
+ * and swallowed rather than thrown. Picks the first TRACKER-type paired
+ * device as "the" device for this connection; a user with both a tracker
+ * and a smart scale only sees the tracker's battery, which is what
+ * they'd expect from a wearable-connections list. */
+async function syncDeviceInfo(connectionId: string, accessToken: string): Promise<void> {
+  try {
+    const client = new GoogleHealthClient(accessToken);
+    const devices = await client.listPairedDevices();
+    const device = pickPrimaryDevice(devices);
+    if (!device) return;
+
+    await wearableConnectionRepository.updateDeviceInfo(connectionId, {
+      deviceName: device.deviceVersion,
+      batteryLevel: device.batteryLevel,
+      batteryStatus: device.batteryStatus,
+    });
+  } catch (error) {
+    console.error(`[fitbitService] Failed to sync device info for connection ${connectionId}:`, error);
+  }
+}

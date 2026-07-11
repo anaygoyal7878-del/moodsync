@@ -14,6 +14,28 @@ function formatLastSynced(lastSyncedAt: string | null): string {
   return `Last synced ${new Date(lastSyncedAt).toLocaleString()}`;
 }
 
+/** Renders nothing when the provider doesn't expose device/battery info
+ * (e.g. WHOOP's public API has no battery endpoint) — this is a real
+ * absence, not a loading state, so there's no placeholder to show. */
+function DeviceInfo({ connection }: { connection: WearableConnectionSummary }) {
+  if (!connection.deviceName && connection.batteryLevel === null) return null;
+
+  return (
+    <p className="mt-1 flex items-center gap-1.5 text-xs text-ink-muted">
+      {connection.deviceName && <span>{connection.deviceName}</span>}
+      {connection.batteryLevel !== null && (
+        <span className="inline-flex items-center gap-1">
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${connection.batteryLevel <= 20 ? "bg-red-400" : connection.batteryLevel <= 50 ? "bg-amber-400" : "bg-brand"}`}
+            aria-hidden="true"
+          />
+          {connection.batteryLevel}% battery
+        </span>
+      )}
+    </p>
+  );
+}
+
 function ConnectAction({
   connection,
   connectHref,
@@ -77,6 +99,7 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
           ) : (
             <p className="mt-1 text-xs text-ink-muted">Not connected</p>
           )}
+          {whoop?.status === "ACTIVE" && <DeviceInfo connection={whoop} />}
         </div>
         <ConnectAction
           connection={whoop}
@@ -100,6 +123,7 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
           ) : (
             <p className="mt-1 text-xs text-ink-muted">Not connected</p>
           )}
+          {fitbit?.status === "ACTIVE" && <DeviceInfo connection={fitbit} />}
         </div>
         <ConnectAction
           connection={fitbit}

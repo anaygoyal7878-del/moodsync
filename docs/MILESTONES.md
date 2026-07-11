@@ -323,10 +323,58 @@ for what was deliberately left out and why.
 - **Explicitly out of scope for this pass** (flagged rather than
   attempted): Apple Health, Oura, and a live Garmin integration — none
   are research-verified against this codebase's standards, and Garmin's
-  developer program is still documented as blocked. Battery-percentage
-  display for connected devices — not confirmed as exposed by any of the
-  four integrated APIs' verified endpoints; would need its own research
-  pass before being added, not assumed to exist.
+  developer program is still documented as blocked.
+
+## Real end-to-end verification + battery display ✅
+
+A second focused pass, prompted by discovering that "create account" did
+nothing in the hosted preview — because only the frontend was running,
+with no backend and no database behind it. Two things came out of
+investigating that properly instead of just explaining the limitation:
+
+- **Local Postgres, for real, in this environment**: no Docker/Homebrew
+  available here, so this used the `embedded-postgres` npm package (a
+  real, standard Postgres 18.4 binary, not an emulation) to run an actual
+  local database. `npx prisma migrate dev` against it created the
+  project's first real migration (previously the schema had only ever
+  been validated by `prisma generate`, never actually migrated onto a
+  live database). The real backend was then booted against this database
+  with generated secrets.
+- **Genuinely verified, not simulated** (browser-driven against the real
+  running stack, not mocked data): signup creates a real user row and
+  returns real JWTs; login/logout/session-persistence-across-tabs all
+  work; a wrong password returns a correct, non-leaky "Invalid email or
+  password" instead of a stack trace; creating and deleting an automation
+  rule round-trips through the real database; clicking "Connect WHOOP"
+  with no `WHOOP_CLIENT_ID` set correctly 503s and the `ConnectErrorBanner`
+  built in the prior pass renders the intended message end-to-end, not
+  just against mock props.
+- **What's still not verifiable without real credentials**: completing
+  an actual third-party OAuth consent screen (WHOOP/Google/Hue/Spotify)
+  requires a registered developer app with real client ID/secret for
+  each platform — MoodSync's own code correctly initiates and handles
+  the redirect/callback/error paths (verified above), but the provider
+  side of the handshake needs real accounts this environment doesn't
+  have. This is an external dependency, not a code gap.
+- **Battery display for Fitbit — real, not the "not confirmed" punt from
+  the prior pass**: re-researched rather than re-asserting the earlier
+  answer. Google Health's `users.pairedDevices` resource genuinely
+  exposes `batteryLevel`/`batteryStatus`/`deviceVersion` (confirmed
+  against the live REST reference, including the specific
+  `googlehealth.settings.readonly` scope it requires — not one of the
+  three scopes already requested for biometric data). Implemented as a
+  new `WearableConnection.deviceName`/`batteryLevel`/`batteryStatus`
+  migration, populated by `fitbitService.syncConnection` and the
+  standalone worker, surfaced in `ConnectionsSection` with a color-coded
+  indicator. Verified against the real local database (a test row
+  inserted directly via Prisma — not a real OAuth-synced device, since
+  that still requires a real Fitbit account — round-tripped correctly
+  through `/api/connections` into the real running UI, then cleaned up).
+  **WHOOP's public API has no battery endpoint at all** (re-confirmed
+  directly against their live reference — eight resource categories,
+  none battery-related) — this is a real capability gap in WHOOP's API,
+  not missing work. Hue's battery field applies to sensors/switches, not
+  the light bulbs this integration syncs — not applicable here either.
 
 ## Blocked / revisit later ⏳
 

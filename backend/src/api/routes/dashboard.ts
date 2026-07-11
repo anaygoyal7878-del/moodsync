@@ -25,6 +25,9 @@ export default async function dashboardRoutes(app: FastifyInstance) {
         provider: c.provider,
         status: c.status,
         lastSyncedAt: c.lastSyncedAt,
+        deviceName: c.deviceName,
+        batteryLevel: c.batteryLevel,
+        batteryStatus: c.batteryStatus,
       })),
       smartHome: smartHome.map((c) => ({
         id: c.id,

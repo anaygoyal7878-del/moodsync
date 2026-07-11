@@ -79,6 +79,29 @@ export interface SleepDataPoint {
  * instead (see below). */
 export type RollupDataType = 'steps' | 'heart-rate' | 'total-calories';
 
+/** Verified against `users.pairedDevices` in the REST reference — the one
+ * data type this integration reads that isn't a `dataTypes.dataPoints`
+ * resource at all, it's the paired-tracker/scale list itself. */
+export interface PairedDevice {
+  name: string;
+  deviceType: 'TRACKER' | 'SCALE';
+  batteryStatus?: 'High' | 'Medium' | 'Low' | 'Empty';
+  batteryLevel?: number;
+  lastSyncTime?: string;
+  deviceVersion?: string;
+}
+
+/** A user can have both a tracker and a smart scale paired — the tracker
+ * is what a "connections" list means by "the device" (it's the one that
+ * produces the biometric readings this integration syncs), so it's
+ * preferred when present. Pure so it's unit-testable without a network
+ * mock; shared (not duplicated) between the backend service and the
+ * standalone sync worker since it has no deployment-target-specific
+ * dependencies, unlike the token-refresh logic those two do duplicate. */
+export function pickPrimaryDevice(devices: PairedDevice[]): PairedDevice | undefined {
+  return devices.find((d) => d.deviceType === 'TRACKER') ?? devices[0];
+}
+
 export class GoogleHealthClient {
   constructor(private readonly accessToken: string) {}
 
@@ -120,5 +143,10 @@ export class GoogleHealthClient {
     const path = `/users/me/dataTypes/sleep/dataPoints?filter=${encodeURIComponent(filter)}`;
     const { dataPoints } = await this.request<{ dataPoints?: SleepDataPoint[] }>(path);
     return dataPoints ?? [];
+  }
+
+  async listPairedDevices(): Promise<PairedDevice[]> {
+    const { pairedDevices } = await this.request<{ pairedDevices?: PairedDevice[] }>('/users/me/pairedDevices');
+    return pairedDevices ?? [];
   }
 }

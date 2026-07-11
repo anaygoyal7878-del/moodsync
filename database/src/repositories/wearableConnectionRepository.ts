@@ -59,6 +59,23 @@ export const wearableConnectionRepository = {
     await prisma.wearableConnection.update({ where: { id }, data: { lastSyncedAt: new Date() } });
   },
 
+  /** Only Google Health (Fitbit) populates these today — see
+   * `docs/INTEGRATIONS_RESEARCH.md` for why WHOOP never will (no battery
+   * endpoint exists in their public API). */
+  async updateDeviceInfo(
+    id: string,
+    info: { deviceName?: string | undefined; batteryLevel?: number | undefined; batteryStatus?: string | undefined },
+  ): Promise<void> {
+    await prisma.wearableConnection.update({
+      where: { id },
+      data: {
+        deviceName: info.deviceName ?? null,
+        batteryLevel: info.batteryLevel ?? null,
+        batteryStatus: info.batteryStatus ?? null,
+      },
+    });
+  },
+
   async markStatus(id: string, status: ConnectionStatus): Promise<void> {
     await prisma.wearableConnection.update({ where: { id }, data: { status } });
   },

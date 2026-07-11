@@ -1,5 +1,11 @@
 import { wearableConnectionRepository, oauthTokenRepository, biometricReadingRepository } from '@moodsync/database';
-import { fetchAndNormalizeGoogleHealthData, refreshGoogleHealthToken, type GoogleHealthOAuthConfig } from '@moodsync/integration-fitbit';
+import {
+  fetchAndNormalizeGoogleHealthData,
+  refreshGoogleHealthToken,
+  GoogleHealthClient,
+  pickPrimaryDevice,
+  type GoogleHealthOAuthConfig,
+} from '@moodsync/integration-fitbit';
 import { dispatchForReading } from '@moodsync/ai';
 
 /**
@@ -45,6 +51,25 @@ async function getFreshAccessToken(oauthTokenId: string, config: GoogleHealthOAu
   return refreshed.access_token;
 }
 
+/** Same rationale as backend/src/services/fitbitService.ts's equivalent —
+ * best-effort, doesn't fail the sync run over a device-info hiccup. */
+async function syncDeviceInfo(connectionId: string, accessToken: string): Promise<void> {
+  try {
+    const client = new GoogleHealthClient(accessToken);
+    const devices = await client.listPairedDevices();
+    const device = pickPrimaryDevice(devices);
+    if (!device) return;
+
+    await wearableConnectionRepository.updateDeviceInfo(connectionId, {
+      deviceName: device.deviceVersion,
+      batteryLevel: device.batteryLevel,
+      batteryStatus: device.batteryStatus,
+    });
+  } catch (error) {
+    console.error(`[fitbit-sync] Failed to sync device info for connection ${connectionId}:`, error);
+  }
+}
+
 async function main() {
   const config = requireGoogleHealthConfig();
   const connections = await wearableConnectionRepository.listActive('GOOGLE_HEALTH');
@@ -66,6 +91,7 @@ async function main() {
 
       const inserted = await biometricReadingRepository.bulkInsert(readings);
       await wearableConnectionRepository.markSynced(connection.id);
+      await syncDeviceInfo(connection.id, accessToken);
 
       if (inserted > 0) {
         const latest = await biometricReadingRepository.findLatestNormalized(connection.userId);

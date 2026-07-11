@@ -104,6 +104,25 @@ at `https://health.googleapis.com/$discovery/rest?version=v4`:
   shapes weren't independently confirmed and the field is optional
   downstream — not worth guessing at for a value nothing depends on.
 
+#### Device name + battery (verified for the production-polish pass)
+
+Confirmed directly against `developers.google.com/health/reference/rest/v4/users.pairedDevices`:
+
+- **Endpoint**: `GET /v4/users/{user}/pairedDevices` → `{ pairedDevices: PairedDevice[], nextPageToken? }`.
+- **`PairedDevice` fields**: `deviceType` (`TRACKER`|`SCALE`), `batteryStatus`
+  (`High`|`Medium`|`Low`|`Empty`), `batteryLevel` (integer), `deviceVersion`
+  (the actual product name, e.g. "Charge 6" — **not** `name`, which is the
+  resource path like `users/me/pairedDevices/xyz`), `lastSyncTime`,
+  `macAddress`.
+- **Required scope**: `googlehealth.settings.readonly` — confirmed via
+  this method's own "Authorization scopes" section. This is **not** one
+  of the three scopes already requested for biometric data (activity/
+  health-metrics/sleep), so it was added as a fourth scope in
+  `GOOGLE_HEALTH_SCOPES` rather than assumed to be covered.
+- A user can have multiple paired devices (tracker + scale) —
+  `pickPrimaryDevice` prefers the tracker, since that's the device that
+  actually produces the biometric readings this integration syncs.
+
 ### WHOOP — build this first
 
 - **Registration**: self-serve at developer.whoop.com, free. Requires the
@@ -124,6 +143,14 @@ at `https://health.googleapis.com/$discovery/rest?version=v4`:
 - **Open item**: no formally documented App Review/production-approval
   gate was found distinct from sandbox access — confirm current commercial
   ToS terms directly with WHOOP before scaling past a beta cohort.
+- **No battery/device endpoint** (verified for the production-polish
+  pass, re-confirmed directly against `developer.whoop.com/api/`'s live
+  reference): WHOOP's public API exposes exactly eight resource
+  categories — Authentication, Activity ID Mapping, Partner, User, Cycle,
+  Recovery, Sleep, Workout — none of which expose device battery level or
+  status. This is a genuine capability gap in WHOOP's public API, not a
+  gap in this integration's implementation; there is nothing to build
+  here without an undocumented/partner-only endpoint.
 
 ### Garmin — blocked, interface-only for now
 
@@ -212,6 +239,11 @@ Spotify instead; Alexa is not part of the v1 or v2 architecture.**
 - **Capabilities**: brightness, color, scenes, warm/cool color temperature
   — all confirmed available via the Remote API's light/group/scene
   resources.
+- **Battery**: CLIP v2 does report battery level (0-100%) for
+  battery-powered Hue *accessories* — motion sensors, dimmer switches,
+  buttons. It does not apply to the `light` resource this integration
+  actually syncs (bulbs are mains-powered by definition). Not a gap in
+  this integration; there's no battery to display for what it connects.
 
 ### Spotify — build it, but real launch needs approval
 

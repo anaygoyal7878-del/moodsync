@@ -29,7 +29,7 @@ export {
   type GoogleHealthTokenResponse,
 } from './oauth.js';
 
-export { GoogleHealthClient, GoogleHealthApiError } from './client.js';
+export { GoogleHealthClient, GoogleHealthApiError, pickPrimaryDevice, type PairedDevice } from './client.js';
 
 export { normalizeGoogleHealthData } from './normalize.js';
 

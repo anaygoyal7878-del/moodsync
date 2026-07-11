@@ -117,6 +117,18 @@ model WearableConnection {
   oauthTokenId   String?          @unique
   oauthToken     OAuthToken?      @relation(fields: [oauthTokenId], references: [id], onDelete: SetNull)
   lastSyncedAt   DateTime?
+  /// Device name/battery fields are nullable because only some providers'
+  /// APIs expose them — confirmed present for Google Health (Fitbit) via
+  /// `users.pairedDevices` (batteryLevel/batteryStatus/deviceVersion);
+  /// confirmed ABSENT from WHOOP's public API (no battery endpoint exists
+  /// in their documented resource categories). See
+  /// docs/INTEGRATIONS_RESEARCH.md.
+  deviceName     String?
+  /// 0-100, or null if the provider doesn't expose it.
+  batteryLevel   Int?
+  /// Provider's own battery status string (e.g. Fitbit's High/Medium/Low/Empty),
+  /// kept as free text rather than an enum since it's provider-specific.
+  batteryStatus  String?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 

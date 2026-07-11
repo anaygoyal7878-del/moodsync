@@ -57,3 +57,27 @@ npm install
 npm run db:generate
 npm run dev:backend
 ```
+
+### Local database
+
+The backend needs a real Postgres reachable at `DATABASE_URL` (see
+`.env.example`) — `npm run dev:backend` will fail its env validation
+without one. Two ways to get one locally:
+
+- **Docker/Homebrew Postgres, if available**: point `DATABASE_URL` at it
+  and run `npx prisma migrate dev` from `database/`.
+- **No Docker/Homebrew available** (e.g. this sandboxed dev environment):
+  use the `embedded-postgres` npm package, which downloads and runs a
+  real Postgres binary as a subprocess — no system install required.
+  ```js
+  // scratch script, not part of the app — run once to init+start:
+  import EmbeddedPostgres from "embedded-postgres";
+  const pg = new EmbeddedPostgres({ databaseDir: "./pgdata", user: "moodsync", password: "moodsync", port: 5432 });
+  await pg.initialise();
+  await pg.start();
+  await pg.createDatabase("moodsync_dev");
+  ```
+  Then `DATABASE_URL="postgresql://moodsync:moodsync@localhost:5432/moodsync_dev"`,
+  same `prisma migrate dev` step. See `docs/MILESTONES.md`'s "Real
+  end-to-end verification" entry for how this was used to verify the
+  full signup/login/session/logout flow against a genuine database.
