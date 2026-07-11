@@ -3,6 +3,7 @@ import type { NormalizedBiometricReading } from '@moodsync/shared';
 import { evaluateRules } from './ruleEngine.js';
 import { isWithinCooldown } from './cooldown.js';
 import { executeHueAction } from './hueActionExecutor.js';
+import { executeSpotifyAction } from './spotifyActionExecutor.js';
 
 export interface DispatchResult {
   ruleId: string;
@@ -44,11 +45,13 @@ export async function dispatchForReading(
       for (const action of rule.actions) {
         if (action.provider === 'hue') {
           await executeHueAction(reading.userId, action);
+        } else if (action.provider === 'spotify') {
+          await executeSpotifyAction(reading.userId, action);
         } else {
-          // Spotify (Milestone 8) and notification actions aren't
-          // implemented yet — fail loudly rather than silently no-op, so
-          // a user who configured one of these sees it in their
-          // automation history instead of wondering why nothing happened.
+          // Notification actions aren't implemented yet — fail loudly
+          // rather than silently no-op, so a user who configured one
+          // sees it in their automation history instead of wondering why
+          // nothing happened.
           throw new Error(`Provider "${action.provider}" automation dispatch is not yet implemented`);
         }
       }

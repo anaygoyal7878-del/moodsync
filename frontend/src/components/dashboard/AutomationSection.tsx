@@ -14,16 +14,18 @@ export function AutomationSection({
   rules,
   history,
   devices,
+  spotifyConnected,
 }: {
   rules: AutomationRuleDefinition[];
   history: AutomationHistoryEntry[];
   devices: DeviceSummary[];
+  spotifyConnected: boolean;
 }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Automation rules</h2>
-        <NewRuleToggle devices={devices} />
+        <NewRuleToggle devices={devices} spotifyConnected={spotifyConnected} />
       </div>
 
       {rules.length === 0 ? (

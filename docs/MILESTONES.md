@@ -227,19 +227,39 @@ has two tracked halves:
   is known.** Until then this integration works for up to 100 sandbox
   users, which is sufficient for a beta.
 
-## Milestone 8 — Spotify integration 📋
+## Milestone 8 — Spotify integration ✅ (8a) / ⏳ (8b)
 
 Same two-track structure as Milestone 7:
-- 8a — Engineering: OAuth client, playback control via
-  `/me/player/play`, buildable and testable today against the 5-user
-  Development Mode cap. Onboarding UI must surface the Premium
-  requirement — free-tier Spotify accounts cannot have playback started
-  remotely.
-- 8b — Business: request Extended Quota Mode. As of Spotify's April 2025
-  policy, this is a discretionary review for "established, scalable,
-  impactful" apps, not automatic — realistically this application is
-  stronger once MoodSync has real usage to point to, so this may need to
-  wait until after a WHOOP+Hue beta is live.
+
+- 8a — Engineering ✅: `integrations/spotify` (`oauth.ts` — standard
+  Authorization Code Flow with HTTP Basic Auth token exchange, no PKCE,
+  see docs/INTEGRATIONS_RESEARCH.md for why this deviates from every
+  other provider; `client.ts` — `PUT /me/player/play`), wired into the
+  dispatch engine via `ai/src/spotifyActionExecutor.ts` (mirrors
+  `hueActionExecutor.ts`'s transparent-refresh pattern — `spotify.play_playlist`
+  actions now actually execute instead of throwing "not yet
+  implemented"), `backend/src/services/spotifyService.ts` + routes at
+  `/api/integrations/spotify/*` (authorize/callback/disconnect — no
+  sync/device endpoints, since Spotify has no readings to sync and no
+  device state to push), and a Spotify card + rule-builder support in the
+  dashboard. Onboarding UI (both the Connections card and the rule form)
+  surfaces the Premium/active-session requirement — free-tier Spotify
+  accounts cannot have playback started remotely, and nothing plays if no
+  device already has an active session.
+- Every endpoint, scope, and request/response shape was independently
+  verified against developer.spotify.com — not assumed from the
+  Milestone 1 research pass. Full details in
+  docs/INTEGRATIONS_RESEARCH.md's "REST implementation details" section.
+- 8b — Business ⏳: **re-verified for this milestone and found to be a
+  materially bigger blocker than the Milestone 1 research pass
+  documented.** Extended Quota Mode as of Spotify's May 2025 policy
+  requires a legally registered business entity, an already-launched
+  service, and **at least 250,000 monthly active users** — not a
+  discretionary content review MoodSync could plausibly pass pre-launch.
+  There is no realistic path to Extended Quota Mode until well past an
+  initial WHOOP+Hue beta has real usage; Development Mode's 5-user cap is
+  the practical ceiling for the foreseeable future, not a temporary
+  formality.
 
 ## Milestone 9 — Insights & analytics 📋
 

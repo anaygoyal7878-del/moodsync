@@ -12,7 +12,7 @@ Where something is uncertain, it's marked uncertain rather than assumed.
 | **WHOOP** | Open, self-serve, stable | **Build first** — only fully unblocked wearable |
 | **Philips Hue** | Open, self-serve, stable | **Build first** — only fully unblocked smart home platform |
 | **Google Health API** (Fitbit's successor) | Self-serve to start, but Restricted scopes require Google security review for production | Build against it now (sandbox/100 test users), but production launch is gated on a real compliance process — see below |
-| **Spotify** | Self-serve, but Feb 2026 policy changes cap unapproved apps at 5 users | Build it, but real launch needs Spotify's discretionary Extended Quota approval |
+| **Spotify** | Self-serve, but Feb 2026 policy changes cap unapproved apps at 5 users | Build it, but real launch requires 250k+ MAU and a registered business — see below, re-verified for Milestone 8 |
 | **Garmin** | Developer program applications are de facto stalled ("Under Construction" for 2+ months, unofficial) | **Blocked.** Define the integration interface, do not build a live client yet |
 | **Ecobee** | Developer program explicitly closed to new registrations | **Blocked.** Define the integration interface, do not build a live client yet |
 | **Amazon Alexa** | N/A — wrong integration point | **Dropped from the architecture entirely** (see below) |
@@ -216,16 +216,26 @@ Spotify instead; Alexa is not part of the v1 or v2 architecture.**
 ### Spotify — build it, but real launch needs approval
 
 - **Registration**: self-serve at developer.spotify.com/dashboard.
-- **February 2026 policy change** (verified from Spotify's own blog and
-  migration guide): new Development Mode apps are capped at **5
-  authorized users**, require the developer to hold Spotify Premium, and
-  get a reduced endpoint set. This is a hard cap, not a soft warning.
-- **Production gate**: scaling past 5 users requires requesting
-  **Extended Quota Mode** through the dashboard. As of Spotify's April
-  2025 policy update, this is now a discretionary review reserved for
-  apps with "established, scalable, and impactful use cases" — not
-  automatic approval, and no published SLA. **Budget real timeline risk
-  here** — this is closer to an app-store review than a form submission.
+- **February 2026 policy change** (verified from Spotify's own blog,
+  TechCrunch's coverage, and the current `quota-modes` reference page):
+  new Development Mode apps are capped at **5 authorized users** (down
+  from 25), require the app owner's account to hold Spotify Premium
+  (enforced starting March 9, 2026), and unapproved users get a 403 on
+  every request until allowlisted. This is a hard cap, not a soft
+  warning.
+- **Production gate, re-verified for Milestone 8 — corrected from the
+  Milestone 1 research pass**: Extended Quota Mode is not merely a
+  "discretionary content review." As of Spotify's May 2025 policy change,
+  eligibility requires **all** of: a legally registered business entity
+  (applications from individuals are no longer accepted), an active and
+  already-launched service, **at least 250,000 monthly active users**,
+  availability in key Spotify markets, and commercial viability. Review
+  is a 4-step dashboard questionnaire and can take **up to six weeks**.
+  **This is a materially higher bar than originally documented** — a
+  quarter-million MAU requirement means MoodSync has no realistic path to
+  Extended Quota Mode until well past an initial beta, not just "budget
+  timeline risk." Development Mode's 5-user cap is the real ceiling for
+  the foreseeable future.
 - **Playback mechanism**: triggering playback from our backend uses the
   Web API's `/me/player/play` (Spotify Connect control), which requires
   (a) the target user already has an active Spotify session open
@@ -237,6 +247,37 @@ Spotify instead; Alexa is not part of the v1 or v2 architecture.**
 - **Rate limits**: rolling 30-second window, 429 on excess; numeric
   ceiling isn't published and differs materially between Development Mode
   and Extended Quota Mode.
+
+#### REST implementation details (verified for Milestone 8a)
+
+Confirmed directly against developer.spotify.com's "Authorization Code
+Flow," "Refreshing tokens," "Scopes," and "Start/Resume Playback"
+reference pages:
+
+- **OAuth endpoints**: authorize at `https://accounts.spotify.com/authorize`,
+  token exchange/refresh at `https://accounts.spotify.com/api/token`.
+- **Token exchange auth is a genuine deviation from every other provider
+  in this codebase**: Spotify's documented Authorization Code Flow
+  authenticates via an `Authorization: Basic base64(client_id:client_secret)`
+  header on the token request, not `client_id`/`client_secret` as body
+  form fields (which is what WHOOP/Hue/Google Health all use). PKCE is
+  deliberately **not** used for this provider — Spotify documents PKCE as
+  a separate flow for clients that can't hold a secret, authenticated via
+  `client_id` in the body instead of Basic Auth, and nothing in Spotify's
+  docs confirms the two can be combined. See
+  `integrations/spotify/src/oauth.ts` for the full reasoning.
+- **Refresh response**: a new `refresh_token` is not guaranteed on every
+  refresh call — Spotify's own docs say to keep using the existing one
+  when absent. Handled the same way as every other provider's refresh
+  logic in this codebase.
+- **Playback**: `PUT https://api.spotify.com/v1/me/player/play` with an
+  optional `?device_id=` query param (targets the user's active device if
+  omitted) and a JSON body `{ context_uri }` for playlist/album/artist
+  playback. Confirmed response codes: 204 success, 401 unauthorized, 403
+  forbidden (most often `PREMIUM_REQUIRED`), 429 rate limited. The exact
+  error-body `reason` enum (e.g. `NO_ACTIVE_DEVICE`) wasn't independently
+  confirmed, so errors are surfaced as-is rather than parsed into a typed
+  reason.
 
 ### Ecobee — blocked, interface-only for now
 

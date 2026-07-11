@@ -12,6 +12,7 @@
     { "path": "../ai" },
     { "path": "../integrations/whoop" },
     { "path": "../integrations/hue" },
-    { "path": "../integrations/fitbit" }
+    { "path": "../integrations/fitbit" },
+    { "path": "../integrations/spotify" }
   ]
 }

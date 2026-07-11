@@ -25,14 +25,14 @@ const OPERATORS = [
   { value: "eq", label: "equals" },
 ] as const;
 
-// Only Hue action types are offered here: spotify.* and notification.* are
-// modeled in the schema (Milestone 4) but have no executor yet — see
-// ai/src/dispatch.ts. Surfacing them would let a user create a rule that
-// always fails, so they arrive in Milestones 8/9 alongside their executors.
+// notification.* is modeled in the schema (Milestone 4) but has no
+// executor yet — see ai/src/dispatch.ts. Surfacing it would let a user
+// create a rule that always fails, so it arrives alongside Milestone 9.
 const ACTION_TYPES = [
-  { value: "hue.set_scene", label: "Activate a Hue scene" },
-  { value: "hue.set_brightness", label: "Set a light's brightness" },
-  { value: "hue.set_color_temperature", label: "Set a light's color temperature" },
+  { value: "hue.set_scene", label: "Activate a Hue scene", provider: "hue" },
+  { value: "hue.set_brightness", label: "Set a light's brightness", provider: "hue" },
+  { value: "hue.set_color_temperature", label: "Set a light's color temperature", provider: "hue" },
+  { value: "spotify.play_playlist", label: "Play a Spotify playlist", provider: "spotify" },
 ] as const;
 
 type ActionType = (typeof ACTION_TYPES)[number]["value"];
@@ -40,7 +40,15 @@ type ActionType = (typeof ACTION_TYPES)[number]["value"];
 const selectClass =
   "w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink focus:border-line-strong focus:outline-none";
 
-export function RuleForm({ devices, onCreated }: { devices: DeviceSummary[]; onCreated?: () => void }) {
+export function RuleForm({
+  devices,
+  spotifyConnected,
+  onCreated,
+}: {
+  devices: DeviceSummary[];
+  spotifyConnected: boolean;
+  onCreated?: () => void;
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [field, setField] = useState<(typeof BIOMETRIC_FIELDS)[number]>("recoveryScore");
@@ -51,9 +59,14 @@ export function RuleForm({ devices, onCreated }: { devices: DeviceSummary[]; onC
   const [sceneId, setSceneId] = useState("");
   const [brightness, setBrightness] = useState("40");
   const [mirek, setMirek] = useState("370");
+  const [playlistUri, setPlaylistUri] = useState("");
   const [cooldownMinutes, setCooldownMinutes] = useState("30");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const actionProvider = ACTION_TYPES.find((a) => a.value === actionType)?.provider ?? "hue";
+  const needsDevice = actionType === "hue.set_brightness" || actionType === "hue.set_color_temperature";
+  const disabledForMissingConnection = needsDevice ? devices.length === 0 : actionType === "spotify.play_playlist" && !spotifyConnected;
 
   function buildActionParams(): Record<string, unknown> {
     switch (actionType) {
@@ -63,6 +76,8 @@ export function RuleForm({ devices, onCreated }: { devices: DeviceSummary[]; onC
         return { deviceId, brightness: Number(brightness) };
       case "hue.set_color_temperature":
         return { deviceId, mirek: Number(mirek) };
+      case "spotify.play_playlist":
+        return { playlistUri };
     }
   }
 
@@ -78,7 +93,7 @@ export function RuleForm({ devices, onCreated }: { devices: DeviceSummary[]; onC
         name,
         enabled: true,
         conditions: [{ field, operator, value: Number(value) }],
-        actions: [{ type: actionType, provider: "hue", params: buildActionParams() }],
+        actions: [{ type: actionType, provider: actionProvider, params: buildActionParams() }],
         cooldownMinutes: Number(cooldownMinutes),
       }),
     });
@@ -181,7 +196,26 @@ export function RuleForm({ devices, onCreated }: { devices: DeviceSummary[]; onC
         {actionType === "hue.set_color_temperature" && (
           <Input type="number" className="w-24" value={mirek} onChange={(e) => setMirek(e.target.value)} required />
         )}
+
+        {actionType === "spotify.play_playlist" &&
+          (spotifyConnected ? (
+            <Input
+              placeholder="spotify:playlist:..."
+              value={playlistUri}
+              onChange={(e) => setPlaylistUri(e.target.value)}
+              required
+            />
+          ) : (
+            <span className="text-xs text-ink-muted">Connect Spotify first</span>
+          ))}
       </div>
+
+      {actionType === "spotify.play_playlist" && (
+        <p className="text-xs text-ink-muted">
+          Requires Spotify Premium and an already-active Spotify session on some device — playback can&apos;t be
+          started remotely on a free account or when nothing is open.
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 text-sm text-ink-secondary">
         <span>Cooldown</span>
@@ -202,12 +236,7 @@ export function RuleForm({ devices, onCreated }: { devices: DeviceSummary[]; onC
         </p>
       )}
 
-      <Button
-        type="submit"
-        variant="primary"
-        disabled={submitting || (actionType !== "hue.set_scene" && devices.length === 0)}
-        className="self-start"
-      >
+      <Button type="submit" variant="primary" disabled={submitting || disabledForMissingConnection} className="self-start">
         {submitting ? "Creating…" : "Create rule"}
       </Button>
     </form>

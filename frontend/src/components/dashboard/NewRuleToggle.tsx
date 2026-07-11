@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { RuleForm } from "./RuleForm";
 import type { DeviceSummary } from "@/lib/types";
 
-export function NewRuleToggle({ devices }: { devices: DeviceSummary[] }) {
+export function NewRuleToggle({ devices, spotifyConnected }: { devices: DeviceSummary[]; spotifyConnected: boolean }) {
   const [open, setOpen] = useState(false);
 
   if (!open) {
@@ -16,5 +16,5 @@ export function NewRuleToggle({ devices }: { devices: DeviceSummary[] }) {
     );
   }
 
-  return <RuleForm devices={devices} onCreated={() => setOpen(false)} />;
+  return <RuleForm devices={devices} spotifyConnected={spotifyConnected} onCreated={() => setOpen(false)} />;
 }

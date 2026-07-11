@@ -51,6 +51,7 @@ export default async function DashboardPage() {
   const rules = rulesResult.ok ? rulesResult.data.rules : [];
   const automationHistory = automationHistoryResult.ok ? automationHistoryResult.data.entries : [];
   const devices = connections.smartHome.flatMap((c) => c.devices);
+  const spotifyConnected = connections.smartHome.some((c) => c.provider === "SPOTIFY" && c.status === "ACTIVE");
 
   return (
     <div className="mx-auto flex max-w-2xl flex-1 flex-col gap-10 px-6 py-16">
@@ -70,7 +71,7 @@ export default async function DashboardPage() {
       <ConnectionsSection connections={connections} />
       <BiometricsSection latest={latest} history={history} />
       <DevicesSection devices={devices} />
-      <AutomationSection rules={rules} history={automationHistory} devices={devices} />
+      <AutomationSection rules={rules} history={automationHistory} devices={devices} spotifyConnected={spotifyConnected} />
     </div>
   );
 }

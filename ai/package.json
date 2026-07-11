@@ -13,6 +13,7 @@
   "dependencies": {
     "@moodsync/database": "*",
     "@moodsync/integration-hue": "*",
+    "@moodsync/integration-spotify": "*",
     "@moodsync/shared": "*"
   },
   "devDependencies": {

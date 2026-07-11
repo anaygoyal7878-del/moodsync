@@ -16,6 +16,7 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
   const whoop = connections.wearables.find((c) => c.provider === "WHOOP");
   const fitbit = connections.wearables.find((c) => c.provider === "GOOGLE_HEALTH");
   const hue = connections.smartHome.find((c) => c.provider === "HUE");
+  const spotify = connections.smartHome.find((c) => c.provider === "SPOTIFY");
 
   return (
     <section className="flex flex-col gap-3">
@@ -73,6 +74,25 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
         ) : (
           <LinkButton href="/api/integrations/hue/connect" variant="primary">
             Connect Hue
+          </LinkButton>
+        )}
+      </Card>
+
+      <Card className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium">{SMART_HOME_LABELS.SPOTIFY}</p>
+          <p className="text-xs text-ink-muted">
+            {/* No "last synced" for Spotify — it has no readings to sync,
+             * only on-demand playback triggered by automation rules. */}
+            {spotify?.status === "ACTIVE" ? "Connected" : "Not connected"}
+          </p>
+          <p className="mt-1 text-xs text-ink-muted">Requires Spotify Premium — free accounts can&apos;t use remote playback.</p>
+        </div>
+        {spotify?.status === "ACTIVE" ? (
+          <DisconnectButton provider="spotify" />
+        ) : (
+          <LinkButton href="/api/integrations/spotify/connect" variant="primary">
+            Connect Spotify
           </LinkButton>
         )}
       </Card>
