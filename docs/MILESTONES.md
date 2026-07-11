@@ -115,13 +115,33 @@ Hue light automatically** — the core product loop, end to end.
   (`updateMany`/`deleteMany` scoped to `{id, userId}`, not a
   check-then-trust pattern)
 
-## Milestone 5 — Frontend foundation 📋
+## Milestone 5 — Frontend foundation ✅
 
-- Next.js app in `frontend/`: marketing site shell + auth pages
-  (signup/login) wired to the Milestone 1 API
-- Design system foundation (typography, spacing, dark mode, the
-  Apple/Linear/Stripe-inspired visual language) — built once, reused by
-  the dashboard in Milestone 6
+- Next.js 16 (App Router, Turbopack, React 19) app in `frontend/`,
+  workspace `@moodsync/frontend`, dev server on port 3001
+- Design system foundation: CSS-first Tailwind v4 config (`@theme inline`
+  in `globals.css`, no `tailwind.config.js`), dark-mode-first token set
+  (`--canvas`, `--surface*`, `--ink*`, `--brand*`), Inter via
+  `next/font/google` — built once, reused by the dashboard in Milestone 6
+- Marketing site shell (`/`) + auth pages (`/login`, `/signup`) wired to
+  the Milestone 1 backend API — signup/login/logout all round-trip
+  through the real Fastify server, not mocked
+- Session handling: httpOnly cookies (access + refresh token), not
+  localStorage — Next.js Route Handlers (`/api/auth/{signup,login,logout}`)
+  proxy to the backend so the browser never talks to the backend origin
+  or sees raw JWTs in JS-accessible storage
+- `dashboard/page.tsx` is a Server Component that reads the session
+  cookie, calls the backend's `/api/me`, and redirects to `/login` when
+  unauthenticated — proves the auth chain end-to-end ahead of Milestone 6
+- No `middleware.ts`/`proxy.ts`: Next 16 deprecated the middleware
+  convention in favor of `proxy.ts`, and Next's own guidance is to avoid
+  it unless there's no other option — the real auth check already lives
+  in the dashboard Server Component, so a separate edge gate would be
+  redundant
+- Verified in-browser end-to-end against the real backend (no live
+  Postgres in this environment, so signup/login correctly surface a
+  500 from the backend through the proxy route and `AuthForm`'s
+  error-handling path, rather than a fake happy path)
 - This is deliberately after Milestones 2-4, not before: a beautiful
   frontend with nothing real to display isn't a demo, it's a mockup, and
   the brief explicitly asked to avoid that
