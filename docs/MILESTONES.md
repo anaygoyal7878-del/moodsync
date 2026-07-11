@@ -146,11 +146,42 @@ Hue light automatically** — the core product loop, end to end.
   frontend with nothing real to display isn't a demo, it's a mockup, and
   the brief explicitly asked to avoid that
 
-## Milestone 6 — Dashboard 📋
+## Milestone 6 — Dashboard ✅
 
-- Connected devices/wearables, today's biometrics, automation history,
-  recommendations, insights — per the dashboard spec in the original
-  brief, built against real Milestone 1-4 data, not sample data
+- Backend: `GET /api/connections` (wearable + smart-home connections,
+  each smart-home connection's synced devices inline), `GET
+  /api/biometrics/latest`, `GET /api/biometrics/history?days=`, `DELETE
+  /api/integrations/{whoop,hue}` (disconnect — ownership-scoped
+  `updateMany`, same pattern as automation rules). Reuses the
+  automation-rules/automation-history endpoints built in Milestone 4
+  rather than duplicating them
+- Frontend dashboard (Server Component data fetching, small client
+  islands for the interactive bits): connection status + connect/sync/
+  disconnect, connected Hue devices with on/off control, latest +
+  7-day biometric readings, automation rule list (enable/disable/
+  delete) with a rule-creation form, automation execution history
+- The rule-creation form only offers `hue.*` action types — `spotify.*`
+  and `notification.*` are modeled in the schema (Milestone 4) but have
+  no executor yet (see `ai/src/dispatch.ts`), so offering them would let
+  a user create a rule that always fails. They're enabled once
+  Milestones 8/9 wire up their executors
+- "Recommendations" and "insights" from the original brief's dashboard
+  spec are Milestone 9's job (`Insight`/`Recommendation` models exist
+  but trend computation and automation-effectiveness scoring don't yet)
+  — deliberately not faked here with sample data
+- Every OAuth-provider action (connect, disconnect) and device/rule
+  mutation goes through a Next.js Route Handler that translates the
+  httpOnly session cookie into a Bearer token, same pattern as
+  Milestone 5's auth routes — the browser never talks to the backend
+  origin directly
+- No live Postgres in this environment, so the authenticated dashboard
+  render itself couldn't be exercised end-to-end (same constraint noted
+  in Milestone 5). Verified instead via: clean build/typecheck/lint,
+  confirmed `/dashboard` redirects to `/login` without a session and
+  throws no server/console errors, and a throwaway preview route
+  (deleted before commit) rendering every new component against mock
+  connections/biometrics/rules/history data to check layout and
+  interactive elements (dropdowns, action-type-dependent form fields)
 
 ## Milestone 7 — Google Health API integration (Fitbit) 📋
 

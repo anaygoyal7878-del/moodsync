@@ -43,4 +43,12 @@ export default async function whoopRoutes(app: FastifyInstance) {
     const inserted = await whoopService.syncConnection(connection.id, request.userId!);
     return reply.send({ readingsInserted: inserted });
   });
+
+  app.delete('/integrations/whoop', { preHandler: app.authenticate }, async (request, reply) => {
+    const connection = await wearableConnectionRepository.findByUserAndProvider(request.userId!, 'WHOOP');
+    if (!connection) return reply.code(404).send({ error: 'No WHOOP connection for this user' });
+
+    await wearableConnectionRepository.disconnect(connection.id, request.userId!);
+    return reply.code(204).send();
+  });
 }

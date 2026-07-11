@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { hueService, HueNotConfiguredError } from '../../../services/hueService.js';
+import { smartHomeConnectionRepository } from '@moodsync/database';
 
 const authorizeQuerySchema = z.object({ returnTo: z.string().url() });
 const callbackQuerySchema = z.object({ code: z.string(), state: z.string() });
@@ -49,4 +50,12 @@ export default async function hueRoutes(app: FastifyInstance) {
       return reply.code(204).send();
     },
   );
+
+  app.delete('/integrations/hue', { preHandler: app.authenticate }, async (request, reply) => {
+    const connection = await smartHomeConnectionRepository.findByUserAndProvider(request.userId!, 'HUE');
+    if (!connection) return reply.code(404).send({ error: 'No Hue connection for this user' });
+
+    await smartHomeConnectionRepository.disconnect(connection.id, request.userId!);
+    return reply.code(204).send();
+  });
 }

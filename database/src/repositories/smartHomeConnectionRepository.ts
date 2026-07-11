@@ -49,6 +49,29 @@ export const smartHomeConnectionRepository = {
     return prisma.smartHomeConnection.findMany({ where: { provider, status: ConnectionStatus.ACTIVE } });
   },
 
+  /** Includes each connection's synced devices — the dashboard's devices
+   * panel is keyed off this, not a separate device query, since a device
+   * only ever makes sense in the context of the connection that owns it. */
+  async listForUser(userId: string) {
+    return prisma.smartHomeConnection.findMany({
+      where: { userId },
+      orderBy: { provider: 'asc' },
+      include: { connectedDevices: true },
+    });
+  },
+
+  async markStatus(id: string, status: ConnectionStatus): Promise<void> {
+    await prisma.smartHomeConnection.update({ where: { id }, data: { status } });
+  },
+
+  async disconnect(id: string, userId: string): Promise<boolean> {
+    const result = await prisma.smartHomeConnection.updateMany({
+      where: { id, userId },
+      data: { status: ConnectionStatus.REVOKED },
+    });
+    return result.count > 0;
+  },
+
   async replaceDevices(
     connectionId: string,
     devices: Array<{ externalDeviceId: string; name: string; deviceType: string; room?: string | undefined }>,

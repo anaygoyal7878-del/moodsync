@@ -28,6 +28,24 @@ async function findLatest(userId: string) {
   return prisma.biometricReading.findFirst({ where: { userId }, orderBy: { timestamp: 'desc' } });
 }
 
+type BiometricReadingRow = NonNullable<Awaited<ReturnType<typeof findLatest>>>;
+
+function toNormalized(row: BiometricReadingRow): NormalizedBiometricReading {
+  return {
+    provider: toProviderId(row.provider),
+    userId: row.userId,
+    timestamp: row.timestamp.toISOString(),
+    heartRate: row.heartRate ?? undefined,
+    restingHeartRate: row.restingHeartRate ?? undefined,
+    sleepScore: row.sleepScore ?? undefined,
+    recoveryScore: row.recoveryScore ?? undefined,
+    stressLevel: row.stressLevel ?? undefined,
+    activityLevel: row.activityLevel ?? undefined,
+    steps: row.steps ?? undefined,
+    calories: row.calories ?? undefined,
+  };
+}
+
 export const biometricReadingRepository = {
   /** Bulk insert for a sync run. `skipDuplicates` relies on there being no
    * unique constraint on (userId, provider, timestamp) today — duplicate
@@ -62,22 +80,18 @@ export const biometricReadingRepository = {
   async findLatestNormalized(userId: string): Promise<{ id: string; reading: NormalizedBiometricReading } | null> {
     const row = await findLatest(userId);
     if (!row) return null;
+    return { id: row.id, reading: toNormalized(row) };
+  },
 
-    return {
-      id: row.id,
-      reading: {
-        provider: toProviderId(row.provider),
-        userId: row.userId,
-        timestamp: row.timestamp.toISOString(),
-        heartRate: row.heartRate ?? undefined,
-        restingHeartRate: row.restingHeartRate ?? undefined,
-        sleepScore: row.sleepScore ?? undefined,
-        recoveryScore: row.recoveryScore ?? undefined,
-        stressLevel: row.stressLevel ?? undefined,
-        activityLevel: row.activityLevel ?? undefined,
-        steps: row.steps ?? undefined,
-        calories: row.calories ?? undefined,
-      },
-    };
+  /** Recent readings for the dashboard's trend view — newest first, capped
+   * to a window in days rather than a row count, since sync frequency
+   * (and therefore reading density) varies by provider. */
+  async listRecentNormalized(userId: string, sinceDays: number): Promise<NormalizedBiometricReading[]> {
+    const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
+    const rows = await prisma.biometricReading.findMany({
+      where: { userId, timestamp: { gte: since } },
+      orderBy: { timestamp: 'desc' },
+    });
+    return rows.map(toNormalized);
   },
 };

@@ -42,6 +42,13 @@ export const wearableConnectionRepository = {
     return prisma.wearableConnection.findUnique({ where: { userId_provider: { userId, provider } } });
   },
 
+  /** Every connection a user has ever made, active or not — what the
+   * dashboard's connections list renders (so a revoked connection still
+   * shows up with a "reconnect" affordance rather than disappearing). */
+  async listForUser(userId: string) {
+    return prisma.wearableConnection.findMany({ where: { userId }, orderBy: { provider: 'asc' } });
+  },
+
   /** Every active connection for a provider — what the sync worker
    * iterates over on each run. */
   async listActive(provider: WearableProvider) {
@@ -54,5 +61,15 @@ export const wearableConnectionRepository = {
 
   async markStatus(id: string, status: ConnectionStatus): Promise<void> {
     await prisma.wearableConnection.update({ where: { id }, data: { status } });
+  },
+
+  /** Ownership-scoped so a userId/id mismatch is a no-op, not a leak
+   * (same `updateMany` pattern as automationRuleRepository). */
+  async disconnect(id: string, userId: string): Promise<boolean> {
+    const result = await prisma.wearableConnection.updateMany({
+      where: { id, userId },
+      data: { status: ConnectionStatus.REVOKED },
+    });
+    return result.count > 0;
   },
 };
