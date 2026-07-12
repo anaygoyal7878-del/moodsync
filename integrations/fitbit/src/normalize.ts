@@ -1,35 +1,29 @@
 import type { NormalizedBiometricReading } from '@moodsync/shared';
-import type { RollupDataPoint, DailyRestingHeartRatePoint, SleepDataPoint, SleepStageSummary } from './client.js';
+import type {
+  RollupDataPoint,
+  DailyRestingHeartRatePoint,
+  SleepDataPoint,
+  HeartRateSamplePoint,
+} from './client.js';
 
 function dayKey(c: { year: number; month: number; day: number }): string {
   return `${c.year}-${String(c.month).padStart(2, '0')}-${String(c.day).padStart(2, '0')}`;
 }
 
-/** Protobuf `Duration` JSON is a string like `"1800s"` or `"1800.5s"`. */
-function durationSeconds(duration: string): number {
-  return parseFloat(duration.replace(/s$/, '')) || 0;
-}
+/** Google Health's Sleep `summary` exposes `minutesAsleep` and
+ * `minutesInSleepPeriod` directly — sleep efficiency, a standard published
+ * sleep-medicine metric (time asleep ÷ time in bed), is just their ratio.
+ * (An earlier pass computed this by hand-summing `stagesSummary`, but that
+ * required guessing at field names that turned out to be wrong; these two
+ * summary fields are confirmed and simpler.) */
+function sleepEfficiencyScore(summary: SleepDataPoint['data']['sleep']['summary']): number | undefined {
+  if (!summary?.minutesAsleep || !summary?.minutesInSleepPeriod) return undefined;
 
-/** Google Health's Sleep data type has no single score/efficiency field
- * (unlike WHOOP's `sleep_performance_percentage`) — this computes sleep
- * efficiency, a standard published sleep-medicine metric (time asleep ÷
- * time in bed), from the one part of the Sleep schema with confirmed
- * field names: `sleepSummary.stageSummary`. See
- * docs/INTEGRATIONS_RESEARCH.md for why the session's own start/end
- * timestamps aren't used here. */
-function sleepEfficiencyScore(stageSummary: SleepStageSummary[] | undefined): number | undefined {
-  if (!stageSummary || stageSummary.length === 0) return undefined;
+  const minutesAsleep = Number(summary.minutesAsleep);
+  const minutesInSleepPeriod = Number(summary.minutesInSleepPeriod);
+  if (!Number.isFinite(minutesAsleep) || !minutesInSleepPeriod) return undefined;
 
-  let totalSeconds = 0;
-  let awakeSeconds = 0;
-  for (const stage of stageSummary) {
-    const seconds = durationSeconds(stage.totalDuration);
-    totalSeconds += seconds;
-    if (stage.sleepStageType === 'AWAKE') awakeSeconds += seconds;
-  }
-  if (totalSeconds === 0) return undefined;
-
-  return Math.round(Math.min(100, Math.max(0, (1 - awakeSeconds / totalSeconds) * 100)));
+  return Math.round(Math.min(100, Math.max(0, (minutesAsleep / minutesInSleepPeriod) * 100)));
 }
 
 /** 10,000 steps/day is the commonly cited fitness-industry activity
@@ -46,6 +40,13 @@ const STEPS_FOR_FULL_ACTIVITY = 10_000;
  * see `sleepEfficiencyScore`'s doc comment for why sleep isn't bucketed
  * per-day like the other metrics. `recoveryScore` and `stressLevel` are
  * left unset: Google Health has no equivalent to either.
+ *
+ * `heartRateSamples`, unlike the other inputs, is NOT folded into the
+ * per-day buckets — each sample becomes its own reading at its own real
+ * timestamp. That's what makes "current heart rate" (the most recent
+ * reading across all providers) actually reflect a recent point-in-time
+ * value instead of a stale daily average, when the sync worker runs on a
+ * short interval.
  */
 export function normalizeGoogleHealthData(params: {
   userId: string;
@@ -54,8 +55,10 @@ export function normalizeGoogleHealthData(params: {
   caloriesRollups: RollupDataPoint[];
   restingHeartRates: DailyRestingHeartRatePoint[];
   sleeps: SleepDataPoint[];
+  heartRateSamples?: HeartRateSamplePoint[];
 }): NormalizedBiometricReading[] {
-  const { userId, stepsRollups, heartRateRollups, caloriesRollups, restingHeartRates, sleeps } = params;
+  const { userId, stepsRollups, heartRateRollups, caloriesRollups, restingHeartRates, sleeps, heartRateSamples } =
+    params;
 
   const byDay = new Map<string, NormalizedBiometricReading>();
 
@@ -76,7 +79,7 @@ export function normalizeGoogleHealthData(params: {
     if (point.steps) getOrCreate(point.civilStartTime).steps = point.steps.countSum;
   }
   for (const point of heartRateRollups) {
-    if (point.heartRate) getOrCreate(point.civilStartTime).heartRate = point.heartRate.bpmAvg;
+    if (point.heartRate) getOrCreate(point.civilStartTime).heartRate = point.heartRate.beatsPerMinuteAvg;
   }
   for (const point of caloriesRollups) {
     if (point.totalCalories) getOrCreate(point.civilStartTime).calories = point.totalCalories.kcalSum;
@@ -95,9 +98,17 @@ export function normalizeGoogleHealthData(params: {
   const mostRecentSleep = sleeps[0];
   const mostRecentDay = [...byDay.keys()].sort().at(-1);
   if (mostRecentSleep && mostRecentDay) {
-    const score = sleepEfficiencyScore(mostRecentSleep.data.sleep.sleepSummary?.stageSummary);
+    const score = sleepEfficiencyScore(mostRecentSleep.data.sleep.summary);
     if (score !== undefined) byDay.get(mostRecentDay)!.sleepScore = score;
   }
 
-  return [...byDay.values()];
+  const sampleReadings: NormalizedBiometricReading[] = [];
+  for (const point of heartRateSamples ?? []) {
+    const physicalTime = point.data.heartRate.sampleTime.physicalTime;
+    const bpm = Number(point.data.heartRate.beatsPerMinute);
+    if (!physicalTime || !Number.isFinite(bpm)) continue;
+    sampleReadings.push({ provider: 'google_health', userId, timestamp: physicalTime, heartRate: bpm });
+  }
+
+  return [...byDay.values(), ...sampleReadings];
 }

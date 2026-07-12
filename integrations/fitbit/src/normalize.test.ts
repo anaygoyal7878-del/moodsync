@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeGoogleHealthData } from './normalize.js';
-import type { RollupDataPoint, DailyRestingHeartRatePoint, SleepDataPoint } from './client.js';
+import type { RollupDataPoint, DailyRestingHeartRatePoint, SleepDataPoint, HeartRateSamplePoint } from './client.js';
 
 function civil(year: number, month: number, day: number) {
   return { year, month, day, hour: 0, minute: 0, second: 0 };
@@ -19,8 +19,20 @@ function makeHeartRateRollup(overrides: Partial<RollupDataPoint> = {}): RollupDa
   return {
     civilStartTime: civil(2026, 7, 10),
     civilEndTime: civil(2026, 7, 11),
-    heartRate: { bpmMin: 55, bpmMax: 140, bpmAvg: 72 },
+    heartRate: { beatsPerMinuteMin: 55, beatsPerMinuteMax: 140, beatsPerMinuteAvg: 72 },
     ...overrides,
+  };
+}
+
+function makeHeartRateSample(overrides: { physicalTime?: string; beatsPerMinute?: string } = {}): HeartRateSamplePoint {
+  return {
+    name: 'users/me/dataTypes/heart-rate/dataPoints/1',
+    data: {
+      heartRate: {
+        sampleTime: { physicalTime: overrides.physicalTime ?? '2026-07-10T12:00:00Z' },
+        beatsPerMinute: overrides.beatsPerMinute ?? '68',
+      },
+    },
   };
 }
 
@@ -31,10 +43,15 @@ function makeRestingHeartRate(overrides: Partial<DailyRestingHeartRatePoint['dat
   };
 }
 
-function makeSleep(stageSummary: Array<{ sleepStageType: 'AWAKE' | 'LIGHT' | 'DEEP' | 'REM'; totalDuration: string }>): SleepDataPoint {
+function makeSleep(summary: { minutesAsleep: string; minutesInSleepPeriod: string }): SleepDataPoint {
   return {
     name: 'users/me/dataTypes/sleep/dataPoints/1',
-    data: { sleep: { startTime: null, endTime: null, sleepSummary: { stageSummary } } },
+    data: {
+      sleep: {
+        interval: { startTime: '2026-07-10T00:00:00Z', endTime: '2026-07-10T08:00:00Z' },
+        summary,
+      },
+    },
   };
 }
 
@@ -97,23 +114,16 @@ describe('normalizeGoogleHealthData', () => {
     expect(result[0]?.activityLevel).toBe(100);
   });
 
-  it('computes sleepScore as efficiency (time asleep / time in bed) on the most recent day', () => {
+  it('computes sleepScore as efficiency (minutesAsleep / minutesInSleepPeriod) on the most recent day', () => {
     const result = normalizeGoogleHealthData({
       userId: 'user-1',
       stepsRollups: [makeStepsRollup()],
       heartRateRollups: [],
       caloriesRollups: [],
       restingHeartRates: [],
-      sleeps: [
-        makeSleep([
-          { sleepStageType: 'LIGHT', totalDuration: '18000s' },
-          { sleepStageType: 'DEEP', totalDuration: '3600s' },
-          { sleepStageType: 'REM', totalDuration: '3600s' },
-          { sleepStageType: 'AWAKE', totalDuration: '2700s' },
-        ]),
-      ],
+      sleeps: [makeSleep({ minutesAsleep: '419', minutesInSleepPeriod: '465' })],
     });
-    // total = 27900s, awake = 2700s -> efficiency = (1 - 2700/27900) * 100 ≈ 90
+    // 419 / 465 * 100 ≈ 90.1 -> rounds to 90
     expect(result[0]?.sleepScore).toBe(90);
   });
 
@@ -127,5 +137,41 @@ describe('normalizeGoogleHealthData', () => {
       sleeps: [],
     });
     expect(result[0]?.sleepScore).toBeUndefined();
+  });
+
+  it('emits a separate reading per heart-rate sample, at its own timestamp, not merged into the day bucket', () => {
+    const result = normalizeGoogleHealthData({
+      userId: 'user-1',
+      stepsRollups: [makeStepsRollup()],
+      heartRateRollups: [],
+      caloriesRollups: [],
+      restingHeartRates: [],
+      sleeps: [],
+      heartRateSamples: [
+        makeHeartRateSample({ physicalTime: '2026-07-10T12:00:00Z', beatsPerMinute: '68' }),
+        makeHeartRateSample({ physicalTime: '2026-07-10T12:05:00Z', beatsPerMinute: '71' }),
+      ],
+    });
+
+    const latest = [...result].sort((a, b) => a.timestamp.localeCompare(b.timestamp)).at(-1);
+    expect(latest?.timestamp).toBe('2026-07-10T12:05:00Z');
+    expect(latest?.heartRate).toBe(71);
+    expect(result).toHaveLength(3); // 1 day bucket (steps) + 2 heart-rate samples
+  });
+
+  it('skips heart-rate samples missing a physicalTime or a parseable bpm value', () => {
+    const result = normalizeGoogleHealthData({
+      userId: 'user-1',
+      stepsRollups: [],
+      heartRateRollups: [],
+      caloriesRollups: [],
+      restingHeartRates: [],
+      sleeps: [],
+      heartRateSamples: [
+        { name: 'x', data: { heartRate: { sampleTime: {}, beatsPerMinute: '70' } } },
+        { name: 'y', data: { heartRate: { sampleTime: { physicalTime: '2026-07-10T12:00:00Z' }, beatsPerMinute: 'not-a-number' } } },
+      ],
+    });
+    expect(result).toHaveLength(0);
   });
 });

@@ -41,8 +41,33 @@ export interface RollupDataPoint {
   civilStartTime: CivilDateTime;
   civilEndTime: CivilDateTime;
   steps?: { countSum: number };
-  heartRate?: { bpmMin: number; bpmMax: number; bpmAvg: number };
+  /** Field names confirmed against `HeartRateRollupValue` in the live REST
+   * reference — the API returns the full `beatsPerMinute{Min,Max,Avg}`
+   * names, not the shorter `bpm*` guessed in an earlier pass. */
+  heartRate?: { beatsPerMinuteMin: number; beatsPerMinuteMax: number; beatsPerMinuteAvg: number };
   totalCalories?: { kcalSum: number };
+}
+
+/** `ObservationSampleTime` — confirmed schema for `HeartRate.sampleTime`.
+ * `physicalTime` is the RFC 3339 instant the sample was recorded; that's
+ * what per-sample heart rate normalization keys on. */
+export interface ObservationSampleTime {
+  physicalTime?: string;
+  utcOffset?: string;
+  civilTime?: CivilDateTime;
+}
+
+/** A single heart-rate sample (not a daily aggregate) — confirmed schema
+ * for the `heart-rate` dataType's `HeartRate` message. `beatsPerMinute` is
+ * serialized as a string (protobuf int64-as-string JSON convention). */
+export interface HeartRateSamplePoint {
+  name: string;
+  data: {
+    heartRate: {
+      sampleTime: ObservationSampleTime;
+      beatsPerMinute: string;
+    };
+  };
 }
 
 export interface DailyRestingHeartRatePoint {
@@ -50,25 +75,33 @@ export interface DailyRestingHeartRatePoint {
   data: { dailyRestingHeartRate: { date: { year: number; month: number; day: number }; beatsPerMinute: number } };
 }
 
-export interface SleepStageSummary {
-  sleepStageType: 'SLEEP_STAGE_TYPE_UNSPECIFIED' | 'AWAKE' | 'LIGHT' | 'DEEP' | 'REM';
-  /** Duration serialized the way protobuf's `google.protobuf.Duration`
-   * renders in JSON: a string like `"1800s"`. */
-  totalDuration: string;
+/** Confirmed against the live REST reference's `Sleep` message — the
+ * earlier `sleepSummary.stageSummary[].{sleepStageType,totalDuration}`
+ * shape didn't match the real API at all; the actual nesting is
+ * `summary.stagesSummary[].{type,minutes}`. */
+export interface SleepStageSummaryEntry {
+  type: 'SLEEP_STAGE_TYPE_UNSPECIFIED' | 'AWAKE' | 'LIGHT' | 'DEEP' | 'REM' | 'ASLEEP' | 'RESTLESS';
+  /** int64-as-string minute count — NOT a protobuf Duration string. */
+  minutes: string;
 }
 
 export interface SleepDataPoint {
   name: string;
   data: {
     sleep: {
-      // `startTime`/`endTime` are `ObservationSampleTime` messages, not
-      // plain ISO strings — their JSON wire shape wasn't confirmable via
-      // docs (see docs/INTEGRATIONS_RESEARCH.md), so deliberately left
-      // untyped rather than guessed at. Only `sleepSummary` (a plain,
-      // confirmed schema) is relied on for normalization.
-      startTime: unknown;
-      endTime: unknown;
-      sleepSummary?: { stageSummary?: SleepStageSummary[] };
+      /** Real ISO 8601 timestamps, confirmed nested under `interval` (not
+       * directly on `sleep` as previously assumed). */
+      interval: { startTime: string; endTime: string };
+      summary?: {
+        stagesSummary?: SleepStageSummaryEntry[];
+        /** Pre-computed by Google Health — preferred over summing
+         * `stagesSummary` by hand for efficiency/duration calculations. */
+        minutesInSleepPeriod?: string;
+        minutesAfterWakeUp?: string;
+        minutesToFallAsleep?: string;
+        minutesAsleep?: string;
+        minutesAwake?: string;
+      };
     };
   };
 }
@@ -142,6 +175,21 @@ export class GoogleHealthClient {
     const filter = `sleep.start_time >= "${since.toISOString()}"`;
     const path = `/users/me/dataTypes/sleep/dataPoints?filter=${encodeURIComponent(filter)}`;
     const { dataPoints } = await this.request<{ dataPoints?: SleepDataPoint[] }>(path);
+    return dataPoints ?? [];
+  }
+
+  /** Individual timestamped heart-rate samples (not a daily average) —
+   * what "current"/near-live heart rate is built on. The filter field path
+   * (`heart_rate.sample_time.physical_time`) follows the same
+   * `{dataType_snake}.{field_snake}` pattern already used by
+   * `listSleep`'s `sleep.start_time` filter; the exact filter grammar for
+   * this specific field wasn't independently doc-confirmed, only inferred
+   * by pattern — flagged here the same way the pre-existing `listSleep`
+   * filter was. */
+  async listHeartRate(since: Date): Promise<HeartRateSamplePoint[]> {
+    const filter = `heart_rate.sample_time.physical_time >= "${since.toISOString()}"`;
+    const path = `/users/me/dataTypes/heart-rate/dataPoints?filter=${encodeURIComponent(filter)}`;
+    const { dataPoints } = await this.request<{ dataPoints?: HeartRateSamplePoint[] }>(path);
     return dataPoints ?? [];
   }
 

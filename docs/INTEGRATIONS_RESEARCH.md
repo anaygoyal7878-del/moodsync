@@ -122,31 +122,72 @@ at `https://health.googleapis.com/$discovery/rest?version=v4`:
   /v4/users/{user}/dataTypes/{dataType}/dataPoints:dailyRollUp` with body
   `{ range: { start: CivilDateTime, end: CivilDateTime }, windowSizeDays }`.
   Response: `{ rollupDataPoints: [{ civilStartTime, civilEndTime, steps?:
-  { countSum }, heartRate?: { bpmMin, bpmMax, bpmAvg }, totalCalories?:
-  { kcalSum } }] }`. `CivilDateTime` is `{ year, month, day, hour, minute,
-  second, nanos }`. Field casing (snake_case in the proto reference →
-  lowerCamelCase in JSON) follows protobuf's standard JSON mapping, which
-  is universal across all Google APIs, not something specific to this one.
+  { countSum }, heartRate?: { beatsPerMinuteMin, beatsPerMinuteMax,
+  beatsPerMinuteAvg }, totalCalories?: { kcalSum } }] }`. `CivilDateTime`
+  is `{ year, month, day, hour, minute, second, nanos }`. Field casing
+  (snake_case in the proto reference → lowerCamelCase in JSON) follows
+  protobuf's standard JSON mapping, which is universal across all Google
+  APIs, not something specific to this one.
+- **Correction (2026-07-12, re-verified against a live doc fetch at the
+  user's request)**: the `heartRate` rollup field names above were
+  originally recorded here as `bpmMin/bpmMax/bpmAvg` — that was wrong.
+  The real `HeartRateRollupValue` schema uses the full
+  `beatsPerMinuteMin/Max/Avg` names shown above; the shorter names were
+  never actually confirmed, just assumed by analogy to the sample type's
+  `beatsPerMinute` field. This silently broke heart-rate normalization
+  (always `undefined`) since Milestone 7a. `steps`/`total-calories`
+  (`countSum`/`kcalSum`) were independently re-confirmed correct.
 - **Daily granularity, no rollup needed** (`daily-resting-heart-rate`):
   `GET /v4/users/{user}/dataTypes/daily-resting-heart-rate/dataPoints` —
   each point's `data.dailyRestingHeartRate` is `{ date, beatsPerMinute }`.
+- **Individual heart-rate samples** (`heart-rate`, `list` method, not
+  `dailyRollUp`): `GET .../dataTypes/heart-rate/dataPoints` — each point's
+  `data.heartRate` is `{ sampleTime: ObservationSampleTime, metadata,
+  beatsPerMinute: string(int64) }`, where `ObservationSampleTime` is
+  `{ physicalTime: Timestamp, utcOffset: Duration, civilTime:
+  CivilDateTime }`. Added for Milestone "Fitbit near-live heart rate" so
+  the dashboard's "current heart rate" reflects an actual recent sample
+  rather than a once-a-day average — see `GoogleHealthClient.listHeartRate`.
 - **Sleep** (`sleep`): `GET .../dataTypes/sleep/dataPoints` — each point's
-  `data.sleep` is `{ startTime, endTime, duration, sleepType,
-  sleepStages[], sleepSummary: { stageSummary: [{ sleepStageType:
-  'AWAKE'|'LIGHT'|'DEEP'|'REM', totalDuration }] }, ... }`. **There is no
+  `data.sleep` is `{ interval: { startTime, endTime, startUtcOffset,
+  endUtcOffset, civilStartTime, civilEndTime }, type:
+  'CLASSIC'|'STAGES', stages: [{ startTime, endTime, type:
+  'AWAKE'|'LIGHT'|'DEEP'|'REM'|'ASLEEP'|'RESTLESS' }], outOfBedSegments,
+  metadata, summary: { stagesSummary: [{ type, minutes, count }],
+  minutesInSleepPeriod, minutesAfterWakeUp, minutesToFallAsleep,
+  minutesAsleep, minutesAwake }, createTime, updateTime }`.
+  **Correction (2026-07-12)**: this section originally described the
+  shape as `{ startTime, endTime, sleepSummary: { stageSummary: [{
+  sleepStageType, totalDuration }] } }` — every one of those field names
+  was wrong (`startTime`/`endTime` are nested under `interval`, not
+  direct; `sleepSummary`/`stageSummary` don't exist, the real keys are
+  `summary`/`stagesSummary`; `sleepStageType`/`totalDuration` are actually
+  `type`/`minutes`, and `minutes` is a plain int64-as-string, not a
+  protobuf Duration string like `"1800s"`). This silently broke
+  `sleepScore` (always `undefined`) since Milestone 7a. **There is no
   single sleep score/efficiency field** in this API (unlike WHOOP's
-  `sleep_performance_percentage`) — `sleepScore` is computed here as
-  sleep efficiency (`1 - awakeDuration/totalDuration`, ×100), a standard
-  published sleep-medicine metric, not an invented one; see
+  `sleep_performance_percentage`), but `summary.minutesAsleep` and
+  `summary.minutesInSleepPeriod` are provided directly — `sleepScore` is
+  now computed as their ratio (a standard published sleep-medicine
+  metric, sleep efficiency) instead of hand-summing stage durations; see
   `integrations/fitbit/src/normalize.ts`.
 - **Uncertain, flagged rather than assumed**: the exact `filter` query
-  string field path for `list` requests on `daily-resting-heart-rate` and
-  `sleep` (only one worked filter example was found in the docs, for
-  `exercise`: `exercise.interval.civil_start_time >= "..."`). This
-  integration follows that same `{dataType}.{field} {op} {value}` pattern
-  by inference — worth a live-sandbox-account spot check before trusting
+  string field path for `list` requests on `daily-resting-heart-rate`,
+  `sleep`, and (newly added) `heart-rate` (only one worked filter example
+  was found in the docs, for `exercise`:
+  `exercise.interval.civil_start_time >= "..."`). This integration
+  follows that same `{dataType}.{field} {op} {value}` pattern by
+  inference — worth a live-sandbox-account spot check before trusting
   non-default page sizes or tight date windows in production, same
   caveat style as WHOOP's pagination note above.
+- **No push/streaming API for heart rate**: `developers.google.com/health/webhooks`
+  exists, but a webhook notification only carries a `dataType` and a time
+  interval ("new data landed here") — the actual values still require a
+  follow-up `list`/`dailyRollUp` call, and subscribing requires a publicly
+  reachable HTTPS endpoint plus a Cloud project number. Not adopted here;
+  "near-live" heart rate is achieved instead by polling `listHeartRate` on
+  a short (5-minute) worker cadence, which Google's documented per-user
+  quota (300 req/min) comfortably supports.
 - **`providerUserId`**: not populated for this connection. Google Health
   exposes `users.getProfile`/`users.getIdentity`, but their response
   shapes weren't independently confirmed and the field is optional
