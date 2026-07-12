@@ -443,3 +443,46 @@ existing OAuth pattern.
   shared local dev database/browser session — confirmed with the user
   to be their own action (signing up themselves to test the earlier
   fix), not something this session did. Left untouched at their request.
+
+## Scheduled sync ✅
+
+The highest-impact gap flagged at the end of the previous round: syncing
+was manual-trigger-only (the dashboard's "Sync now" button), with no
+automated path — a real user would have to remember to click it.
+
+- **Refactored, not just added to**: `whoopSync.ts` and `fitbitSync.ts`
+  had near-identical per-connection loop orchestration (list active
+  connections, isolate one user's failure from the rest, mark synced,
+  fire automations off the latest reading, tally success/failure) —
+  duplicated for a reason that no longer held once both lived in the
+  same `workers` package (the cross-deployable-duplication rule that
+  justifies the same pattern in `backend`/`ai`/`workers` doesn't apply
+  *within* one package). Extracted into `workers/src/lib/runProviderSync.ts`;
+  the two entrypoints are now ~10 lines each, and provider-specific logic
+  (token refresh, the API client, Fitbit's extra device-info sync) moved
+  into `workers/src/providers/{whoop,fitbit}.ts`.
+- **`workers/src/syncAll.ts`**: runs every configured provider in one
+  invocation — one cron entry instead of coordinating N schedules. A
+  provider with no client credentials set is skipped, not fatal, so a
+  deployment with only WHOOP configured doesn't fail its whole run
+  because Fitbit isn't set up yet; one provider throwing doesn't stop
+  the others.
+- **Verified for real**: ran against the real local Postgres with no
+  provider credentials set (both skipped, clean exit), then again with
+  WHOOP "configured" (fake credentials, since no real WHOOP app exists
+  in this environment) to confirm the real Prisma query runs, correctly
+  finds zero active connections (there are none — no real OAuth
+  connection has ever been completed here), and reports success rather
+  than a false failure for the empty case.
+- **Still requires external scheduling** — this was true before this
+  round and remains true: `workers` are one-shot scripts by design (see
+  Milestone 2's original rationale — an external scheduler is more
+  robust than an in-process `setInterval` that dies with the process).
+  Wire `npm run start:sync-all -w workers` into cron, a Kubernetes
+  CronJob, or a platform's scheduled-jobs feature at whatever interval
+  matches the provider's rate limits (WHOOP: 100 req/min, 10k/day per
+  client — hourly is comfortable for any realistic user count). Example
+  crontab entry for hourly:
+  ```
+  0 * * * * cd /path/to/moodsync/workers && npm run start:sync-all
+  ```
