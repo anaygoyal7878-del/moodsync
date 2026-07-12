@@ -395,3 +395,51 @@ investigating that properly instead of just explaining the limitation:
   build here; Hue and (eventually) Ecobee are the correct direct
   integration points the original brief's "connect Alexa" step was
   actually pointing at.
+
+## Apple Health companion app + connections polish ✅
+
+Prompted by "configure all connections of fitbit and whoop and apple
+health and improve overall UI." Apple Health specifically required
+research into whether it could even be a backend integration at all —
+it can't (see docs/INTEGRATIONS_RESEARCH.md's "Apple Health" section) —
+so this shipped as a genuinely new component, not a variant of the
+existing OAuth pattern.
+
+- **`ios/MoodSyncCompanion`**: new SwiftPM package — HealthKit reading
+  (heart rate, resting heart rate, steps, active energy, sleep
+  efficiency), a client for this product's real `/api/auth/login` and a
+  new `POST /api/integrations/apple-health/ingest` endpoint, and a
+  one-screen SwiftUI view. Compile-verified via `swift build` (real
+  HealthKit API usage, not stubbed) and logic-verified via a throwaway
+  executable running the same assertions as the committed `XCTest`
+  files by hand (XCTest itself isn't runnable in this sandbox — see the
+  package's README for the exact, itemized boundary of what was and
+  wasn't verifiable without Xcode).
+- **Backend**: `APPLE_HEALTH` added to the `WearableProvider` enum
+  (migration included, applied to the real local Postgres set up in the
+  prior round), `wearableConnectionRepository.upsertTokenlessConnection`
+  (no OAuth token — HealthKit has none), and the ingest route itself —
+  verified end-to-end against the real database via curl (real user,
+  real insert, real connection row, confirmed through `/api/connections`
+  and the live dashboard UI).
+- **Frontend**: an Apple Health connections card with honest messaging —
+  no "Connect" OAuth link, since none exists; status instead reflects
+  whether the iOS app has ever successfully synced.
+- **Real mobile layout bug found and fixed**: the new Apple Health card's
+  longer status text wrapped awkwardly and pushed its Disconnect button
+  out of alignment at 375px width — found via an actual mobile-viewport
+  screenshot, not assumed. Fixed by switching every connection card's
+  flex alignment from center-aligned-fixed-height to
+  wrap-and-align-to-top (`items-start` + `flex-wrap` + `min-w-0 flex-1`
+  on the text column), verified again after the fix at both mobile and
+  desktop widths.
+- **`docs/CONNECTING_REAL_ACCOUNTS.md`**: exact step-by-step for
+  registering real WHOOP and Google Health API developer apps (redirect
+  URIs, scopes, test-user setup) so a real OAuth connection can be
+  completed locally — this requires the account holder's own developer
+  registration and can't be done by an agent on their behalf.
+- **Privacy note**: while verifying this round's changes, a real user
+  account (the account holder's actual email) was found logged into the
+  shared local dev database/browser session — confirmed with the user
+  to be their own action (signing up themselves to test the earlier
+  fix), not something this session did. Left untouched at their request.

@@ -38,6 +38,21 @@ export const wearableConnectionRepository = {
     });
   },
 
+  /** For providers with no OAuth handshake at all — Apple Health/HealthKit
+   * has no server-side API or OAuth flow (see
+   * docs/INTEGRATIONS_RESEARCH.md), so "connecting" it just means the iOS
+   * companion app has authenticated with the user's existing MoodSync
+   * session and successfully pushed a sync. `oauthTokenId` stays null;
+   * `WearableConnection.oauthTokenId` is nullable specifically to allow
+   * this. */
+  async upsertTokenlessConnection(userId: string, provider: WearableProvider) {
+    return prisma.wearableConnection.upsert({
+      where: { userId_provider: { userId, provider } },
+      create: { userId, provider, status: ConnectionStatus.ACTIVE },
+      update: { status: ConnectionStatus.ACTIVE },
+    });
+  },
+
   async findByUserAndProvider(userId: string, provider: WearableProvider) {
     return prisma.wearableConnection.findUnique({ where: { userId_provider: { userId, provider } } });
   },

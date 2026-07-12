@@ -6,7 +6,12 @@ import { SyncButton } from "./SyncButton";
 import { ConnectionStatusBadge, needsReconnect } from "./ConnectionStatusBadge";
 import type { ConnectionsResponse, WearableConnectionSummary, SmartHomeConnectionSummary } from "@/lib/types";
 
-const WEARABLE_LABELS: Record<string, string> = { WHOOP: "WHOOP", GOOGLE_HEALTH: "Fitbit", GARMIN: "Garmin" };
+const WEARABLE_LABELS: Record<string, string> = {
+  WHOOP: "WHOOP",
+  GOOGLE_HEALTH: "Fitbit",
+  GARMIN: "Garmin",
+  APPLE_HEALTH: "Apple Health",
+};
 const SMART_HOME_LABELS: Record<string, string> = { HUE: "Philips Hue", SPOTIFY: "Spotify", ECOBEE: "Ecobee" };
 
 function formatLastSynced(lastSyncedAt: string | null): string {
@@ -51,7 +56,7 @@ function ConnectAction({
 }) {
   if (connection?.status === "ACTIVE") {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         {extraActiveActions}
         <DisconnectButton provider={provider} />
       </div>
@@ -60,7 +65,7 @@ function ConnectAction({
 
   if (connection && needsReconnect(connection.status)) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <LinkButton href={connectHref} variant="primary">
           Reconnect
         </LinkButton>
@@ -79,6 +84,7 @@ function ConnectAction({
 export function ConnectionsSection({ connections }: { connections: ConnectionsResponse }) {
   const whoop = connections.wearables.find((c) => c.provider === "WHOOP");
   const fitbit = connections.wearables.find((c) => c.provider === "GOOGLE_HEALTH");
+  const appleHealth = connections.wearables.find((c) => c.provider === "APPLE_HEALTH");
   const hue = connections.smartHome.find((c) => c.provider === "HUE");
   const spotify = connections.smartHome.find((c) => c.provider === "SPOTIFY");
 
@@ -86,11 +92,11 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
     <section className="flex flex-col gap-3">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Connections</h2>
 
-      <Card className="flex items-center justify-between gap-4 transition-colors hover:bg-surface-hover">
-        <div>
+      <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">{WEARABLE_LABELS.WHOOP}</p>
           {whoop ? (
-            <div className="mt-1 flex items-center gap-2">
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <ConnectionStatusBadge status={whoop.status} />
               {whoop.status === "ACTIVE" && (
                 <span className="text-xs text-ink-muted">· {formatLastSynced(whoop.lastSyncedAt)}</span>
@@ -110,11 +116,11 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
         />
       </Card>
 
-      <Card className="flex items-center justify-between gap-4 transition-colors hover:bg-surface-hover">
-        <div>
+      <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">{WEARABLE_LABELS.GOOGLE_HEALTH}</p>
           {fitbit ? (
-            <div className="mt-1 flex items-center gap-2">
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <ConnectionStatusBadge status={fitbit.status} />
               {fitbit.status === "ACTIVE" && (
                 <span className="text-xs text-ink-muted">· {formatLastSynced(fitbit.lastSyncedAt)}</span>
@@ -134,11 +140,32 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
         />
       </Card>
 
-      <Card className="flex items-center justify-between gap-4 transition-colors hover:bg-surface-hover">
-        <div>
+      <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">{WEARABLE_LABELS.APPLE_HEALTH}</p>
+          {appleHealth?.status === "ACTIVE" ? (
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <ConnectionStatusBadge status={appleHealth.status} />
+              <span className="text-xs text-ink-muted">· {formatLastSynced(appleHealth.lastSyncedAt)}</span>
+            </div>
+          ) : (
+            <p className="mt-1 text-xs text-ink-muted">
+              {appleHealth ? "Disconnected" : "Not connected"} · sign in from the MoodSync iOS app to connect
+            </p>
+          )}
+          <p className="mt-1 text-xs text-ink-muted">
+            HealthKit has no web-based OAuth flow — connecting only happens by signing into this account from the
+            iOS companion app.
+          </p>
+        </div>
+        {appleHealth?.status === "ACTIVE" && <DisconnectButton provider="apple-health" />}
+      </Card>
+
+      <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">{SMART_HOME_LABELS.HUE}</p>
           {hue ? (
-            <div className="mt-1 flex items-center gap-2">
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <ConnectionStatusBadge status={hue.status} />
               {hue.status === "ACTIVE" && (
                 <span className="text-xs text-ink-muted">
@@ -153,11 +180,11 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
         <ConnectAction connection={hue} connectHref="/api/integrations/hue/connect" connectLabel="Connect Hue" provider="hue" />
       </Card>
 
-      <Card className="flex items-center justify-between gap-4 transition-colors hover:bg-surface-hover">
-        <div>
+      <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">{SMART_HOME_LABELS.SPOTIFY}</p>
           {spotify ? (
-            <div className="mt-1 flex items-center gap-2">
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <ConnectionStatusBadge status={spotify.status} />
             </div>
           ) : (

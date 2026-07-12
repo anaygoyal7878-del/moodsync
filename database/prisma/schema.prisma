@@ -61,6 +61,7 @@ enum WearableProvider {
   WHOOP
   GOOGLE_HEALTH
   GARMIN
+  APPLE_HEALTH
 }
 
 enum SmartHomeProvider {

@@ -4,7 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 
-export function DisconnectButton({ provider }: { provider: "whoop" | "hue" | "google-health" | "spotify" }) {
+export function DisconnectButton({
+  provider,
+}: {
+  provider: "whoop" | "hue" | "google-health" | "spotify" | "apple-health";
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 

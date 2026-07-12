@@ -4,7 +4,7 @@ export type ConnectionStatus = "ACTIVE" | "EXPIRED" | "REVOKED" | "ERROR" | "NOT
 
 export interface WearableConnectionSummary {
   id: string;
-  provider: "WHOOP" | "GOOGLE_HEALTH" | "GARMIN";
+  provider: "WHOOP" | "GOOGLE_HEALTH" | "GARMIN" | "APPLE_HEALTH";
   status: ConnectionStatus;
   lastSyncedAt: string | null;
   /** Only populated for providers whose API exposes it — confirmed

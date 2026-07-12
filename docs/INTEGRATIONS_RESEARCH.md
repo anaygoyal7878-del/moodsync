@@ -16,8 +16,56 @@ Where something is uncertain, it's marked uncertain rather than assumed.
 | **Garmin** | Developer program applications are de facto stalled ("Under Construction" for 2+ months, unofficial) | **Blocked.** Define the integration interface, do not build a live client yet |
 | **Ecobee** | Developer program explicitly closed to new registrations | **Blocked.** Define the integration interface, do not build a live client yet |
 | **Amazon Alexa** | N/A — wrong integration point | **Dropped from the architecture entirely** (see below) |
+| **Apple Health** | No server-side API exists at all — architecturally different from every other row here | **Built as a separate native iOS companion app** (`ios/MoodSyncCompanion`), not a backend OAuth integration — see below |
 
 ---
+
+### Apple Health — no OAuth flow exists, by design
+
+- **Confirmed directly against Apple's own HealthKit developer docs**:
+  there is no public server-side/REST API for a third party to pull a
+  user's Apple Health data. Health data lives only on-device; the only
+  way to access it is a native app the user installs, which requests
+  HealthKit read authorization (`HKHealthStore.requestAuthorization`)
+  and reads samples locally (`HKSampleQuery`, `HKStatisticsQuery`,
+  category queries for sleep). This is a deliberate Apple privacy design
+  choice, not a gap in available documentation.
+- **What this means architecturally**: every other integration in this
+  document is "web backend performs OAuth against a third-party API."
+  Apple Health can't be that — it has to be "a native app the user
+  installs reads the data and pushes it to our backend," a different
+  component entirely, not a variant of the existing OAuth pattern.
+- **Built as `ios/MoodSyncCompanion`** (a SwiftPM package: HealthKit
+  reading, a client for this product's own `/api/auth/login` and a new
+  `/api/integrations/apple-health/ingest` endpoint, and a one-screen
+  SwiftUI view). Authenticates as a normal MoodSync user — logging into
+  the same email/password account used on the web — rather than a
+  separate device-pairing flow, since there's no OAuth provider to
+  delegate identity to.
+- **Environment-verified, not just written**: this sandbox has the Swift
+  compiler but not full Xcode (`xcodebuild -version` fails with
+  "requires Xcode, but active developer directory is a command line
+  tools instance"). `swift build`/`swift run` still compile-verify real
+  HealthKit API usage by targeting macOS 14 (HealthKit links there too),
+  confirmed first against a pre-existing sibling package already in this
+  repo (`Packages/MoodSyncCore/Sources/MoodSyncHealthKit`) before writing
+  new code against the same proven query shapes. `XCTest` itself isn't
+  available in this environment either (same limitation, confirmed
+  against that same pre-existing package's test target) — the pure logic
+  (sleep efficiency calculation, JSON payload shape) was verified via a
+  throwaway executable running the same assertions by hand, then
+  deleted; the real, permanent tests live in
+  `ios/MoodSyncCompanion/Tests/MoodSyncCompanionTests` for a machine with
+  Xcode to run. See `ios/MoodSyncCompanion/README.md` for the complete,
+  itemized breakdown of what was and wasn't verifiable here (compiling
+  an actual `.app` bundle, the HealthKit entitlement, the real
+  permission dialog, and code signing all require Xcode + a paid Apple
+  Developer account, none of which exist in this sandbox).
+- **`sleepScore`**: HealthKit's `.sleepAnalysis` category has no single
+  numeric score, only stage segments (`inBed`/`asleepCore`/`asleepDeep`/
+  `asleepREM`/`awake`) — same situation as Google Health. Computed as
+  sleep efficiency (asleep ÷ asleep+awake time), the same standard
+  metric and the same reasoning as the Fitbit integration's `sleepScore`.
 
 ## Wearables
 

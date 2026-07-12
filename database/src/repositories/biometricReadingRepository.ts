@@ -10,6 +10,8 @@ function toProviderEnum(provider: WearableProviderId): WearableProvider {
       return 'GOOGLE_HEALTH';
     case 'garmin':
       return 'GARMIN';
+    case 'apple_health':
+      return 'APPLE_HEALTH';
   }
 }
 
@@ -21,6 +23,8 @@ function toProviderId(provider: WearableProvider): WearableProviderId {
       return 'google_health';
     case 'GARMIN':
       return 'garmin';
+    case 'APPLE_HEALTH':
+      return 'apple_health';
   }
 }
 
