@@ -486,3 +486,149 @@ automated path — a real user would have to remember to click it.
   ```
   0 * * * * cd /path/to/moodsync/workers && npm run start:sync-all
   ```
+
+## Fitbit near-live heart rate + Google Health schema verification
+
+- **Verified the Google Health API implementation against Google's live
+  REST reference** (`developers.google.com/health`), field by field, at
+  the user's request. Found and fixed two confirmed bugs where the code's
+  assumed JSON field names didn't match the real API — both would have
+  silently produced `undefined` values forever, not errors:
+  - `HeartRateRollupValue`'s fields are `beatsPerMinuteMin/Max/Avg`, not
+    the `bpmMin/Max/Avg` the code guessed.
+  - The `Sleep` schema nests differently than assumed:
+    `interval.startTime/endTime` (not directly on `sleep`), and
+    `summary.stagesSummary[].{type,minutes}` (not
+    `sleepSummary.stageSummary[].{sleepStageType,totalDuration}`).
+    `sleepEfficiencyScore` now uses `summary.minutesAsleep` /
+    `summary.minutesInSleepPeriod` directly instead of hand-summing stage
+    durations. `steps`/`total-calories` rollup field names
+    (`countSum`/`kcalSum`) and every `pairedDevices` field were confirmed
+    correct on the first pass — no changes there.
+- **Added `GoogleHealthClient.listHeartRate`**: fetches individual
+  timestamped heart-rate samples (the `heart-rate` dataType's `list`
+  method) instead of only a once-a-day rollup average. Each sample becomes
+  its own `NormalizedBiometricReading` at its real `physicalTime`, so the
+  dashboard's "latest reading" reflects an actual recent measurement, not
+  a stale daily average — this is what "current heart rate" is built on.
+  There's no true push/streaming API (`developers.google.com/health/webhooks`
+  exists but only notifies "new data landed in this time range," it still
+  requires a follow-up `list`/`dailyRollUp` call to fetch values, and
+  needs a publicly reachable HTTPS endpoint — not adopted here), so
+  "near-live" means polling on a short interval.
+- **Fitbit sync worker cadence dropped from hourly to every 5 minutes** to
+  make that polling actually near-live. Confirmed safe against
+  `developers.google.com/health/rate-limits`: 300 requests/minute per
+  user — a 5-minute sync does roughly 6 requests per connected user, far
+  under quota. WHOOP's own quota (100 req/min, 10k/day per client) is also
+  comfortable at this cadence. Updated crontab example:
+  ```
+  */5 * * * * cd /path/to/moodsync/workers && npm run start:sync-all
+  ```
+- **Added a unique constraint** on `BiometricReading(userId, provider,
+  timestamp)` and switched `bulkInsert` to `skipDuplicates: true` — a
+  5-minute cadence with a 20-minute heart-rate lookback window
+  (`heartRateSinceMinutes`, deliberately wider than the sync interval so
+  one missed cycle doesn't drop a sample) intentionally re-requests
+  overlapping data on every run; without the constraint this would
+  otherwise insert repeat rows for the same sample.
+- **Verified for real**: rebuilt and typechecked
+  `@moodsync/integration-fitbit`, `@moodsync/database`,
+  `@moodsync/workers`, and `backend` clean; ran the new/updated
+  `normalize.test.ts` suite (8 passing, including new coverage for
+  per-sample heart-rate readings and the fixed sleep-efficiency
+  calculation); applied the new migration to the real local Postgres
+  instance and confirmed no pre-existing duplicate rows blocked it;
+  restarted the real backend and re-ran the real `syncAll` worker against
+  the live database to confirm nothing regressed (no active connections
+  exist in this environment yet, so the actual Google Health API response
+  shapes are still unverified against live traffic — only against the
+  documented schema).
+
+## Apple Health production-readiness pass
+
+- **Full architecture design** written up in
+  `docs/APPLE_HEALTH_ARCHITECTURE.md`: system diagram, auth flow, data
+  flow, security model, sync/background-sync strategy, error handling,
+  privacy considerations, platform limitations, and an explicit
+  on-device-vs-server-side split — grounded in a fresh round of
+  `developer.apple.com` research (not carried over from the prior
+  session), with every HealthKit identifier and schema claim in it
+  independently confirmed against live doc fetches this round.
+- **New confirmed findings from that research**:
+  - `HKDevice` has no battery property at all — confirmed by listing its
+    complete field set. This is a permanent HealthKit platform gap
+    (unlike Google Health's `pairedDevices`, which does expose battery),
+    not a bug or an oversight.
+  - Blood oxygen (`oxygenSaturation`) is a real HealthKit type, but its
+    availability on US Apple Watch hardware has an unusual recent history
+    (disabled Jan 2024 by an ITC ruling tied to Masimo patent litigation,
+    partially restored Aug 2025 via iPhone-side processing, litigation
+    ongoing) — whether third-party HealthKit reads see the restored data
+    on affected devices couldn't be confirmed from available docs and is
+    flagged as genuinely uncertain rather than guessed at.
+  - HealthKit has no true push/real-time API for historical data —
+    `HKObserverQuery` + `enableBackgroundDelivery` is the closest thing,
+    and it's an OS-scheduled, non-guaranteed-immediate wake, not a
+    notification.
+- **Expanded `HealthKitReader`**: added heart rate variability (SDNN),
+  respiratory rate, blood oxygen, and device-name reading (off the most
+  recent heart-rate sample's `HKDevice`); requested (but did not yet
+  sync) workout authorization, so a future round doesn't need a new
+  permission prompt. Added `enableBackgroundDelivery(onUpdate:)` —
+  `HKObserverQuery` registration + `enableBackgroundDelivery` for every
+  watched sample type, heart rate at `.immediate`, everything else at
+  `.hourly`.
+- **Extended the data model end-to-end** for the three new metrics:
+  `NormalizedReading` (Swift) → `readingSchema` (Zod, backend ingest) →
+  `NormalizedBiometricReading` (shared TS type) → `BiometricReading`
+  (Prisma model + real migration applied to the local Postgres) →
+  `biometricReadingRepository`. Device name now flows through
+  `wearableConnectionRepository.updateDeviceInfo` the same way Fitbit's
+  already does.
+- **Built `scripts/demoAppleHealthSync.mjs`**: since Apple Health has no
+  server-side API, there's no way to fake an OAuth connection and let a
+  worker pull data (unlike WHOOP/Fitbit) — the only real producer of
+  Apple Health data is a physical device. This script instead logs into
+  a real MoodSync account and pushes a realistic simulated day of data
+  through the REAL `/api/integrations/apple-health/ingest` endpoint,
+  letting the entire server + dashboard half of the integration be
+  verified without an iPhone or Apple Developer account.
+- **Connections card overhaul** for Apple Health specifically (a
+  dedicated `AppleHealthCard` component, not the shared OAuth-provider
+  card): shows device name, relative last-sync time, a list of requested
+  metrics with an explicit note that HealthKit never reveals true
+  grant/deny state (so the framing says "requested," never "granted"),
+  a no-battery note, and — when not connected — a 4-step onboarding
+  panel explaining there's no web sign-in for this provider.
+- **Wrote `docs/APPLE_HEALTH_DEVELOPER_GUIDE.md`**: the complete,
+  assume-zero-prior-setup guide for everything that requires the user's
+  own Apple Developer account and hardware — enrollment, App ID +
+  HealthKit capability, wrapping the existing Swift package in an Xcode
+  project, Info.plist keys, Background Modes, running on a physical
+  iPhone (HealthKit does not work in the Simulator — this is a hard
+  requirement, not a convenience choice), TestFlight, and App Store
+  submission's HealthKit-specific privacy declarations.
+- **Verified for real**: full monorepo build/typecheck/lint/test all
+  clean; `swift build` clean on the expanded Swift package; the Swift
+  package's pure logic (including the new fields' JSON round-trip
+  against the exact key names the backend Zod schema expects) verified
+  via the same temporary-executable-target technique as the prior
+  Apple Health round (added, run, deleted before commit — XCTest itself
+  still isn't runnable in this sandbox); ran
+  `scripts/demoAppleHealthSync.mjs` twice against two disposable test
+  accounts created and deleted specifically for this verification (never
+  touched any pre-existing user data — see the standing privacy protocol
+  from earlier in this project), confirming all new fields (HRV,
+  respiratory rate, blood oxygen, device name) persist correctly through
+  the real ingest pipeline once the backend was rebuilt with this
+  round's changes; visually verified both the disconnected-onboarding
+  and connected states of the new Apple Health Connections card in a
+  real browser session against the live local backend. Also found and
+  fixed one pre-existing, unrelated flaky test
+  (`backend/src/lib/oauthState.test.ts`'s tamper-detection test) —
+  base64url's final character can carry unused padding bits, so a fixed
+  last-character swap could coincidentally decode to the same signature
+  bytes and leave tampering undetected; fixed by flipping a character in
+  the middle of the token instead, confirmed stable across 5 repeated
+  runs.

@@ -22,7 +22,7 @@ public final class SyncCoordinator {
         do {
             try await healthKit.requestAuthorization()
             let reading = try await healthKit.readCurrentSnapshot()
-            let inserted = try await apiClient.ingest(readings: [reading], accessToken: accessToken)
+            let inserted = try await apiClient.ingest(readings: [reading], deviceName: reading.deviceName, accessToken: accessToken)
             return .success(readingsInserted: inserted)
         } catch let error as HealthKitError {
             return .failure(describeHealthKitError(error))

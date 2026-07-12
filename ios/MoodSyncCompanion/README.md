@@ -8,13 +8,33 @@ This package is that app's logic: it exists specifically so MoodSync can
 support Apple Health at all, not as an alternative to the OAuth-based
 integrations (WHOOP, Fitbit, Hue, Spotify).
 
+See [docs/APPLE_HEALTH_ARCHITECTURE.md](../../docs/APPLE_HEALTH_ARCHITECTURE.md)
+for the full system design (auth flow, data flow, security model, sync
+strategy, privacy, and exactly which HealthKit metrics are/aren't
+available — verified against live `developer.apple.com` documentation)
+and [docs/APPLE_HEALTH_DEVELOPER_GUIDE.md](../../docs/APPLE_HEALTH_DEVELOPER_GUIDE.md)
+for the step-by-step Apple Developer account/Xcode/device setup required
+to actually run this on a phone.
+
+## Metrics read
+
+Heart rate, resting heart rate, heart rate variability (SDNN), respiratory
+rate, blood oxygen (SpO2), steps, active calories, sleep stages, and the
+recording device's name (via `HKDevice`). Workout authorization is
+requested but workout *data* isn't synced yet — see the architecture
+doc's §11 for why. There is no device battery field: HealthKit's
+`HKDevice` has no battery property at all, confirmed against Apple's own
+reference — this is a permanent platform gap, not a bug.
+
 ## Architecture
 
 - `MoodSyncCompanion` (library target): HealthKit authorization/reading
-  (`HealthKitReader`), the networking client (`MoodSyncAPIClient`), and
-  the pure orchestration logic (`SyncCoordinator`) — all behind protocols
-  (`HealthKitReading`, `MoodSyncAPIClientProtocol`) so the coordinator is
-  unit-testable without HealthKit or the network.
+  (`HealthKitReader`, including background delivery via `HKObserverQuery`
+  + `enableBackgroundDelivery`), the networking client
+  (`MoodSyncAPIClient`), and the pure orchestration logic
+  (`SyncCoordinator`) — all behind protocols (`HealthKitReading`,
+  `MoodSyncAPIClientProtocol`) so the coordinator is unit-testable
+  without HealthKit or the network.
 - `MoodSyncCompanionUI` (library target): the one-screen SwiftUI view
   (login + sync). Deliberately minimal — this app's only job is getting
   HealthKit data into the backend, not a second product surface.

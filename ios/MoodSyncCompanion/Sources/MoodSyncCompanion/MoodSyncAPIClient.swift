@@ -16,7 +16,7 @@ public struct MoodSyncTokens: Sendable, Equatable {
 public protocol MoodSyncAPIClientProtocol: Sendable {
     func login(email: String, password: String) async throws -> MoodSyncTokens
     @discardableResult
-    func ingest(readings: [NormalizedReading], accessToken: String) async throws -> Int
+    func ingest(readings: [NormalizedReading], deviceName: String?, accessToken: String) async throws -> Int
 }
 
 /// Talks to the exact same endpoints the web app uses
@@ -45,16 +45,20 @@ public actor MoodSyncAPIClient: MoodSyncAPIClientProtocol {
         return MoodSyncTokens(accessToken: response.accessToken, refreshToken: response.refreshToken)
     }
 
-    /// Matches the backend's `{ readings: [...] }` request body and
-    /// `{ readingsInserted: number }` response exactly.
+    /// Matches the backend's `{ readings: [...], deviceName? }` request
+    /// body and `{ readingsInserted: number }` response exactly. Each
+    /// `NormalizedReading` also carries its own `deviceName` field (used
+    /// for the on-device domain model), which the backend's per-reading
+    /// Zod schema simply ignores as an unrecognized key — `deviceName` is
+    /// only read from this top-level field.
     @discardableResult
-    public func ingest(readings: [NormalizedReading], accessToken: String) async throws -> Int {
-        struct IngestRequest: Encodable { let readings: [NormalizedReading] }
+    public func ingest(readings: [NormalizedReading], deviceName: String? = nil, accessToken: String) async throws -> Int {
+        struct IngestRequest: Encodable { let readings: [NormalizedReading]; let deviceName: String? }
         struct IngestResponse: Decodable { let readingsInserted: Int }
 
         let response: IngestResponse = try await post(
             path: "/api/integrations/apple-health/ingest",
-            body: IngestRequest(readings: readings),
+            body: IngestRequest(readings: readings, deviceName: deviceName),
             accessToken: accessToken
         )
         return response.readingsInserted

@@ -12,6 +12,16 @@ export interface NormalizedBiometricReading {
   timestamp: string;
   heartRate?: number | undefined;
   restingHeartRate?: number | undefined;
+  /** Milliseconds (SDNN). Apple Health-only today — no confirmed WHOOP or
+   * Google Health field maps to this cleanly (WHOOP's recovery HRV is a
+   * different metric/units, not independently confirmed to be SDNN). */
+  heartRateVariability?: number | undefined;
+  /** Breaths per minute. Apple Health-only today. */
+  respiratoryRate?: number | undefined;
+  /** 0-100 percentage (SpO2). Apple Health-only today — see
+   * docs/APPLE_HEALTH_ARCHITECTURE.md §6 for a real caveat about this
+   * metric's availability on some US Apple Watch hardware. */
+  bloodOxygen?: number | undefined;
   /** 0-100, provider-normalized */
   sleepScore?: number | undefined;
   /** 0-100. WHOOP-native ("Recovery"); no Google Health equivalent today. */

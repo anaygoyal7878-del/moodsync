@@ -33,7 +33,15 @@ describe('createOAuthState / verifyOAuthState', () => {
       returnTo: 'https://app.example.com/connected',
     });
 
-    const tampered = state.slice(0, -1) + (state.endsWith('a') ? 'b' : 'a');
+    // Flip a character in the middle of the payload segment, not the very
+    // last character of the token: base64url's final character can encode
+    // a couple of unused padding bits that decoders ignore, so a fixed
+    // last-character swap can — depending on the original byte value —
+    // coincidentally decode to the same bytes and leave the signature
+    // valid, making this test flaky rather than a reliable tamper check.
+    const middle = Math.floor(state.length / 2);
+    const flipped = state[middle] === 'a' ? 'b' : 'a';
+    const tampered = state.slice(0, middle) + flipped + state.slice(middle + 1);
     await expect(verifyOAuthState(tampered)).rejects.toThrow(InvalidOAuthStateError);
   });
 

@@ -11,6 +11,16 @@ public struct NormalizedReading: Codable, Equatable, Sendable {
     public let timestamp: Date
     public var heartRate: Double?
     public var restingHeartRate: Double?
+    /// Standard deviation of NN intervals, in milliseconds
+    /// (`HKQuantityTypeIdentifier.heartRateVariabilitySDNN`) — confirmed
+    /// real HealthKit identifier, see docs/APPLE_HEALTH_ARCHITECTURE.md §6.
+    public var heartRateVariability: Double?
+    /// Breaths per minute (`.respiratoryRate`).
+    public var respiratoryRate: Double?
+    /// 0-100 percentage (`.oxygenSaturation`) — see
+    /// docs/APPLE_HEALTH_ARCHITECTURE.md §6 for a real caveat about this
+    /// metric's availability on some US Apple Watch hardware.
+    public var bloodOxygen: Double?
     /// 0-100 sleep efficiency (time asleep / time asleep+awake) — HealthKit
     /// has no single "sleep score" field, same reasoning as this product's
     /// Google Health integration (see docs/INTEGRATIONS_RESEARCH.md).
@@ -22,23 +32,38 @@ public struct NormalizedReading: Codable, Equatable, Sendable {
     /// identical across providers so the dashboard's "Activity" metric
     /// means the same thing regardless of source.
     public var activityLevel: Double?
+    /// The name of the device that recorded the most recent heart-rate
+    /// sample (from `HKSample.device`) — e.g. "Apple Watch". HealthKit has
+    /// no battery-level API for paired devices at all (confirmed:
+    /// `HKDevice` has no battery property), so unlike Google Health there
+    /// is no `batteryLevel`/`batteryStatus` here — see
+    /// docs/APPLE_HEALTH_ARCHITECTURE.md §6.
+    public var deviceName: String?
 
     public init(
         timestamp: Date,
         heartRate: Double? = nil,
         restingHeartRate: Double? = nil,
+        heartRateVariability: Double? = nil,
+        respiratoryRate: Double? = nil,
+        bloodOxygen: Double? = nil,
         sleepScore: Double? = nil,
         steps: Double? = nil,
         calories: Double? = nil,
-        activityLevel: Double? = nil
+        activityLevel: Double? = nil,
+        deviceName: String? = nil
     ) {
         self.timestamp = timestamp
         self.heartRate = heartRate
         self.restingHeartRate = restingHeartRate
+        self.heartRateVariability = heartRateVariability
+        self.respiratoryRate = respiratoryRate
+        self.bloodOxygen = bloodOxygen
         self.sleepScore = sleepScore
         self.steps = steps
         self.calories = calories
         self.activityLevel = activityLevel
+        self.deviceName = deviceName
     }
 }
 

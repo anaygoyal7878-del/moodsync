@@ -81,6 +81,80 @@ function ConnectAction({
   );
 }
 
+/** What MoodSync requests read access to via HealthKit — a fixed list,
+ * not derived from any per-connection API response, because HealthKit
+ * has no endpoint that reports which of these a user actually granted
+ * (see docs/APPLE_HEALTH_ARCHITECTURE.md §8: read-permission denial is
+ * deliberately invisible to apps, by Apple design). Showing this as
+ * "requested," not "granted," is the honest framing — MoodSync cannot
+ * know true per-type permission state, only what values a sync actually
+ * returned. */
+const APPLE_HEALTH_REQUESTED_METRICS = [
+  "Heart rate",
+  "Resting heart rate",
+  "Heart rate variability",
+  "Respiratory rate",
+  "Blood oxygen",
+  "Steps & active calories",
+  "Sleep stages",
+];
+
+function formatRelativeSync(lastSyncedAt: string | null): string {
+  if (!lastSyncedAt) return "Never synced";
+  const ms = Date.now() - new Date(lastSyncedAt).getTime();
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return "Synced just now";
+  if (minutes < 60) return `Synced ${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `Synced ${hours}h ago`;
+  return `Synced ${Math.round(hours / 24)}d ago`;
+}
+
+function AppleHealthCard({ connection }: { connection: WearableConnectionSummary | undefined }) {
+  const isActive = connection?.status === "ACTIVE";
+
+  return (
+    <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{WEARABLE_LABELS.APPLE_HEALTH}</p>
+
+        {connection ? (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <ConnectionStatusBadge status={connection.status} />
+            {isActive && <span className="text-xs text-ink-muted">· {formatRelativeSync(connection.lastSyncedAt)}</span>}
+          </div>
+        ) : (
+          <p className="mt-1 text-xs text-ink-muted">Not connected</p>
+        )}
+        {isActive && <DeviceInfo connection={connection} />}
+
+        {isActive ? (
+          <div className="mt-2 space-y-1">
+            <p className="text-xs text-ink-muted">
+              <span className="font-medium text-ink">Permissions requested:</span> {APPLE_HEALTH_REQUESTED_METRICS.join(", ")}.
+              iOS never tells any app which of these you actually allowed — if a metric is missing from your dashboard,
+              it either wasn&apos;t granted or your device hasn&apos;t recorded it yet.
+            </p>
+            <p className="text-xs text-ink-muted">No battery status — Apple Health has no battery API for paired devices.</p>
+          </div>
+        ) : (
+          <div className="mt-2 space-y-1.5 rounded-lg bg-surface-raised p-2.5 text-xs text-ink-muted">
+            <p className="font-medium text-ink">HealthKit has no web sign-in — connect from the iOS app:</p>
+            <ol className="list-decimal space-y-0.5 pl-4">
+              <li>Install the MoodSync companion app on your iPhone.</li>
+              <li>Sign in with this same MoodSync account.</li>
+              <li>Allow the Health data permissions when prompted.</li>
+              <li>Tap &quot;Sync now&quot; — this card updates automatically once data arrives.</li>
+            </ol>
+            <p>Reads: {APPLE_HEALTH_REQUESTED_METRICS.join(", ")}. Read-only — MoodSync never writes to your Health data.</p>
+          </div>
+        )}
+      </div>
+      {isActive && <DisconnectButton provider="apple-health" />}
+    </Card>
+  );
+}
+
 export function ConnectionsSection({ connections }: { connections: ConnectionsResponse }) {
   const whoop = connections.wearables.find((c) => c.provider === "WHOOP");
   const fitbit = connections.wearables.find((c) => c.provider === "GOOGLE_HEALTH");
@@ -140,26 +214,7 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
         />
       </Card>
 
-      <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">{WEARABLE_LABELS.APPLE_HEALTH}</p>
-          {appleHealth?.status === "ACTIVE" ? (
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <ConnectionStatusBadge status={appleHealth.status} />
-              <span className="text-xs text-ink-muted">· {formatLastSynced(appleHealth.lastSyncedAt)}</span>
-            </div>
-          ) : (
-            <p className="mt-1 text-xs text-ink-muted">
-              {appleHealth ? "Disconnected" : "Not connected"} · sign in from the MoodSync iOS app to connect
-            </p>
-          )}
-          <p className="mt-1 text-xs text-ink-muted">
-            HealthKit has no web-based OAuth flow — connecting only happens by signing into this account from the
-            iOS companion app.
-          </p>
-        </div>
-        {appleHealth?.status === "ACTIVE" && <DisconnectButton provider="apple-health" />}
-      </Card>
+      <AppleHealthCard connection={appleHealth} />
 
       <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
         <div className="min-w-0 flex-1">

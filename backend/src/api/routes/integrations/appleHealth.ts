@@ -17,6 +17,14 @@ const readingSchema = z.object({
   timestamp: z.string().datetime(),
   heartRate: z.number().optional(),
   restingHeartRate: z.number().optional(),
+  /** Milliseconds (SDNN) — see docs/APPLE_HEALTH_ARCHITECTURE.md §6. */
+  heartRateVariability: z.number().optional(),
+  /** Breaths per minute. */
+  respiratoryRate: z.number().optional(),
+  /** 0-100 percentage (SpO2) — see docs/APPLE_HEALTH_ARCHITECTURE.md §6
+   * for a real caveat about this metric's availability on some US Apple
+   * Watch hardware. */
+  bloodOxygen: z.number().min(0).max(100).optional(),
   /** Sleep efficiency (time asleep / time in bed), computed on-device from
    * raw HKCategoryValueSleepAnalysis samples — HealthKit has no single
    * "sleep score" field, same reasoning as Google Health's sleepScore. */
@@ -26,7 +34,16 @@ const readingSchema = z.object({
   activityLevel: z.number().min(0).max(100).optional(),
 });
 
-const ingestSchema = z.object({ readings: z.array(readingSchema).min(1).max(500) });
+const ingestSchema = z.object({
+  readings: z.array(readingSchema).min(1).max(500),
+  /** Read off the most recent heart-rate sample's `HKDevice` — e.g.
+   * "Apple Watch". No battery field exists: HealthKit's `HKDevice` has no
+   * battery property at all (confirmed, see
+   * docs/APPLE_HEALTH_ARCHITECTURE.md §6) — unlike Google Health's
+   * `pairedDevices`, there is nothing to populate `batteryLevel`/
+   * `batteryStatus` from for this provider. */
+  deviceName: z.string().optional(),
+});
 
 export default async function appleHealthRoutes(app: FastifyInstance) {
   app.post('/integrations/apple-health/ingest', { preHandler: app.authenticate }, async (request, reply) => {
@@ -40,6 +57,9 @@ export default async function appleHealthRoutes(app: FastifyInstance) {
       timestamp: r.timestamp,
       heartRate: r.heartRate,
       restingHeartRate: r.restingHeartRate,
+      heartRateVariability: r.heartRateVariability,
+      respiratoryRate: r.respiratoryRate,
+      bloodOxygen: r.bloodOxygen,
       sleepScore: r.sleepScore,
       steps: r.steps,
       calories: r.calories,
@@ -49,6 +69,9 @@ export default async function appleHealthRoutes(app: FastifyInstance) {
     const connection = await wearableConnectionRepository.upsertTokenlessConnection(userId, 'APPLE_HEALTH');
     const inserted = await biometricReadingRepository.bulkInsert(readings);
     await wearableConnectionRepository.markSynced(connection.id);
+    if (parsed.data.deviceName) {
+      await wearableConnectionRepository.updateDeviceInfo(connection.id, { deviceName: parsed.data.deviceName });
+    }
 
     if (inserted > 0) {
       const latest = await biometricReadingRepository.findLatestNormalized(userId);

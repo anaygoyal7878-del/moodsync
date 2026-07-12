@@ -41,6 +41,9 @@ function toNormalized(row: BiometricReadingRow): NormalizedBiometricReading {
     timestamp: row.timestamp.toISOString(),
     heartRate: row.heartRate ?? undefined,
     restingHeartRate: row.restingHeartRate ?? undefined,
+    heartRateVariability: row.heartRateVariability ?? undefined,
+    respiratoryRate: row.respiratoryRate ?? undefined,
+    bloodOxygen: row.bloodOxygen ?? undefined,
     sleepScore: row.sleepScore ?? undefined,
     recoveryScore: row.recoveryScore ?? undefined,
     stressLevel: row.stressLevel ?? undefined,
@@ -51,11 +54,11 @@ function toNormalized(row: BiometricReadingRow): NormalizedBiometricReading {
 }
 
 export const biometricReadingRepository = {
-  /** Bulk insert for a sync run. `skipDuplicates` relies on there being no
-   * unique constraint on (userId, provider, timestamp) today — duplicate
-   * readings across overlapping sync windows are an accepted tradeoff for
-   * v1 (see ai/README.md), not a correctness bug, since the decision
-   * engine only ever reads the latest reading. */
+  /** Bulk insert for a sync run. A unique constraint on
+   * (userId, provider, timestamp) plus `skipDuplicates` makes this safe to
+   * call with overlapping lookback windows — e.g. a short-interval poll
+   * for heart-rate samples that intentionally re-requests a bit of
+   * overlap each run in case a previous cycle was missed. */
   async bulkInsert(readings: NormalizedBiometricReading[]): Promise<number> {
     if (readings.length === 0) return 0;
     const result = await prisma.biometricReading.createMany({
@@ -65,6 +68,9 @@ export const biometricReadingRepository = {
         timestamp: new Date(r.timestamp),
         heartRate: r.heartRate ?? null,
         restingHeartRate: r.restingHeartRate ?? null,
+        heartRateVariability: r.heartRateVariability ?? null,
+        respiratoryRate: r.respiratoryRate ?? null,
+        bloodOxygen: r.bloodOxygen ?? null,
         sleepScore: r.sleepScore ?? null,
         recoveryScore: r.recoveryScore ?? null,
         stressLevel: r.stressLevel ?? null,
@@ -72,6 +78,7 @@ export const biometricReadingRepository = {
         steps: r.steps ?? null,
         calories: r.calories ?? null,
       })),
+      skipDuplicates: true,
     });
     return result.count;
   },

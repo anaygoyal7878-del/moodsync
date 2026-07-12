@@ -12,20 +12,24 @@ private final class FakeHealthKitReader: HealthKitReading, @unchecked Sendable {
     }
 
     func readCurrentSnapshot() async throws -> NormalizedReading { snapshot }
+
+    func enableBackgroundDelivery(onUpdate: @escaping @Sendable () -> Void) async throws {}
 }
 
 private final class FakeAPIClient: MoodSyncAPIClientProtocol, @unchecked Sendable {
     var ingestError: MoodSyncAPIError?
     var insertedCount = 1
     private(set) var lastIngestedReadings: [NormalizedReading] = []
+    private(set) var lastIngestedDeviceName: String?
 
     func login(email: String, password: String) async throws -> MoodSyncTokens {
         MoodSyncTokens(accessToken: "fake-token", refreshToken: "fake-refresh")
     }
 
-    func ingest(readings: [NormalizedReading], accessToken: String) async throws -> Int {
+    func ingest(readings: [NormalizedReading], deviceName: String?, accessToken: String) async throws -> Int {
         if let ingestError { throw ingestError }
         lastIngestedReadings = readings
+        lastIngestedDeviceName = deviceName
         return insertedCount
     }
 }
@@ -41,6 +45,17 @@ final class SyncCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(result, .success(readingsInserted: 1))
         XCTAssertEqual(api.lastIngestedReadings, [healthKit.snapshot])
+    }
+
+    func testSyncPassesDeviceNameThroughToTheAPIClient() async {
+        let healthKit = FakeHealthKitReader()
+        healthKit.snapshot.deviceName = "Apple Watch"
+        let api = FakeAPIClient()
+        let coordinator = SyncCoordinator(healthKit: healthKit, apiClient: api)
+
+        _ = await coordinator.sync(accessToken: "token")
+
+        XCTAssertEqual(api.lastIngestedDeviceName, "Apple Watch")
     }
 
     func testHealthKitAuthorizationFailureIsSurfacedAsFailure() async {

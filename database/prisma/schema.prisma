@@ -189,6 +189,12 @@ model BiometricReading {
   timestamp        DateTime
   heartRate        Float?
   restingHeartRate Float?
+  /// Milliseconds (SDNN). Apple Health-only today.
+  heartRateVariability Float?
+  /// Breaths per minute. Apple Health-only today.
+  respiratoryRate  Float?
+  /// 0-100 percentage (SpO2). Apple Health-only today.
+  bloodOxygen      Float?
   sleepScore       Float?
   recoveryScore    Float?
   stressLevel      Float?
@@ -197,6 +203,11 @@ model BiometricReading {
   calories         Float?
   createdAt        DateTime         @default(now())
 
+  // Frequent-polling providers (e.g. Fitbit heart-rate samples on a
+  // 5-minute worker cadence) can re-fetch a data point already inserted
+  // by a previous run when its lookback window overlaps — this constraint
+  // lets bulkInsert use skipDuplicates instead of accumulating repeats.
+  @@unique([userId, provider, timestamp])
   @@index([userId, timestamp])
   @@map("biometric_readings")
 }
