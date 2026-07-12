@@ -721,3 +721,78 @@ automated path — a real user would have to remember to click it.
   error-path assertions — proving the hand-implemented crypto is
   actually correct, not merely that it throws on bad input). Full
   monorepo build/typecheck/lint/test all pass (81 tests total).
+
+## Fitbit/Google Health: real-account sync bug fixes
+
+- **A real user connected a real Fitbit account through the dashboard
+  during this session** (via the ngrok tunnel set up for Alexa testing)
+  and reported the sync failing. Diagnosed by decrypting that
+  connection's real stored access token and calling Google's API
+  directly, bypassing the app entirely, to see Google's actual error
+  response — `GoogleHealthClient`'s error handling only captured HTTP
+  status codes, not response bodies, so this was the only way to see
+  what Google was actually rejecting. Found and fixed **three
+  independent, real bugs**, none of which had ever been exercised
+  against a live linked account before:
+  1. `dailyRollUp`'s request body used a flat
+     `{year,month,day,hour,minute,second}` `CivilDateTime` — Google
+     rejected this outright (`Unknown name "year" at 'range.start'`).
+     The real shape nests a `date` object and an optional `time` object
+     with plural field names: `{date:{year,month,day}, time?:{hours,
+     minutes,seconds,nanos}}`. This broke **every** dailyRollUp call
+     (steps, heart-rate, total-calories) since Milestone 7a.
+  2. `listSleep`'s filter used `sleep.start_time`, which Google's API
+     doesn't support filtering by at all — sleep can only be filtered
+     by *end* time (`sleep.interval.end_time`). Confirmed as a real,
+     permanent API constraint via the docs' own filter-field list, not
+     a naming bug.
+  3. `listDailyRestingHeartRate`'s filter used `dailyRestingHeartRate.date`
+     (the response's camelCase field name) instead of the required
+     snake_case data-type segment, `daily_resting_heart_rate.date` —
+     this project's own research doc already noted the snake_case rule
+     but this specific filter wasn't written to follow it.
+- Also fixed `GoogleHealthApiError` to capture the response body, not
+  just the status code — the exact gap that made this investigation
+  need a live out-of-band request in the first place.
+- **Verified for real, repeatedly**, against the same real linked
+  account, rebuilding and restarting the backend between each fix:
+  first reproduced the original failure, then confirmed each fix in
+  turn, then confirmed a full successful sync (7 readings inserted,
+  including the user's real device — a Fitbit Sense 2 at 2%/Empty
+  battery — and real calorie data). Directly confirmed via a raw API
+  call that the still-null heart-rate/steps fields are genuinely empty
+  on Google's side for this account (`{}` response), not a remaining
+  bug. Corrected `docs/INTEGRATIONS_RESEARCH.md`'s prior (wrong)
+  request-shape/filter documentation to match. Full monorepo
+  build/typecheck/lint/test pass (87 tests).
+
+## Amazfit (Zepp) research — blocked, interface-only
+
+- Researched Zepp Health's real developer platform before writing any
+  code, per this project's standing rule. Found a genuine, documented
+  OAuth 2.0 API (Huami/Zepp's official `zepp-health/rest-api` GitHub
+  wiki — distinct from **Zepp OS**, which is for building on-watch Mini
+  Programs, not third-party server data access) with real
+  authorization/token endpoints and seven scopes including continuous
+  `heartrate` and raw `motion` data.
+- **Hard-gated, not self-serve**: the docs explicitly state "Data
+  cooperation currently only supports corporate users, not individual
+  users," with registration at dev.huami.com requiring a 3-7 day
+  business-partnership review — no path to a client ID without an
+  approved partnership, a harder blocker than Garmin's (stalled
+  program) or Ecobee's (closed registration).
+- **Followed the exact existing precedent** for this situation
+  (`integrations/garmin`, `integrations/ecobee`): added `amazfit` to
+  `WearableProviderId` and the `WearableProvider` Prisma enum (migration
+  applied to the real local Postgres), created
+  `integrations/amazfit` exporting only `amazfitIntegrationStatus`
+  (`not_yet_available`, with the real reason above) — no live client,
+  since untested OAuth code for an API we have no way to get credentials
+  for is more likely to ship with real bugs than not, which the Fitbit
+  fixes above are direct proof of. Recorded the real, confirmed OAuth
+  endpoints/scopes in both the package and
+  `docs/INTEGRATIONS_RESEARCH.md` so a future partnership can start
+  from verified facts, not new research. Wired into the dashboard's
+  label map the same minimal way Garmin already is (recognized, no
+  card, since there's nothing to connect). Full monorepo
+  build/typecheck/lint/test pass.

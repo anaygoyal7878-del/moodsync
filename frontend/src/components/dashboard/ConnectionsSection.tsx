@@ -11,6 +11,7 @@ const WEARABLE_LABELS: Record<string, string> = {
   GOOGLE_HEALTH: "Fitbit",
   GARMIN: "Garmin",
   APPLE_HEALTH: "Apple Health",
+  AMAZFIT: "Amazfit",
 };
 const SMART_HOME_LABELS: Record<string, string> = {
   HUE: "Philips Hue",

@@ -12,28 +12,38 @@ export class GoogleHealthApiError extends Error {
   constructor(
     message: string,
     readonly status?: number,
+    /** Google's raw error response body — captured so a real API error
+     * (e.g. a schema mismatch) is diagnosable from logs alone instead of
+     * needing a live out-of-band request to reproduce, which is how the
+     * bug this field exists to prevent was originally found. */
+    readonly responseBody?: string,
   ) {
     super(message);
   }
 }
 
+/** Confirmed against the live REST reference's `CivilDateTime` type
+ * definition — NOT a flat `{year,month,day,hour,minute,second}` object,
+ * despite that being a very natural first guess (and what this file
+ * originally shipped with). The real shape nests a `google.type.Date`
+ * under `date` and an optional `google.type.TimeOfDay` under `time`,
+ * with `time`'s fields plural (`hours`/`minutes`/`seconds`, plus
+ * `nanos`) — confirmed by reproducing the exact 400 `INVALID_ARGUMENT`
+ * Google returns for the old flat shape ("Unknown name \"year\" at
+ * 'range.start'") against a real linked account, then re-verifying
+ * against the doc's type definition before writing this fix. This
+ * silently broke every `dailyRollUp` call (steps, heart-rate,
+ * total-calories) since the field was introduced — see
+ * docs/INTEGRATIONS_RESEARCH.md's correction note. */
 export interface CivilDateTime {
-  year: number;
-  month: number;
-  day: number;
-  hour?: number;
-  minute?: number;
-  second?: number;
+  date: { year: number; month: number; day: number };
+  time?: { hours: number; minutes: number; seconds: number; nanos?: number };
 }
 
 function toCivilDateTime(date: Date): CivilDateTime {
   return {
-    year: date.getUTCFullYear(),
-    month: date.getUTCMonth() + 1,
-    day: date.getUTCDate(),
-    hour: date.getUTCHours(),
-    minute: date.getUTCMinutes(),
-    second: date.getUTCSeconds(),
+    date: { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: date.getUTCDate() },
+    time: { hours: date.getUTCHours(), minutes: date.getUTCMinutes(), seconds: date.getUTCSeconds() },
   };
 }
 
@@ -144,7 +154,8 @@ export class GoogleHealthClient {
       headers: { ...init?.headers, Authorization: `Bearer ${this.accessToken}` },
     });
     if (!res.ok) {
-      throw new GoogleHealthApiError(`Google Health API request failed: ${path} -> ${res.status}`, res.status);
+      const body = await res.text().catch(() => '');
+      throw new GoogleHealthApiError(`Google Health API request failed: ${path} -> ${res.status}`, res.status, body);
     }
     return res.json() as Promise<T>;
   }
@@ -164,28 +175,45 @@ export class GoogleHealthClient {
     return rollupDataPoints ?? [];
   }
 
+  /** Confirmed against a real 400 (`INVALID_DATA_POINT_FILTER_DATA_TYPE_RESTRICTION`,
+   * "Restriction member path segment 'dailyRestingHeartRate' does not
+   * match any data type") from a live linked account: filter expressions
+   * must reference the data type in **snake_case**
+   * (`daily_resting_heart_rate`), not the camelCase field name the JSON
+   * response happens to use (`dailyRestingHeartRate`) — confirmed
+   * against the docs' own naming-convention note ("in a filter
+   * parameter... the data type name must be in snake case"), which this
+   * client had read but not actually applied here. */
   async listDailyRestingHeartRate(since: Date): Promise<DailyRestingHeartRatePoint[]> {
-    const filter = `dailyRestingHeartRate.date >= "${since.toISOString().slice(0, 10)}"`;
+    const filter = `daily_resting_heart_rate.date >= "${since.toISOString().slice(0, 10)}"`;
     const path = `/users/me/dataTypes/daily-resting-heart-rate/dataPoints?filter=${encodeURIComponent(filter)}`;
     const { dataPoints } = await this.request<{ dataPoints?: DailyRestingHeartRatePoint[] }>(path);
     return dataPoints ?? [];
   }
 
+  /** Confirmed against the live REST reference (reproducing the exact
+   * `INVALID_DATA_POINT_FILTER_DATA_TYPE_MEMBER` / "Member
+   * 'sleep.start_time' is not supported for filtering" error against a
+   * real linked account first, then re-verifying against the docs):
+   * `sleep` only supports filtering by **end** time
+   * (`interval.end_time`/`interval.civil_end_time`) — there is no
+   * start-time filter for this data type at all. A session that ended
+   * after `since` is what "sleep sessions since N days ago" means here;
+   * this is a real, permanent API constraint, not a bug in the filter
+   * string's syntax. */
   async listSleep(since: Date): Promise<SleepDataPoint[]> {
-    const filter = `sleep.start_time >= "${since.toISOString()}"`;
+    const filter = `sleep.interval.end_time >= "${since.toISOString()}"`;
     const path = `/users/me/dataTypes/sleep/dataPoints?filter=${encodeURIComponent(filter)}`;
     const { dataPoints } = await this.request<{ dataPoints?: SleepDataPoint[] }>(path);
     return dataPoints ?? [];
   }
 
   /** Individual timestamped heart-rate samples (not a daily average) —
-   * what "current"/near-live heart rate is built on. The filter field path
-   * (`heart_rate.sample_time.physical_time`) follows the same
-   * `{dataType_snake}.{field_snake}` pattern already used by
-   * `listSleep`'s `sleep.start_time` filter; the exact filter grammar for
-   * this specific field wasn't independently doc-confirmed, only inferred
-   * by pattern — flagged here the same way the pre-existing `listSleep`
-   * filter was. */
+   * what "current"/near-live heart rate is built on. The filter
+   * `heart_rate.sample_time.physical_time >= "..."` is now independently
+   * confirmed against a live doc excerpt verbatim (previously only
+   * inferred by pattern from `listSleep`'s filter — which, unlike this
+   * one, turned out to be wrong; see `listSleep`'s doc comment). */
   async listHeartRate(since: Date): Promise<HeartRateSamplePoint[]> {
     const filter = `heart_rate.sample_time.physical_time >= "${since.toISOString()}"`;
     const path = `/users/me/dataTypes/heart-rate/dataPoints?filter=${encodeURIComponent(filter)}`;

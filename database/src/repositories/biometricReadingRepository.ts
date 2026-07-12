@@ -12,6 +12,8 @@ function toProviderEnum(provider: WearableProviderId): WearableProvider {
       return 'GARMIN';
     case 'apple_health':
       return 'APPLE_HEALTH';
+    case 'amazfit':
+      return 'AMAZFIT';
   }
 }
 
@@ -25,6 +27,8 @@ function toProviderId(provider: WearableProvider): WearableProviderId {
       return 'garmin';
     case 'APPLE_HEALTH':
       return 'apple_health';
+    case 'AMAZFIT':
+      return 'amazfit';
   }
 }
 

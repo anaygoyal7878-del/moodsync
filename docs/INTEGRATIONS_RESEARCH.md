@@ -123,11 +123,26 @@ at `https://health.googleapis.com/$discovery/rest?version=v4`:
   `{ range: { start: CivilDateTime, end: CivilDateTime }, windowSizeDays }`.
   Response: `{ rollupDataPoints: [{ civilStartTime, civilEndTime, steps?:
   { countSum }, heartRate?: { beatsPerMinuteMin, beatsPerMinuteMax,
-  beatsPerMinuteAvg }, totalCalories?: { kcalSum } }] }`. `CivilDateTime`
-  is `{ year, month, day, hour, minute, second, nanos }`. Field casing
+  beatsPerMinuteAvg }, totalCalories?: { kcalSum } }] }`. Field casing
   (snake_case in the proto reference → lowerCamelCase in JSON) follows
   protobuf's standard JSON mapping, which is universal across all Google
   APIs, not something specific to this one.
+- **Correction (2026-07-12, found via a real "why did Fitbit sync fail"
+  investigation against a genuinely linked account, then re-verified
+  against the doc's type definition before fixing)**: `CivilDateTime`
+  was recorded here (and implemented) as a flat
+  `{ year, month, day, hour, minute, second, nanos }` object — that was
+  wrong, and broke **every** `dailyRollUp` call outright (steps,
+  heart-rate, total-calories all 400'd with `INVALID_ARGUMENT`:
+  `Unknown name "year" at 'range.start'`, reproduced live). The real
+  shape nests a `google.type.Date` under `date` and an optional
+  `google.type.TimeOfDay` under `time`, whose fields are plural
+  (`hours`/`minutes`/`seconds`, plus `nanos`):
+  `{ date: { year, month, day }, time?: { hours, minutes, seconds, nanos } }`.
+  This applies to the response's `civilStartTime`/`civilEndTime` too —
+  they nest the same way, not flat. Fixed in
+  `integrations/fitbit/src/client.ts`; see its `CivilDateTime` doc
+  comment.
 - **Correction (2026-07-12, re-verified against a live doc fetch at the
   user's request)**: the `heartRate` rollup field names above were
   originally recorded here as `bpmMin/bpmMax/bpmAvg` — that was wrong.
@@ -171,15 +186,36 @@ at `https://health.googleapis.com/$discovery/rest?version=v4`:
   now computed as their ratio (a standard published sleep-medicine
   metric, sleep efficiency) instead of hand-summing stage durations; see
   `integrations/fitbit/src/normalize.ts`.
-- **Uncertain, flagged rather than assumed**: the exact `filter` query
-  string field path for `list` requests on `daily-resting-heart-rate`,
-  `sleep`, and (newly added) `heart-rate` (only one worked filter example
-  was found in the docs, for `exercise`:
-  `exercise.interval.civil_start_time >= "..."`). This integration
-  follows that same `{dataType}.{field} {op} {value}` pattern by
-  inference — worth a live-sandbox-account spot check before trusting
-  non-default page sizes or tight date windows in production, same
-  caveat style as WHOOP's pagination note above.
+- **Correction (2026-07-12)**: the `filter` query strings for `list` were
+  previously only inferred by pattern (flagged as uncertain below) — a
+  live-account spot check, prompted directly by a real sync failure,
+  found two of the three were wrong:
+  - `listSleep` used `sleep.start_time >= "..."` — Google rejected this
+    with `INVALID_DATA_POINT_FILTER_DATA_TYPE_MEMBER`, "Member
+    'sleep.start_time' is not supported for filtering." **`sleep` has no
+    start-time filter at all** — only end time:
+    `sleep.interval.end_time >= "..."` (or `interval.civil_end_time`).
+    This is a real, permanent API constraint (confirmed against the
+    docs' own filter-field list for this data type), not a syntax bug —
+    "sleep sessions since N days ago" now means "sessions that *ended*
+    after N days ago," a reasonable proxy but worth knowing about if
+    exact semantics ever matter.
+  - `listDailyRestingHeartRate` used `dailyRestingHeartRate.date >=
+    "..."` (matching the JSON response's camelCase field name) — Google
+    rejected this with `INVALID_DATA_POINT_FILTER_DATA_TYPE_RESTRICTION`,
+    "Restriction member path segment 'dailyRestingHeartRate' does not
+    match any data type." The filter's leading segment must be the data
+    type in **snake_case** (`daily_resting_heart_rate`), not the
+    response field's camelCase — this project's own docs already noted
+    "in a filter parameter... the data type name must be in snake case"
+    but this specific filter wasn't actually written that way.
+  - `listHeartRate`'s `heart_rate.sample_time.physical_time >= "..."`
+    was independently confirmed correct (matches a live doc excerpt
+    verbatim) — the one of the three that was right.
+  All three fixed in `integrations/fitbit/src/client.ts`. Net effect:
+  the Fitbit/Google Health sync had never successfully completed against
+  a real linked account before this fix — `dailyRollUp`'s malformed
+  request body alone would have failed every sync since Milestone 7a.
 - **No push/streaming API for heart rate**: `developers.google.com/health/webhooks`
   exists, but a webhook notification only carries a `dataType` and a time
   interval ("new data landed here") — the actual values still require a
@@ -265,6 +301,44 @@ Confirmed directly against `developers.google.com/health/reference/rest/v4/users
   fees. Native metrics include Body Battery (their recovery-score analog)
   and a native stress score — richer than WHOOP/Google Health on paper,
   worth revisiting once the program is confirmed open again.
+
+### Amazfit (via Zepp) — blocked, interface-only for now
+
+- **Correct product**: Zepp Health's (formerly Huami) "Data Cooperation"
+  partner API, documented at the official `zepp-health/rest-api` GitHub
+  wiki — a real company repository, not a community project. This is a
+  genuine OAuth 2.0 API distinct from **Zepp OS**, which is a separate
+  product for building Mini Programs/watch faces that run *on* the
+  device itself and has no bearing on a third-party server pulling a
+  user's health history.
+- **Real, confirmed OAuth details** (recorded here so implementation can
+  start immediately if a partnership is approved, without re-research):
+  - Authorization: `https://user.huami.com/oauth/index.html#/?client_id=...&redirect_uri=...&response_type=code&state=...`
+  - Token exchange: `POST https://auth.huami.com/oauth2/access_token`
+  - Grants: authorization_code (recommended) or implicit
+  - Scopes: `profile`, `activity`, `sleep`, `heartrate`, `motion`,
+    `sport`, `sportDetail` — `heartrate` and `motion` in particular go
+    well beyond what WHOOP/Google Health expose (continuous heart rate
+    and raw per-minute motion-sensor data, respectively).
+  - Token lifetime: 90-day access token, 10-year refresh token.
+- **Current status — hard-gated, not self-serve**: registration happens
+  at `https://dev.huami.com/#/home`, with a stated 3-7 day review period,
+  but the docs are explicit: *"Data cooperation currently only supports
+  corporate users, not individual users."* There is no path from "create
+  an account" to "get a client ID" the way Fitbit, WHOOP, or Spotify
+  offer — this requires an approved business partnership, a different
+  and harder blocker than Garmin's (program exists but is de facto
+  stalled) or Ecobee's (registration explicitly closed).
+- **What we do about it**: `integrations/amazfit` exports only
+  `amazfitIntegrationStatus` (`availability: 'not_yet_available'`, with
+  the reason above) — no live client, matching
+  `integrations/garmin`/`integrations/ecobee`'s current shape exactly
+  (both are metadata-only today, not a stub client class). Untested
+  OAuth/client code for an API we have no way to get real credentials
+  for is more likely to ship with real bugs than not — see the Fitbit
+  `CivilDateTime`/filter-field corrections above, found only because a
+  real account triggered a real error. Better to wait for an approved
+  partnership and build against live traffic than guess now.
 
 ### Normalized wearable data model
 

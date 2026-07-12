@@ -3,7 +3,7 @@ import { normalizeGoogleHealthData } from './normalize.js';
 import type { RollupDataPoint, DailyRestingHeartRatePoint, SleepDataPoint, HeartRateSamplePoint } from './client.js';
 
 function civil(year: number, month: number, day: number) {
-  return { year, month, day, hour: 0, minute: 0, second: 0 };
+  return { date: { year, month, day }, time: { hours: 0, minutes: 0, seconds: 0 } };
 }
 
 function makeStepsRollup(overrides: Partial<RollupDataPoint> = {}): RollupDataPoint {

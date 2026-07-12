@@ -62,27 +62,29 @@ export function normalizeGoogleHealthData(params: {
 
   const byDay = new Map<string, NormalizedBiometricReading>();
 
-  function getOrCreate(civilStartTime: RollupDataPoint['civilStartTime']): NormalizedBiometricReading {
-    const key = dayKey(civilStartTime);
+  /** Takes a plain `{year,month,day}` — callers with a `CivilDateTime`
+   * (which nests this under `.date`, see client.ts) pass
+   * `civilStartTime.date`; `dailyRestingHeartRate.date` is already a
+   * plain `google.type.Date` with no nesting, so it's passed as-is. */
+  function getOrCreate(date: { year: number; month: number; day: number }): NormalizedBiometricReading {
+    const key = dayKey(date);
     const existing = byDay.get(key);
     if (existing) return existing;
 
-    const timestamp = new Date(
-      Date.UTC(civilStartTime.year, civilStartTime.month - 1, civilStartTime.day),
-    ).toISOString();
+    const timestamp = new Date(Date.UTC(date.year, date.month - 1, date.day)).toISOString();
     const reading: NormalizedBiometricReading = { provider: 'google_health', userId, timestamp };
     byDay.set(key, reading);
     return reading;
   }
 
   for (const point of stepsRollups) {
-    if (point.steps) getOrCreate(point.civilStartTime).steps = point.steps.countSum;
+    if (point.steps) getOrCreate(point.civilStartTime.date).steps = point.steps.countSum;
   }
   for (const point of heartRateRollups) {
-    if (point.heartRate) getOrCreate(point.civilStartTime).heartRate = point.heartRate.beatsPerMinuteAvg;
+    if (point.heartRate) getOrCreate(point.civilStartTime.date).heartRate = point.heartRate.beatsPerMinuteAvg;
   }
   for (const point of caloriesRollups) {
-    if (point.totalCalories) getOrCreate(point.civilStartTime).calories = point.totalCalories.kcalSum;
+    if (point.totalCalories) getOrCreate(point.civilStartTime.date).calories = point.totalCalories.kcalSum;
   }
   for (const point of restingHeartRates) {
     const d = point.data.dailyRestingHeartRate;

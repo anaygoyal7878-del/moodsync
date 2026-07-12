@@ -36,7 +36,7 @@ export interface NormalizedBiometricReading {
   calories?: number | undefined;
 }
 
-export type WearableProviderId = 'whoop' | 'google_health' | 'garmin' | 'apple_health';
+export type WearableProviderId = 'whoop' | 'google_health' | 'garmin' | 'apple_health' | 'amazfit';
 
 export type SmartHomeProviderId = 'hue' | 'spotify' | 'ecobee' | 'alexa';
 
