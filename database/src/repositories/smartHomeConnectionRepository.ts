@@ -64,6 +64,15 @@ export const smartHomeConnectionRepository = {
     await prisma.smartHomeConnection.update({ where: { id }, data: { status } });
   },
 
+  /** No existing smart-home provider has called this before Alexa — Hue
+   * and Spotify are control-only (driven live from the dashboard, no
+   * "sync" concept). Alexa uses it to record the last time a voice
+   * command was actually received, which is what "Last sync" means for
+   * a request-driven integration (see docs/ALEXA_ARCHITECTURE.md §5). */
+  async markSynced(id: string): Promise<void> {
+    await prisma.smartHomeConnection.update({ where: { id }, data: { lastSyncedAt: new Date() } });
+  },
+
   async disconnect(id: string, userId: string): Promise<boolean> {
     const result = await prisma.smartHomeConnection.updateMany({
       where: { id, userId },

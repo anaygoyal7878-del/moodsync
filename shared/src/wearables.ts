@@ -38,7 +38,7 @@ export interface NormalizedBiometricReading {
 
 export type WearableProviderId = 'whoop' | 'google_health' | 'garmin' | 'apple_health';
 
-export type SmartHomeProviderId = 'hue' | 'spotify' | 'ecobee';
+export type SmartHomeProviderId = 'hue' | 'spotify' | 'ecobee' | 'alexa';
 
 export type IntegrationAvailability = 'available' | 'not_yet_available';
 

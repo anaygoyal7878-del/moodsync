@@ -13,9 +13,11 @@
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",
+    "@fastify/formbody": "^8.0.2",
     "@fastify/sensible": "^6.0.2",
     "@moodsync/ai": "*",
     "@moodsync/database": "*",
+    "@moodsync/integration-alexa": "*",
     "@moodsync/integration-fitbit": "*",
     "@moodsync/integration-hue": "*",
     "@moodsync/integration-spotify": "*",

@@ -27,7 +27,7 @@ export interface DeviceSummary {
 
 export interface SmartHomeConnectionSummary {
   id: string;
-  provider: "HUE" | "SPOTIFY" | "ECOBEE";
+  provider: "HUE" | "SPOTIFY" | "ECOBEE" | "ALEXA";
   status: ConnectionStatus;
   lastSyncedAt: string | null;
   devices: DeviceSummary[];

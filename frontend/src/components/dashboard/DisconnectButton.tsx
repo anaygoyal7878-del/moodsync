@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 export function DisconnectButton({
   provider,
 }: {
-  provider: "whoop" | "hue" | "google-health" | "spotify" | "apple-health";
+  provider: "whoop" | "hue" | "google-health" | "spotify" | "apple-health" | "alexa";
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);

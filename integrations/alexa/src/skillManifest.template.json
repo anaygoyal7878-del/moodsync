@@ -1,0 +1,60 @@
+{
+  "_comment": "Template for the Alexa Developer Console's skill manifest (or SMAPI skill.json). Every <PLACEHOLDER> must be filled in manually — see docs/ALEXA_DEVELOPER_GUIDE.md. Schema confirmed against developer.amazon.com/en-US/docs/alexa/smapi/account-linking-schemas.html and the custom-skill manifest reference during this integration's design pass.",
+  "manifest": {
+    "publishingInformation": {
+      "locales": {
+        "en-US": {
+          "name": "MoodSync",
+          "summary": "Ask MoodSync how you're doing, start a relaxation session, or check your sleep — all by voice.",
+          "description": "MoodSync connects your wearable health data to your smart home. This skill lets you check your status, get your sleep summary, sync your devices, and trigger your own automation rules (relaxation, focus, evening routine) by voice. Requires a MoodSync account and account linking.",
+          "examplePhrases": [
+            "Alexa, ask MoodSync how I'm doing today",
+            "Alexa, ask MoodSync for my sleep summary",
+            "Alexa, ask MoodSync to start a relaxation session"
+          ],
+          "keywords": ["health", "wellness", "smart home", "automation", "sleep", "mood"]
+        }
+      },
+      "isAvailableWorldwide": false,
+      "testingInstructions": "Log in with the demo account provided in the submission notes. See docs/ALEXA_DEVELOPER_GUIDE.md for the full testing checklist.",
+      "category": "HEALTH_AND_FITNESS",
+      "distributionCountries": ["US"]
+    },
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "https://<YOUR_BACKEND_DOMAIN>/api/alexa/skill",
+          "sslCertificateType": "Trusted"
+        },
+        "interfaces": []
+      }
+    },
+    "manifestVersion": "1.0",
+    "permissions": [],
+    "privacyAndCompliance": {
+      "allowsPurchases": false,
+      "usesPersonalInfo": true,
+      "isChildDirected": false,
+      "isExportCompliant": true,
+      "containsAds": false,
+      "locales": {
+        "en-US": {
+          "privacyPolicyUrl": "https://<YOUR_DOMAIN>/privacy"
+        }
+      }
+    }
+  },
+  "_accountLinkingRequest_comment": "This block is configured separately in the Alexa Developer Console's Account Linking tab, not inside manifest.json directly — included here as a reference for what to enter. type AUTH_CODE matches the flow in docs/ALEXA_ARCHITECTURE.md §4.",
+  "accountLinkingRequest": {
+    "type": "AUTH_CODE",
+    "authorizationUrl": "https://<YOUR_FRONTEND_DOMAIN>/integrations/alexa/authorize",
+    "accessTokenUrl": "https://<YOUR_BACKEND_DOMAIN>/api/integrations/alexa/token",
+    "clientId": "<ALEXA_SKILL_CLIENT_ID — generate with `openssl rand -hex 32`>",
+    "clientSecret": "<ALEXA_SKILL_CLIENT_SECRET — generate with `openssl rand -base64 32`>",
+    "scopes": ["profile"],
+    "domains": [],
+    "accessTokenScheme": "HTTP_BASIC",
+    "defaultTokenExpirationInSeconds": 3600,
+    "skipOnEnablement": false
+  }
+}

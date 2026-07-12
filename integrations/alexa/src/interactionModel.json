@@ -1,0 +1,83 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "mood sync",
+      "intents": [
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] },
+        { "name": "AMAZON.NavigateHomeIntent", "samples": [] },
+        {
+          "name": "GetStatusIntent",
+          "samples": [
+            "how I'm doing today",
+            "how I'm doing",
+            "how am I doing",
+            "how am I doing today",
+            "for my status",
+            "for my current status",
+            "to check my status",
+            "what's my status"
+          ],
+          "slots": []
+        },
+        {
+          "name": "GetSleepSummaryIntent",
+          "samples": [
+            "for my sleep summary",
+            "how I slept",
+            "how did I sleep",
+            "how I slept last night",
+            "about my sleep",
+            "for my sleep score"
+          ],
+          "slots": []
+        },
+        {
+          "name": "SyncDevicesIntent",
+          "samples": [
+            "to sync my devices",
+            "to sync now",
+            "to sync",
+            "to refresh my devices",
+            "to update my devices"
+          ],
+          "slots": []
+        },
+        {
+          "name": "StartRelaxationIntent",
+          "samples": [
+            "to start a relaxation session",
+            "to help me relax",
+            "to start relaxing",
+            "for a relaxation session",
+            "to relax"
+          ],
+          "slots": []
+        },
+        {
+          "name": "ImproveFocusIntent",
+          "samples": [
+            "to improve my focus",
+            "to help me focus",
+            "for a focus session",
+            "to start focusing"
+          ],
+          "slots": []
+        },
+        {
+          "name": "ActivateEveningRoutineIntent",
+          "samples": [
+            "to activate my evening routine",
+            "to start my evening routine",
+            "to run my evening routine",
+            "for my evening routine"
+          ],
+          "slots": []
+        }
+      ],
+      "types": []
+    }
+  }
+}

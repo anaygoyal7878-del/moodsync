@@ -12,7 +12,12 @@ const WEARABLE_LABELS: Record<string, string> = {
   GARMIN: "Garmin",
   APPLE_HEALTH: "Apple Health",
 };
-const SMART_HOME_LABELS: Record<string, string> = { HUE: "Philips Hue", SPOTIFY: "Spotify", ECOBEE: "Ecobee" };
+const SMART_HOME_LABELS: Record<string, string> = {
+  HUE: "Philips Hue",
+  SPOTIFY: "Spotify",
+  ECOBEE: "Ecobee",
+  ALEXA: "Amazon Alexa",
+};
 
 function formatLastSynced(lastSyncedAt: string | null): string {
   if (!lastSyncedAt) return "Never synced";
@@ -155,12 +160,82 @@ function AppleHealthCard({ connection }: { connection: WearableConnectionSummary
   );
 }
 
+/** Every voice command this skill supports — see
+ * docs/ALEXA_ARCHITECTURE.md §9 for the full intent -> implementation
+ * mapping. Shown as "available," not "granted": unlike account linking,
+ * there's no per-command permission to have been denied — once linked,
+ * every command works immediately. */
+const ALEXA_VOICE_COMMANDS = [
+  "how I'm doing today",
+  "my sleep summary",
+  "to sync my devices",
+  "to start a relaxation session",
+  "to improve my focus",
+  "to activate my evening routine",
+];
+
+function AlexaCard({ connection }: { connection: SmartHomeConnectionSummary | undefined }) {
+  const isActive = connection?.status === "ACTIVE";
+
+  return (
+    <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{SMART_HOME_LABELS.ALEXA}</p>
+
+        {connection ? (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <ConnectionStatusBadge status={connection.status} />
+            {isActive && <span className="text-xs text-ink-muted">· {formatRelativeSync(connection.lastSyncedAt)}</span>}
+          </div>
+        ) : (
+          <p className="mt-1 text-xs text-ink-muted">Not connected</p>
+        )}
+
+        {isActive ? (
+          <div className="mt-2 space-y-1">
+            <p className="text-xs text-ink-muted">
+              <span className="font-medium text-ink">Linked account:</span> this MoodSync account. MoodSync
+              doesn&apos;t request your Amazon profile — only enough to identify you when the skill calls in.
+            </p>
+            <p className="text-xs text-ink-muted">
+              <span className="font-medium text-ink">Skill status:</span> account linked and ready. If a
+              command stops working, try unlinking and relinking from the Alexa app.
+            </p>
+            <p className="text-xs text-ink-muted">
+              <span className="font-medium text-ink">Try saying:</span> &quot;Alexa, ask MoodSync{" "}
+              {ALEXA_VOICE_COMMANDS.map((c, i) => (
+                <span key={c}>
+                  {i > 0 && (i === ALEXA_VOICE_COMMANDS.length - 1 ? ", or " : ", ")}
+                  {c}
+                </span>
+              ))}
+              .&quot;
+            </p>
+          </div>
+        ) : (
+          <div className="mt-2 space-y-1.5 rounded-lg bg-surface-raised p-2.5 text-xs text-ink-muted">
+            <p className="font-medium text-ink">Link from the Alexa app — MoodSync can&apos;t start this from the dashboard:</p>
+            <ol className="list-decimal space-y-0.5 pl-4">
+              <li>Open the Alexa app and search for the &quot;MoodSync&quot; skill.</li>
+              <li>Enable the skill, then tap &quot;Link account&quot;.</li>
+              <li>Log in with this same MoodSync account and approve access.</li>
+            </ol>
+            <p>Once linked, try: &quot;Alexa, ask MoodSync {ALEXA_VOICE_COMMANDS[0]}.&quot;</p>
+          </div>
+        )}
+      </div>
+      {isActive && <DisconnectButton provider="alexa" />}
+    </Card>
+  );
+}
+
 export function ConnectionsSection({ connections }: { connections: ConnectionsResponse }) {
   const whoop = connections.wearables.find((c) => c.provider === "WHOOP");
   const fitbit = connections.wearables.find((c) => c.provider === "GOOGLE_HEALTH");
   const appleHealth = connections.wearables.find((c) => c.provider === "APPLE_HEALTH");
   const hue = connections.smartHome.find((c) => c.provider === "HUE");
   const spotify = connections.smartHome.find((c) => c.provider === "SPOTIFY");
+  const alexa = connections.smartHome.find((c) => c.provider === "ALEXA");
 
   return (
     <section className="flex flex-col gap-3">
@@ -254,6 +329,8 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
           provider="spotify"
         />
       </Card>
+
+      <AlexaCard connection={alexa} />
     </section>
   );
 }

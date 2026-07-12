@@ -632,3 +632,92 @@ automated path — a real user would have to remember to click it.
   bytes and leave tampering undetected; fixed by flipping a character in
   the middle of the token instead, confirmed stable across 5 repeated
   runs.
+
+## Amazon Alexa integration
+
+- **Researched fresh against developer.amazon.com** (not assumed):
+  confirmed a **Custom Skill** (not a Smart Home Skill) is the right fit
+  — Smart Home Skills are documented as unsuitable for conversational
+  queries like "how am I doing today," and every required command
+  follows the `"Alexa, ask {invocation} to {utterance}"` pattern that
+  defines a custom skill. Confirmed the exact request-signature
+  verification algorithm (`SignatureCertChainUrl`/`Signature-256`
+  headers, SHA-256, 150-second replay window), the exact account-linking
+  redirect URIs for all three Amazon regions, and the account-linking
+  manifest schema.
+- **The key architectural finding**: unlike every other integration,
+  Alexa account linking requires **MoodSync to be the OAuth 2.0
+  authorization server**, not a client of a third party's OAuth — Amazon
+  redirects users to MoodSync's own authorize endpoint. Documented in
+  full in `docs/ALEXA_ARCHITECTURE.md`, including why this requires a
+  frontend consent page (not a backend redirect) since MoodSync's
+  session lives in the frontend's own httpOnly cookie.
+- **New `integrations/alexa` package**: hand-typed request/response
+  envelopes (no `ask-sdk-core` dependency, matching this project's
+  existing hand-rolled-client pattern); `verifyRequest.ts` implementing
+  Amazon's full signature-verification algorithm with Node's built-in
+  `crypto`/`tls` (X.509 chain-of-trust walking, RSA-SHA256 verification)
+  rather than an unvetted third-party "alexa-verifier" package, since
+  this is a security-critical path with a fully-specified algorithm;
+  `authCode.ts`/`skillToken.ts` mirroring the existing
+  `oauthState.ts`/`jwt.ts`/`refreshToken.ts` patterns; the full voice
+  interaction model and a skill manifest template.
+- **Backend**: `alexaService.ts` implements the authorization-code mint,
+  token exchange (both `authorization_code` and `refresh_token` grants,
+  with a selector:verifier-split refresh token so encrypted tokens don't
+  need a full-table decrypt-and-scan to look up), and all six voice
+  intent handlers. Three new routes: `POST /integrations/alexa/authorize`
+  (session-authenticated, called by the frontend consent page),
+  `POST /integrations/alexa/token` (RFC 6749 token endpoint, HTTP Basic
+  client auth — added `@fastify/formbody` since this is the one endpoint
+  in the product that needs form-urlencoded parsing), and
+  `POST /alexa/skill` (the real signature-verified voice webhook, with a
+  scoped `addContentTypeParser` override to capture the exact raw bytes
+  Amazon signed — Fastify's per-plugin encapsulation keeps this from
+  affecting any other route file).
+- **Voice commands reuse existing product logic, not new invented
+  behavior**: `GetStatusIntent`/`GetSleepSummaryIntent` read the same
+  `biometricReadingRepository` the dashboard uses;
+  `SyncDevicesIntent` calls the exact same sync-now service functions as
+  the dashboard's `SyncButton`; `StartRelaxationIntent`/
+  `ImproveFocusIntent`/`ActivateEveningRoutineIntent` find the user's own
+  enabled automation rule by name keyword and execute its actions
+  directly via `executeHueAction`/`executeSpotifyAction` (newly exported
+  from `@moodsync/ai` — `executeSpotifyAction` wasn't public before,
+  only used internally by `dispatch.ts`), rather than hardcoding what
+  "relaxing" means.
+- **Dashboard**: a dedicated `AlexaCard` (mirroring the Apple Health
+  card's pattern of a bespoke component for a structurally-different
+  provider) showing connection status, an honest "linked to this MoodSync
+  account" note (Alexa's own profile is never requested), skill status,
+  relative last-voice-command time, the full list of voice commands, and
+  a 3-step onboarding panel explaining linking always starts from the
+  Alexa app, never the dashboard.
+- **`scripts/demoAlexaVoiceCommand.mjs`**: since the real signature-verified
+  webhook can't be exercised without a live, certified skill (no way to
+  obtain a genuine Amazon certificate chain/signature in this sandbox),
+  this script instead exercises the complete OAuth-as-authorization-server
+  flow for real (authorize → code → token exchange → refresh) and every
+  intent handler through a dev-only `demo-intent` route that calls the
+  exact same `alexaService.handleIntentRequest` the real webhook uses,
+  gated out entirely when `NODE_ENV=production`.
+- **Verified for real**: ran the demo script twice against a disposable
+  test account (created and deleted, never touching real user data) —
+  once against an empty account (confirmed every intent's honest
+  "no data yet" / "no matching rule" fallback speech) and once after
+  seeding a real biometric reading and an automation rule named "Evening
+  Relax Routine" (confirmed `GetStatusIntent` correctly reports the real
+  reading, and both `StartRelaxationIntent` and
+  `ActivateEveningRoutineIntent` correctly match and execute the same
+  rule via its "relax"/"evening" keyword overlap — verified this was the
+  intended keyword-matching behavior, not a bug). Confirmed exactly one
+  `SmartHomeConnection` row exists after repeated linking (upsert, not
+  duplicate) and `lastSyncedAt` updates on each voice interaction.
+  Visually verified both the disconnected-onboarding and connected states
+  of the new `AlexaCard` in a real browser session. Wrote 28 new unit
+  tests for `integrations/alexa` (`verifyRequest.test.ts` includes a full
+  positive-path pipeline test against a genuinely-generated synthetic
+  X.509 certificate chain and a real RSA-SHA256 signature — not just
+  error-path assertions — proving the hand-implemented crypto is
+  actually correct, not merely that it throws on bad input). Full
+  monorepo build/typecheck/lint/test all pass (81 tests total).
