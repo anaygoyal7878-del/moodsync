@@ -796,3 +796,53 @@ automated path — a real user would have to remember to click it.
   label map the same minimal way Garmin already is (recognized, no
   card, since there's nothing to connect). Full monorepo
   build/typecheck/lint/test pass.
+
+## Amazfit (Zepp OS) — correction: self-serve via Mini Programs, now available ✅
+
+- **Correction (2026-07-13)**: the research above concluded Amazfit was
+  blocked, based on investigating only one of Zepp Health's two separate
+  developer products — the corporate-gated "Data Cooperation" REST API.
+  A second, unrelated product, **Zepp OS**, is genuinely self-serve (free
+  consumer account, no business review) and supports building **Mini
+  Programs**: small apps that run on the watch, with an optional
+  phone-side **Side Service** that can call arbitrary HTTPS endpoints via
+  a documented Fetch API. This is architecturally identical to Apple
+  Health — no cloud API exists for a third party to pull a user's
+  history, so the answer is a device-side companion, not OAuth.
+- Confirmed real sensor APIs against live `docs.zepp.com` reference pages
+  and a real official sample Mini Program
+  (`zepp-health/zeppos-samples/application/2.0/post-health-data`, fetched
+  verbatim): `HeartRate`/`Sleep`/`Step` classes from `@zos/sensor`, the
+  `BaseApp`/`BasePage`/`BaseSideService` + plugin pattern from
+  `@zeppos/zml`, the Settings API (`settingsStorage`), the Fetch API's
+  request shape, and the `AppSettingsPage`/`Button`/`View`/`TextInput`
+  Settings App components.
+- Flipped `integrations/amazfit`'s `amazfitIntegrationStatus` from
+  `not_yet_available` to `available` and built the real Mini Program at
+  `zepp/MoodSyncCompanion` (Device App reading sensors, Side Service
+  relaying to MoodSync's backend, Settings App for login) — see
+  `docs/AMAZFIT_ARCHITECTURE.md` for the full design and
+  `zepp/MoodSyncCompanion/README.md` for exactly what was verified
+  against real docs/samples versus flagged as unconfirmed (notably: no
+  password-masked `TextInput` variant found, and `app.json`'s `appId`/
+  `deviceSource` values are placeholders a real registration replaces).
+- Added the real backend counterpart,
+  `POST /api/integrations/amazfit/ingest` (mirrors Apple Health's
+  tokenless-connection ingest pattern exactly — same Zod validation, same
+  `app.authenticate` JWT middleware, same repository calls) and the
+  dashboard's Amazfit Connections card (mirrors the Apple Health card's
+  "no web sign-in, connect from the device" framing).
+- **Verified for real, not just compiled**: ran
+  `scripts/demoAmazfitSync.mjs` against a live local backend + Postgres
+  with a disposable signed-up test account — confirmed a simulated
+  sensor snapshot round-trips through the real ingest endpoint, persists
+  via `biometricReadingRepository`, and shows up correctly as an
+  `ACTIVE` `AMAZFIT` connection from `GET /api/connections`. What's
+  **not** verifiable in this sandbox: the Zepp OS runtime itself — the
+  Zeus CLI installs but won't run past `--help` here (missing peer
+  dependency, then a broken binary symlink after working around it), and
+  even a working CLI still needs the proprietary Zepp Simulator (GUI-only)
+  or a physical Amazfit device, neither available here. Documented
+  honestly in `zepp/MoodSyncCompanion/README.md`, same framing as the
+  Apple Health iOS package's Xcode limitation.
+- Full monorepo build/typecheck/lint/test pass (78 tests, all packages).

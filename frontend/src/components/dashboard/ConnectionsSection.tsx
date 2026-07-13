@@ -161,6 +161,54 @@ function AppleHealthCard({ connection }: { connection: WearableConnectionSummary
   );
 }
 
+/** What the Zepp OS Mini Program's Device App reads via @zos/sensor — a
+ * fixed list, same "requested, not confirmed-granted" framing as Apple
+ * Health's metrics list, since there's no per-metric permission API to
+ * query either (see docs/AMAZFIT_ARCHITECTURE.md §6). */
+const AMAZFIT_SYNCED_METRICS = ["Heart rate", "Sleep score", "Steps"];
+
+function AmazfitCard({ connection }: { connection: WearableConnectionSummary | undefined }) {
+  const isActive = connection?.status === "ACTIVE";
+
+  return (
+    <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{WEARABLE_LABELS.AMAZFIT}</p>
+
+        {connection ? (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <ConnectionStatusBadge status={connection.status} />
+            {isActive && <span className="text-xs text-ink-muted">· {formatRelativeSync(connection.lastSyncedAt)}</span>}
+          </div>
+        ) : (
+          <p className="mt-1 text-xs text-ink-muted">Not connected</p>
+        )}
+
+        {isActive ? (
+          <div className="mt-2 space-y-1">
+            <p className="text-xs text-ink-muted">
+              <span className="font-medium text-ink">Syncs:</span> {AMAZFIT_SYNCED_METRICS.join(", ")}. Sent from the
+              MoodSync Mini Program on your watch each time you tap &quot;Sync&quot; — not continuous background sync.
+            </p>
+            <p className="text-xs text-ink-muted">No battery status — no Zepp OS sensor API for device battery was found.</p>
+          </div>
+        ) : (
+          <div className="mt-2 space-y-1.5 rounded-lg bg-surface-raised p-2.5 text-xs text-ink-muted">
+            <p className="font-medium text-ink">Amazfit has no web sign-in — connect from your watch:</p>
+            <ol className="list-decimal space-y-0.5 pl-4">
+              <li>Install the MoodSync Mini Program via the Zepp app (see the developer guide for the install QR code).</li>
+              <li>Open the Mini Program&apos;s settings and log in with this same MoodSync account.</li>
+              <li>Open the Mini Program on your watch and tap &quot;Sync&quot; — this card updates once data arrives.</li>
+            </ol>
+            <p>Reads: {AMAZFIT_SYNCED_METRICS.join(", ")}. Read-only — MoodSync never writes to your watch.</p>
+          </div>
+        )}
+      </div>
+      {isActive && <DisconnectButton provider="amazfit" />}
+    </Card>
+  );
+}
+
 /** Every voice command this skill supports — see
  * docs/ALEXA_ARCHITECTURE.md §9 for the full intent -> implementation
  * mapping. Shown as "available," not "granted": unlike account linking,
@@ -234,6 +282,7 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
   const whoop = connections.wearables.find((c) => c.provider === "WHOOP");
   const fitbit = connections.wearables.find((c) => c.provider === "GOOGLE_HEALTH");
   const appleHealth = connections.wearables.find((c) => c.provider === "APPLE_HEALTH");
+  const amazfit = connections.wearables.find((c) => c.provider === "AMAZFIT");
   const hue = connections.smartHome.find((c) => c.provider === "HUE");
   const spotify = connections.smartHome.find((c) => c.provider === "SPOTIFY");
   const alexa = connections.smartHome.find((c) => c.provider === "ALEXA");
@@ -291,6 +340,8 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
       </Card>
 
       <AppleHealthCard connection={appleHealth} />
+
+      <AmazfitCard connection={amazfit} />
 
       <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
         <div className="min-w-0 flex-1">

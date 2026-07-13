@@ -1,0 +1,17 @@
+{
+  "name": "moodsync-companion",
+  "version": "1.0.0",
+  "description": "Zepp OS Mini Program syncing Amazfit sensor data to MoodSync",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"no test runner configured — this package can't be compiled/run in this sandbox, see README.md\" && exit 0"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@zeppos/device-types": "^2.0.0"
+  },
+  "dependencies": {
+    "@zeppos/zml": "^0.0.22"
+  }
+}

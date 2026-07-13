@@ -302,43 +302,85 @@ Confirmed directly against `developers.google.com/health/reference/rest/v4/users
   and a native stress score — richer than WHOOP/Google Health on paper,
   worth revisiting once the program is confirmed open again.
 
-### Amazfit (via Zepp) — blocked, interface-only for now
+### Amazfit (via Zepp) — available via a Zepp OS Mini Program, not a cloud API
 
-- **Correct product**: Zepp Health's (formerly Huami) "Data Cooperation"
-  partner API, documented at the official `zepp-health/rest-api` GitHub
-  wiki — a real company repository, not a community project. This is a
-  genuine OAuth 2.0 API distinct from **Zepp OS**, which is a separate
-  product for building Mini Programs/watch faces that run *on* the
-  device itself and has no bearing on a third-party server pulling a
-  user's health history.
-- **Real, confirmed OAuth details** (recorded here so implementation can
-  start immediately if a partnership is approved, without re-research):
-  - Authorization: `https://user.huami.com/oauth/index.html#/?client_id=...&redirect_uri=...&response_type=code&state=...`
-  - Token exchange: `POST https://auth.huami.com/oauth2/access_token`
-  - Grants: authorization_code (recommended) or implicit
-  - Scopes: `profile`, `activity`, `sleep`, `heartrate`, `motion`,
-    `sport`, `sportDetail` — `heartrate` and `motion` in particular go
-    well beyond what WHOOP/Google Health expose (continuous heart rate
-    and raw per-minute motion-sensor data, respectively).
-  - Token lifetime: 90-day access token, 10-year refresh token.
-- **Current status — hard-gated, not self-serve**: registration happens
-  at `https://dev.huami.com/#/home`, with a stated 3-7 day review period,
-  but the docs are explicit: *"Data cooperation currently only supports
-  corporate users, not individual users."* There is no path from "create
-  an account" to "get a client ID" the way Fitbit, WHOOP, or Spotify
-  offer — this requires an approved business partnership, a different
-  and harder blocker than Garmin's (program exists but is de facto
-  stalled) or Ecobee's (registration explicitly closed).
-- **What we do about it**: `integrations/amazfit` exports only
-  `amazfitIntegrationStatus` (`availability: 'not_yet_available'`, with
-  the reason above) — no live client, matching
-  `integrations/garmin`/`integrations/ecobee`'s current shape exactly
-  (both are metadata-only today, not a stub client class). Untested
-  OAuth/client code for an API we have no way to get real credentials
-  for is more likely to ship with real bugs than not — see the Fitbit
-  `CivilDateTime`/filter-field corrections above, found only because a
-  real account triggered a real error. Better to wait for an approved
-  partnership and build against live traffic than guess now.
+**Correction (2026-07-13)**: this section originally concluded Amazfit
+was blocked/interface-only, based on researching only one of Zepp
+Health's two distinct developer surfaces. That conclusion was wrong —
+there is a genuine, self-serve path. Corrected below; the original
+(gated) API is still documented since it's real and may be worth
+revisiting for its richer scopes if a partnership is ever pursued.
+
+- **Two unrelated Zepp Health developer products exist — don't confuse
+  them**:
+  1. **The "Data Cooperation" REST API** (`dev.huami.com`,
+     `zepp-health/rest-api`) — a real OAuth 2.0 cloud API
+     (`https://user.huami.com/oauth/...` authorize,
+     `https://auth.huami.com/oauth2/access_token` token exchange,
+     scopes `profile`/`activity`/`sleep`/`heartrate`/`motion`/`sport`/
+     `sportDetail`, 90-day access / 10-year refresh tokens) — but
+     **hard-gated**: *"Data cooperation currently only supports
+     corporate users, not individual users,"* with a 3-7 day partnership
+     review. No self-serve path to a client ID, same blocked category as
+     Garmin/Ecobee. Recorded here in case a partnership is ever pursued
+     (richer scopes than WHOOP/Google Health — continuous heart rate,
+     raw motion data).
+  2. **Zepp OS** (`developer.zepp.com`, `docs.zepp.com`) — a completely
+     different, genuinely self-serve platform for building **Mini
+     Programs** (small apps that run on the watch itself, plus an
+     optional phone-side component). Registration is a free consumer
+     Zepp account (email, Google, Facebook, etc. — confirmed via the
+     account-creation flow), not a business application. **This is the
+     one Apple Health's architecture already anticipates**: no cloud API
+     exists for pulling a user's data, so — exactly like HealthKit — the
+     only way in is a device-side app the user installs, that reads
+     sensors locally and pushes to MoodSync's own backend.
+- **Confirmed Zepp OS architecture for this**:
+  - **Device App**: the on-watch JavaScript code. Confirmed real sensor
+    APIs exist for `HeartRate`, `Sleep`, and `Step` (`hmSensor`/newAPI
+    sensor modules, each with its own live doc page) — available from
+    API_LEVEL 2.0 for HeartRate/Sleep, no special review needed beyond
+    a normal account.
+  - **Side Service**: a companion process that runs inside the Zepp
+    phone app (no UI) — confirmed via `docs.zepp.com`'s own
+    architecture docs. Exposes a `Fetch API`
+    (`docs.zepp.com/docs/reference/side-service-api/fetch/`) that can
+    issue `fetch({ url, method, headers, body })` requests to an
+    **arbitrary external URL** — the documented example POSTs JSON to
+    `https://xxx.com/api/xxx`, and no domain allowlist, CORS
+    restriction, or URL pre-registration is mentioned anywhere in the
+    reference. This is the piece that actually reaches MoodSync's
+    backend, mirroring `MoodSyncAPIClient` in the iOS companion app.
+  - **Device App ↔ Side Service**: a `Messaging API`
+    (`docs.zepp.com/docs/reference/side-service-api/messaging/`) —
+    device sends via `messageBuilder.request()`, Side Service receives
+    via `.on('call')` (and the reverse for phone-to-watch pushes) — this
+    is how a sensor reading collected on the watch gets to the Side
+    Service, which then relays it onward via Fetch.
+  - **Distribution without app-store review**: `zeus preview` (Zeus
+    CLI) generates a QR code installable directly onto a device via the
+    Zepp App's "Developer Mode" — confirmed from the CLI's own docs, the
+    same category of direct-to-device install Xcode offers for iOS,
+    letting a Mini Program be used for real without Zepp's review.
+- **What wasn't independently confirmed**: the exact `app.json` keys for
+  declaring a Side Service (the fetched doc excerpt didn't include this
+  — the Mini Program's manifest was written from the `zeus create`
+  project-scaffold structure and the `AppSideService` constructor
+  pattern shown in the Side Service intro doc, not a fully-quoted
+  manifest schema), and whether `zeus preview`'s Developer Mode install
+  has a device-count or time limit (undocumented in what was fetched).
+  Both should be spot-checked once real Zeus CLI tooling is run — see
+  `docs/AMAZFIT_DEVELOPER_GUIDE.md`.
+- **What we do about it**: `integrations/amazfit` now exports
+  `amazfitIntegrationStatus` with `availability: 'available'` (matching
+  Apple Health's category — connectable without third-party OAuth
+  credentials), plus the actual Mini Program in `zepp/MoodSyncCompanion`
+  — see `docs/AMAZFIT_ARCHITECTURE.md`. Unlike the Swift/HealthKit case,
+  this sandbox has no way to run the real Zepp OS runtime or Simulator
+  (a GUI app, and even the Zeus CLI itself failed to run standalone here
+  due to a broken peer-dependency in its own package) — same category of
+  environment limitation as Xcode's, documented with the same honesty
+  about what was and wasn't verifiable.
 
 ### Normalized wearable data model
 
