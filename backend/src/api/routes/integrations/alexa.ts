@@ -156,7 +156,15 @@ export default async function alexaRoutes(app: FastifyInstance) {
       });
     } catch (error) {
       if (error instanceof AlexaRequestVerificationError) {
-        request.log.warn({ err: error }, 'Rejected unverified Alexa request');
+        request.log.warn(
+          {
+            err: error,
+            requestTimestamp: envelope.request.timestamp,
+            serverNow: new Date().toISOString(),
+            skewMs: Date.now() - new Date(envelope.request.timestamp).getTime(),
+          },
+          'Rejected unverified Alexa request'
+        );
         return reply.code(400).send({ error: 'Request verification failed' });
       }
       throw error;
