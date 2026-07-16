@@ -16,6 +16,12 @@ export const ALEXA_INTENTS = {
   START_RELAXATION: 'StartRelaxationIntent',
   IMPROVE_FOCUS: 'ImproveFocusIntent',
   ACTIVATE_EVENING_ROUTINE: 'ActivateEveningRoutineIntent',
+  /** Voice-driven confirmation loop for Sleep Detection's lock/security
+   * check (see docs/DECISION_ENGINE_ROADMAP.md) — Alexa has no cross-skill
+   * device-state query API, so this is honest by design: it reports
+   * whatever MoodSync itself knows (nothing, today — no lock/security
+   * integration exists) rather than querying or claiming device state. */
+  CHECK_SECURITY: 'CheckSecurityIntent',
   HELP: 'AMAZON.HelpIntent',
   STOP: 'AMAZON.StopIntent',
   CANCEL: 'AMAZON.CancelIntent',
@@ -36,7 +42,15 @@ export const NAMED_RULE_INTENT_KEYWORDS: Partial<Record<AlexaIntentName, string>
 
 export const HELP_SPEECH =
   "You can ask MoodSync how you're doing, for your sleep summary, to sync your devices, " +
-  'to start a relaxation session, to improve your focus, or to activate your evening routine.';
+  'to start a relaxation session, to improve your focus, to activate your evening routine, ' +
+  'or if your house is secure.';
+
+/** No lock/security integration exists yet (see
+ * docs/DECISION_ENGINE_ROADMAP.md) — this is the honest response, not a
+ * guess or a claim of device control/knowledge MoodSync doesn't have. */
+export const NO_SECURITY_INTEGRATION_SPEECH =
+  "I don't have any smart locks or security systems connected yet, so I can't check that for you — " +
+  "you'll want to check them yourself before bed.";
 
 export const STOP_SPEECH = 'Okay, goodbye.';
 

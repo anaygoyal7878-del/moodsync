@@ -59,5 +59,6 @@ export {
   STOP_SPEECH,
   FALLBACK_SPEECH,
   NOT_LINKED_SPEECH,
+  NO_SECURITY_INTEGRATION_SPEECH,
   type AlexaIntentName,
 } from './intents.js';

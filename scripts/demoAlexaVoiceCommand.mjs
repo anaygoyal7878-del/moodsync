@@ -128,6 +128,7 @@ try {
     'StartRelaxationIntent',
     'ImproveFocusIntent',
     'ActivateEveningRoutineIntent',
+    'CheckSecurityIntent',
     'AMAZON.HelpIntent',
   ];
   console.log('\nExercising every voice intent:');

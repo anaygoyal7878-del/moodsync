@@ -75,6 +75,18 @@
             "for my evening routine"
           ],
           "slots": []
+        },
+        {
+          "name": "CheckSecurityIntent",
+          "samples": [
+            "if my house is secure",
+            "if I locked up",
+            "if my doors are locked",
+            "to check my security",
+            "if my house is locked up",
+            "if everything is secure"
+          ],
+          "slots": []
         }
       ],
       "types": []

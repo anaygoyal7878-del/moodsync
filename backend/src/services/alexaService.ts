@@ -13,6 +13,7 @@ import {
   STOP_SPEECH,
   FALLBACK_SPEECH,
   NOT_LINKED_SPEECH,
+  NO_SECURITY_INTEGRATION_SPEECH,
   plainTextResponse,
   linkAccountResponse,
   type ResponseEnvelope,
@@ -237,6 +238,8 @@ export const alexaService = {
       case ALEXA_INTENTS.IMPROVE_FOCUS:
       case ALEXA_INTENTS.ACTIVATE_EVENING_ROUTINE:
         return this.handleNamedRuleIntent(userId, intentName as AlexaIntentName);
+      case ALEXA_INTENTS.CHECK_SECURITY:
+        return this.handleCheckSecurity();
       case ALEXA_INTENTS.HELP:
         return plainTextResponse(HELP_SPEECH, false);
       case ALEXA_INTENTS.STOP:
@@ -260,6 +263,18 @@ export const alexaService = {
       return plainTextResponse("I don't have a recent sleep score for you yet.");
     }
     return plainTextResponse(`Your most recent sleep score is ${Math.round(latest.reading.sleepScore)} out of 100.`);
+  },
+
+  /** CheckSecurityIntent — see docs/DECISION_ENGINE_ROADMAP.md for why
+   * this can't query real lock/security state: Alexa's platform gives a
+   * Custom Skill no cross-skill device-query API (confirmed against
+   * developer.amazon.com's LockController/SecurityPanelController docs —
+   * those interfaces are for the skill that *owns* a device to report its
+   * own state to Alexa, not for another skill to read it). Honest,
+   * fixed response — no userId/DB lookup needed until a real
+   * lock/security integration exists to back this. */
+  async handleCheckSecurity(): Promise<ResponseEnvelope> {
+    return plainTextResponse(NO_SECURITY_INTEGRATION_SPEECH);
   },
 
   async handleSyncDevices(userId: string): Promise<ResponseEnvelope> {

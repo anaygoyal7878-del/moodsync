@@ -221,6 +221,7 @@ const ALEXA_VOICE_COMMANDS = [
   "to start a relaxation session",
   "to improve my focus",
   "to activate my evening routine",
+  "if my house is secure",
 ];
 
 function AlexaCard({ connection }: { connection: SmartHomeConnectionSummary | undefined }) {

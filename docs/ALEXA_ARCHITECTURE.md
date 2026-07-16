@@ -264,6 +264,7 @@ to handlers that call existing repositories/executors.
 | "start a relaxation session" | `StartRelaxationIntent` | Finds the user's enabled `AutomationRule` whose name contains "relax" (case-insensitive); executes its actions directly via `executeHueAction`/`executeSpotifyAction` (bypassing condition/cooldown checks — this is an explicit command, not a biometric trigger) |
 | "improve my focus" | `ImproveFocusIntent` | Same pattern, matching rule name contains "focus" |
 | "activate my evening routine" | `ActivateEveningRoutineIntent` | Same pattern, matching rule name contains "evening" |
+| "is my house secure" | `CheckSecurityIntent` | Fixed, honest response — no lock/security integration exists, and Alexa has no cross-skill API to query one even if it did (see docs/DECISION_ENGINE_ROADMAP.md) |
 
 The relaxation/focus/evening-routine intents deliberately do **not**
 hardcode a fixed scene — MoodSync has no built-in concept of "what
