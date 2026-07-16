@@ -26,15 +26,16 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  refreshTokens         RefreshToken[]
-  wearableConnections   WearableConnection[]
-  smartHomeConnections  SmartHomeConnection[]
-  automationRules       AutomationRule[]
-  biometricReadings     BiometricReading[]
-  insights              Insight[]
-  recommendations       Recommendation[]
-  automationLogs        AutomationExecutionLog[]
-  preferences           UserPreferences?
+  refreshTokens        RefreshToken[]
+  wearableConnections  WearableConnection[]
+  smartHomeConnections SmartHomeConnection[]
+  automationRules      AutomationRule[]
+  biometricReadings    BiometricReading[]
+  insights             Insight[]
+  recommendations      Recommendation[]
+  automationLogs       AutomationExecutionLog[]
+  notifications        Notification[]
+  preferences          UserPreferences?
 
   @@map("users")
 }
@@ -87,11 +88,11 @@ enum ConnectionStatus {
 /// enforced by the unique FK on each connection table rather than a
 /// polymorphic reverse relation.
 model OAuthToken {
-  id                     String   @id @default(uuid())
-  accessTokenCiphertext  Bytes
-  accessTokenNonce       Bytes
-  refreshTokenCiphertext Bytes?
-  refreshTokenNonce      Bytes?
+  id                       String   @id @default(uuid())
+  accessTokenCiphertext    Bytes
+  accessTokenNonce         Bytes
+  refreshTokenCiphertext   Bytes?
+  refreshTokenNonce        Bytes?
   /// Generic slot for a third encrypted secret some providers issue
   /// alongside the OAuth pair — e.g. Philips Hue's long-lived
   /// `hue-application-key`, which functions as a credential and gets the
@@ -99,10 +100,10 @@ model OAuthToken {
   /// rather than living in a connection's plaintext `metadata` JSON.
   providerSecretCiphertext Bytes?
   providerSecretNonce      Bytes?
-  scope                  String
-  expiresAt              DateTime
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  scope                    String
+  expiresAt                DateTime
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
   wearableConnection  WearableConnection?
   smartHomeConnection SmartHomeConnection?
@@ -141,20 +142,20 @@ model WearableConnection {
 }
 
 model SmartHomeConnection {
-  id                 String            @id @default(uuid())
-  userId             String
-  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  provider           SmartHomeProvider
-  providerAccountId  String?
-  status             ConnectionStatus  @default(ACTIVE)
-  oauthTokenId       String?           @unique
-  oauthToken         OAuthToken?       @relation(fields: [oauthTokenId], references: [id], onDelete: SetNull)
+  id                String            @id @default(uuid())
+  userId            String
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider          SmartHomeProvider
+  providerAccountId String?
+  status            ConnectionStatus  @default(ACTIVE)
+  oauthTokenId      String?           @unique
+  oauthToken        OAuthToken?       @relation(fields: [oauthTokenId], references: [id], onDelete: SetNull)
   /// Provider-specific non-secret metadata, e.g. { "bridgeId": "..." } for
   /// Hue or { "activeDeviceId": "..." } for Spotify.
-  metadata           Json              @default("{}")
-  lastSyncedAt       DateTime?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  metadata          Json              @default("{}")
+  lastSyncedAt      DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   connectedDevices ConnectedDevice[]
 
@@ -164,16 +165,16 @@ model SmartHomeConnection {
 }
 
 model ConnectedDevice {
-  id                     String              @id @default(uuid())
-  smartHomeConnectionId  String
-  smartHomeConnection    SmartHomeConnection @relation(fields: [smartHomeConnectionId], references: [id], onDelete: Cascade)
-  externalDeviceId       String
-  name                   String
-  deviceType             String
-  room                   String?
-  isOnline               Boolean             @default(true)
-  createdAt              DateTime            @default(now())
-  updatedAt              DateTime            @updatedAt
+  id                    String              @id @default(uuid())
+  smartHomeConnectionId String
+  smartHomeConnection   SmartHomeConnection @relation(fields: [smartHomeConnectionId], references: [id], onDelete: Cascade)
+  externalDeviceId      String
+  name                  String
+  deviceType            String
+  room                  String?
+  isOnline              Boolean             @default(true)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
 
   @@unique([smartHomeConnectionId, externalDeviceId])
   @@map("connected_devices")
@@ -184,26 +185,26 @@ model ConnectedDevice {
 /// every metric field here is nullable because no provider fills all of
 /// them.
 model BiometricReading {
-  id               String           @id @default(uuid())
-  userId           String
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  provider         WearableProvider
-  timestamp        DateTime
-  heartRate        Float?
-  restingHeartRate Float?
+  id                   String           @id @default(uuid())
+  userId               String
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider             WearableProvider
+  timestamp            DateTime
+  heartRate            Float?
+  restingHeartRate     Float?
   /// Milliseconds (SDNN). Apple Health-only today.
   heartRateVariability Float?
   /// Breaths per minute. Apple Health-only today.
-  respiratoryRate  Float?
+  respiratoryRate      Float?
   /// 0-100 percentage (SpO2). Apple Health-only today.
-  bloodOxygen      Float?
-  sleepScore       Float?
-  recoveryScore    Float?
-  stressLevel      Float?
-  activityLevel    Float?
-  steps            Int?
-  calories         Float?
-  createdAt        DateTime         @default(now())
+  bloodOxygen          Float?
+  sleepScore           Float?
+  recoveryScore        Float?
+  stressLevel          Float?
+  activityLevel        Float?
+  steps                Int?
+  calories             Float?
+  createdAt            DateTime         @default(now())
 
   // Frequent-polling providers (e.g. Fitbit heart-rate samples on a
   // 5-minute worker cadence) can re-fetch a data point already inserted
@@ -225,6 +226,16 @@ model AutomationRule {
   /// AutomationAction[] from shared/src/automation.ts
   actions         Json
   cooldownMinutes Int      @default(30)
+  /// 0-100, default 50 — resolves conflicts when two matched rules target
+  /// the same resource in one dispatch pass (see ai/src/dispatch.ts's
+  /// `resourceKeyFor`). Rules that never collide with another are
+  /// unaffected by this value.
+  priority        Int      @default(50)
+  /// TimeWindow ({start, end} "HH:mm") from shared/src/automation.ts, or
+  /// null for a purely biometric-triggered rule. Schedule-triggered
+  /// templates (Focus Mode, Sleep Preparation) rely on this alongside an
+  /// empty `conditions` array — see docs/DECISION_ENGINE_ARCHITECTURE.md.
+  timeWindow      Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -238,6 +249,15 @@ enum ExecutionOutcome {
   EXECUTED
   SKIPPED_COOLDOWN
   SKIPPED_DISABLED
+  /// Lost a same-resource conflict to a higher-priority rule matched in
+  /// the same dispatch pass — see ai/src/dispatch.ts.
+  SKIPPED_CONFLICT
+  /// The user had automations paused (UserPreferences.automationsPausedUntil)
+  /// at dispatch time.
+  SKIPPED_MANUAL_PAUSE
+  /// Hit the per-user hourly action-execution rate limit — a safety check,
+  /// not a user preference (see ai/src/dispatch.ts's RATE_LIMIT constant).
+  SKIPPED_SAFETY_RATE_LIMIT
   FAILED
 }
 
@@ -250,11 +270,35 @@ model AutomationExecutionLog {
   triggerReadingId String?
   outcome          ExecutionOutcome
   failureReason    String?
+  /// Human-readable explainability text (ai/src/explain.ts) — why this
+  /// outcome happened, in terms of the actual reading values / conflict /
+  /// pause / rate limit involved. Null for rows logged before this field
+  /// existed.
+  reason           String?
   executedAt       DateTime         @default(now())
 
   @@index([userId, executedAt])
   @@index([ruleId, executedAt])
   @@map("automation_execution_logs")
+}
+
+/// A real, persisted, explainable notification — the notification engine
+/// described in docs/DECISION_ENGINE_ARCHITECTURE.md. Generated
+/// automatically for every dispatch outcome (not just a dedicated
+/// notification action type), reusing the same `reason` text stored on
+/// `AutomationExecutionLog`.
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  ruleId    String?
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+
+  @@index([userId, createdAt])
+  @@map("notifications")
 }
 
 enum InsightPeriod {
@@ -289,15 +333,15 @@ enum RecommendationStatus {
 }
 
 model Recommendation {
-  id               String                @id @default(uuid())
+  id               String               @id @default(uuid())
   userId           String
-  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   title            String
   description      String
   /// AutomationAction[] this recommendation would create if accepted
   suggestedActions Json
-  status           RecommendationStatus  @default(PENDING)
-  createdAt        DateTime              @default(now())
+  status           RecommendationStatus @default(PENDING)
+  createdAt        DateTime             @default(now())
   respondedAt      DateTime?
 
   @@index([userId, status])
@@ -305,14 +349,20 @@ model Recommendation {
 }
 
 model UserPreferences {
-  userId               String   @id
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  quietHoursStart      String?
-  quietHoursEnd        String?
-  notificationsEnabled Boolean  @default(true)
-  automationsEnabled   Boolean  @default(true)
-  preferredUnits       String   @default("imperial")
-  updatedAt            DateTime @updatedAt
+  userId                 String    @id
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quietHoursStart        String?
+  quietHoursEnd          String?
+  notificationsEnabled   Boolean   @default(true)
+  automationsEnabled     Boolean   @default(true)
+  /// Manual override: when set and in the future, dispatch skips every
+  /// rule with SKIPPED_MANUAL_PAUSE rather than checking conditions at
+  /// all — the dashboard's "Pause automations for 1 hour" control. Unlike
+  /// `automationsEnabled` (a standing preference), this is a temporary,
+  /// self-expiring override — see docs/DECISION_ENGINE_ARCHITECTURE.md.
+  automationsPausedUntil DateTime?
+  preferredUnits         String    @default("imperial")
+  updatedAt              DateTime  @updatedAt
 
   @@map("user_preferences")
 }

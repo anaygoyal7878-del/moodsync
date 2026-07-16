@@ -9,7 +9,16 @@ import { DevicesSection } from "@/components/dashboard/DevicesSection";
 import { BiometricsSection } from "@/components/dashboard/BiometricsSection";
 import { InsightsSection } from "@/components/dashboard/InsightsSection";
 import { AutomationSection } from "@/components/dashboard/AutomationSection";
-import type { ConnectionsResponse, AutomationRuleDefinition, AutomationHistoryEntry, InsightsResponse } from "@/lib/types";
+import { WellnessScoreCard } from "@/components/dashboard/WellnessScoreCard";
+import { NotificationHistorySection } from "@/components/dashboard/NotificationHistorySection";
+import type {
+  ConnectionsResponse,
+  AutomationRuleDefinition,
+  AutomationHistoryEntry,
+  InsightsResponse,
+  WellnessResponse,
+  NotificationEntry,
+} from "@/lib/types";
 import type { NormalizedBiometricReading } from "@moodsync/shared";
 
 interface MeResponse {
@@ -40,15 +49,27 @@ export default async function DashboardPage({
   const [user, { error }] = await Promise.all([fetchCurrentUser(), searchParams]);
   if (!user) redirect("/login");
 
-  const [connectionsResult, latestResult, historyResult, rulesResult, automationHistoryResult, insightsResult] =
-    await Promise.all([
-      backendFetch<ConnectionsResponse>("/api/connections"),
-      backendFetch<{ reading: NormalizedBiometricReading | null }>("/api/biometrics/latest"),
-      backendFetch<{ readings: NormalizedBiometricReading[] }>("/api/biometrics/history?days=7"),
-      backendFetch<{ rules: AutomationRuleDefinition[] }>("/api/automation-rules"),
-      backendFetch<{ entries: AutomationHistoryEntry[] }>("/api/automation-history?limit=20"),
-      backendFetch<InsightsResponse>("/api/insights?days=14"),
-    ]);
+  const [
+    connectionsResult,
+    latestResult,
+    historyResult,
+    rulesResult,
+    automationHistoryResult,
+    insightsResult,
+    wellnessResult,
+    notificationsResult,
+    pauseResult,
+  ] = await Promise.all([
+    backendFetch<ConnectionsResponse>("/api/connections"),
+    backendFetch<{ reading: NormalizedBiometricReading | null }>("/api/biometrics/latest"),
+    backendFetch<{ readings: NormalizedBiometricReading[] }>("/api/biometrics/history?days=7"),
+    backendFetch<{ rules: AutomationRuleDefinition[] }>("/api/automation-rules"),
+    backendFetch<{ entries: AutomationHistoryEntry[] }>("/api/automation-history?limit=20"),
+    backendFetch<InsightsResponse>("/api/insights?days=14"),
+    backendFetch<WellnessResponse>("/api/wellness"),
+    backendFetch<{ notifications: NotificationEntry[] }>("/api/notifications?limit=20"),
+    backendFetch<{ pausedUntil: string | null; isPaused: boolean }>("/api/preferences/automation-pause"),
+  ]);
 
   const connections: ConnectionsResponse = connectionsResult.ok
     ? connectionsResult.data
@@ -57,7 +78,13 @@ export default async function DashboardPage({
   const history = historyResult.ok ? historyResult.data.readings : [];
   const rules = rulesResult.ok ? rulesResult.data.rules : [];
   const automationHistory = automationHistoryResult.ok ? automationHistoryResult.data.entries : [];
-  const insights: InsightsResponse = insightsResult.ok ? insightsResult.data : { trends: [], automationEffectiveness: [] };
+  const insights: InsightsResponse = insightsResult.ok
+    ? insightsResult.data
+    : { trends: [], wellnessTrends: [], automationEffectiveness: [] };
+  const wellnessScores = wellnessResult.ok ? wellnessResult.data.scores : null;
+  const notifications = notificationsResult.ok ? notificationsResult.data.notifications : [];
+  const pausedUntil = pauseResult.ok ? pauseResult.data.pausedUntil : null;
+  const isAutomationPaused = pauseResult.ok ? pauseResult.data.isPaused : false;
   const devices = connections.smartHome.flatMap((c) => c.devices);
   const spotifyConnected = connections.smartHome.some((c) => c.provider === "SPOTIFY" && c.status === "ACTIVE");
 
@@ -78,9 +105,15 @@ export default async function DashboardPage({
 
       <ConnectionsSection connections={connections} />
       <BiometricsSection latest={latest} history={history} />
-      <InsightsSection trends={insights.trends} automationEffectiveness={insights.automationEffectiveness} />
+      <WellnessScoreCard scores={wellnessScores} />
+      <InsightsSection
+        trends={insights.trends}
+        wellnessTrends={insights.wellnessTrends}
+        automationEffectiveness={insights.automationEffectiveness}
+      />
       <DevicesSection devices={devices} />
       <AutomationSection rules={rules} history={automationHistory} devices={devices} spotifyConnected={spotifyConnected} />
+      <NotificationHistorySection notifications={notifications} pausedUntil={pausedUntil} isPaused={isAutomationPaused} />
     </div>
   );
 }

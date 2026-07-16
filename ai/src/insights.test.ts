@@ -15,6 +15,7 @@ function makeRule(overrides: Partial<AutomationRuleDefinition> = {}): Automation
     conditions: [{ field: 'recoveryScore', operator: 'lt', value: 50 }],
     actions: [{ type: 'hue.set_brightness', provider: 'hue', params: { deviceId: 'd1', brightness: 30 } }],
     cooldownMinutes: 30,
+    priority: 50,
     ...overrides,
   };
 }

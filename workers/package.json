@@ -8,6 +8,7 @@
     "start:whoop-sync": "node dist/whoopSync.js",
     "start:fitbit-sync": "node dist/fitbitSync.js",
     "start:sync-all": "node dist/syncAll.js",
+    "start:scheduled-dispatch": "node dist/scheduledDispatch.js",
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {

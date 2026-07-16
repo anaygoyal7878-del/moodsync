@@ -7,6 +7,9 @@ const OUTCOME_LABELS: Record<AutomationHistoryEntry["outcome"], string> = {
   EXECUTED: "Executed",
   SKIPPED_COOLDOWN: "Skipped (cooldown)",
   SKIPPED_DISABLED: "Skipped (disabled)",
+  SKIPPED_CONFLICT: "Skipped (conflict)",
+  SKIPPED_MANUAL_PAUSE: "Skipped (paused)",
+  SKIPPED_SAFETY_RATE_LIMIT: "Skipped (safety limit)",
   FAILED: "Failed",
 };
 
@@ -50,22 +53,25 @@ export function AutomationSection({
         </Card>
       ) : (
         <Card>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             {history.map((entry) => (
-              <div key={entry.id} className="flex items-center justify-between text-sm">
-                <span className="text-ink-secondary">{entry.rule.name}</span>
-                <span
-                  className={
-                    entry.outcome === "EXECUTED"
-                      ? "text-brand"
-                      : entry.outcome === "FAILED"
-                        ? "text-red-400"
-                        : "text-ink-muted"
-                  }
-                >
-                  {OUTCOME_LABELS[entry.outcome]}
-                </span>
-                <span className="text-xs text-ink-muted">{new Date(entry.executedAt).toLocaleString()}</span>
+              <div key={entry.id} className="border-b border-line pb-2 text-sm last:border-0 last:pb-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-ink-secondary">{entry.rule.name}</span>
+                  <span
+                    className={
+                      entry.outcome === "EXECUTED"
+                        ? "text-brand"
+                        : entry.outcome === "FAILED"
+                          ? "text-red-400"
+                          : "text-ink-muted"
+                    }
+                  >
+                    {OUTCOME_LABELS[entry.outcome]}
+                  </span>
+                  <span className="text-xs text-ink-muted">{new Date(entry.executedAt).toLocaleString()}</span>
+                </div>
+                {entry.reason && <p className="mt-0.5 text-xs text-ink-muted">{entry.reason}</p>}
               </div>
             ))}
           </div>

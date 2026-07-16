@@ -1,6 +1,6 @@
 import { prisma } from '../prismaClient.js';
-import type { Prisma } from '@prisma/client';
-import type { AutomationRuleDefinition, RuleCondition, AutomationAction } from '@moodsync/shared';
+import { Prisma } from '@prisma/client';
+import type { AutomationRuleDefinition, RuleCondition, AutomationAction, TimeWindow } from '@moodsync/shared';
 
 /** RuleCondition[]/AutomationAction[] are plain JSON-shaped interfaces
  * (strings/numbers/Record<string,unknown>), so this cast is a type-system
@@ -18,6 +18,8 @@ function toDomain(row: {
   conditions: unknown;
   actions: unknown;
   cooldownMinutes: number;
+  priority: number;
+  timeWindow: unknown;
 }): AutomationRuleDefinition {
   return {
     id: row.id,
@@ -27,6 +29,8 @@ function toDomain(row: {
     conditions: row.conditions as RuleCondition[],
     actions: row.actions as AutomationAction[],
     cooldownMinutes: row.cooldownMinutes,
+    priority: row.priority,
+    ...(row.timeWindow ? { timeWindow: row.timeWindow as TimeWindow } : {}),
   };
 }
 
@@ -45,6 +49,8 @@ export interface AutomationRuleUpdateInput {
   conditions?: RuleCondition[] | undefined;
   actions?: AutomationAction[] | undefined;
   cooldownMinutes?: number | undefined;
+  priority?: number | undefined;
+  timeWindow?: TimeWindow | null | undefined;
 }
 
 export const automationRuleRepository = {
@@ -58,6 +64,18 @@ export const automationRuleRepository = {
     return rows.map(toDomain);
   },
 
+  /** Every distinct user with at least one enabled, time-window rule —
+   * what workers/src/scheduledDispatch.ts iterates, so the scheduled tick
+   * doesn't have to scan every user in the system on every run. */
+  async listUserIdsWithScheduledRules(): Promise<string[]> {
+    const rows = await prisma.automationRule.findMany({
+      where: { enabled: true, timeWindow: { not: Prisma.JsonNull } },
+      select: { userId: true },
+      distinct: ['userId'],
+    });
+    return rows.map((r) => r.userId);
+  },
+
   findById,
 
   async create(input: Omit<AutomationRuleDefinition, 'id'>): Promise<AutomationRuleDefinition> {
@@ -69,6 +87,8 @@ export const automationRuleRepository = {
         conditions: toJson(input.conditions),
         actions: toJson(input.actions),
         cooldownMinutes: input.cooldownMinutes,
+        priority: input.priority,
+        ...(input.timeWindow ? { timeWindow: toJson(input.timeWindow) } : {}),
       },
     });
     return toDomain(row);
@@ -86,6 +106,10 @@ export const automationRuleRepository = {
         ...(input.conditions !== undefined ? { conditions: toJson(input.conditions) } : {}),
         ...(input.actions !== undefined ? { actions: toJson(input.actions) } : {}),
         ...(input.cooldownMinutes !== undefined ? { cooldownMinutes: input.cooldownMinutes } : {}),
+        ...(input.priority !== undefined ? { priority: input.priority } : {}),
+        ...(input.timeWindow !== undefined
+          ? { timeWindow: input.timeWindow ? toJson(input.timeWindow) : Prisma.JsonNull }
+          : {}),
       },
     });
     if (result.count === 0) return null;

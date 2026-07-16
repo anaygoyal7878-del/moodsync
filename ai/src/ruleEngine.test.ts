@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AutomationRuleDefinition, NormalizedBiometricReading } from '@moodsync/shared';
-import { evaluateRule, evaluateRules } from './ruleEngine.js';
+import { evaluateRule, evaluateRules, withinTimeWindow } from './ruleEngine.js';
 
 function makeReading(overrides: Partial<NormalizedBiometricReading> = {}): NormalizedBiometricReading {
   return {
@@ -20,6 +20,7 @@ function makeRule(overrides: Partial<AutomationRuleDefinition> = {}): Automation
     conditions: [{ field: 'recoveryScore', operator: 'lt', value: 40 }],
     actions: [{ type: 'hue.set_scene', provider: 'hue', params: { scene: 'relax' } }],
     cooldownMinutes: 30,
+    priority: 50,
     ...overrides,
   };
 }
@@ -73,5 +74,60 @@ describe('evaluateRules', () => {
     const reading = makeReading({ recoveryScore: 32 });
 
     expect(evaluateRules([matching, nonMatching], reading)).toEqual([matching]);
+  });
+});
+
+describe('timeWindow', () => {
+  it('matches a schedule-only rule (no biometric conditions) within its window', () => {
+    const rule = makeRule({ conditions: [], timeWindow: { start: '09:00', end: '17:00' } });
+    const noon = new Date();
+    noon.setHours(12, 0, 0, 0);
+    expect(evaluateRule(rule, makeReading(), noon)).toBe(true);
+  });
+
+  it('does not match a schedule-only rule outside its window', () => {
+    const rule = makeRule({ conditions: [], timeWindow: { start: '09:00', end: '17:00' } });
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    expect(evaluateRule(rule, makeReading(), midnight)).toBe(false);
+  });
+
+  it('a rule with both conditions and a timeWindow requires both to match', () => {
+    const rule = makeRule({
+      conditions: [{ field: 'recoveryScore', operator: 'lt', value: 40 }],
+      timeWindow: { start: '09:00', end: '17:00' },
+    });
+    const noon = new Date();
+    noon.setHours(12, 0, 0, 0);
+    expect(evaluateRule(rule, makeReading({ recoveryScore: 32 }), noon)).toBe(true);
+    expect(evaluateRule(rule, makeReading({ recoveryScore: 90 }), noon)).toBe(false);
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    expect(evaluateRule(rule, makeReading({ recoveryScore: 32 }), midnight)).toBe(false);
+  });
+});
+
+describe('withinTimeWindow', () => {
+  it('handles a same-day window', () => {
+    const window = { start: '09:00', end: '17:00' };
+    const inWindow = new Date();
+    inWindow.setHours(10, 0, 0, 0);
+    const outOfWindow = new Date();
+    outOfWindow.setHours(20, 0, 0, 0);
+    expect(withinTimeWindow(window, inWindow)).toBe(true);
+    expect(withinTimeWindow(window, outOfWindow)).toBe(false);
+  });
+
+  it('handles an overnight-wrapping window', () => {
+    const window = { start: '22:00', end: '06:00' };
+    const lateNight = new Date();
+    lateNight.setHours(23, 0, 0, 0);
+    const earlyMorning = new Date();
+    earlyMorning.setHours(5, 0, 0, 0);
+    const midday = new Date();
+    midday.setHours(12, 0, 0, 0);
+    expect(withinTimeWindow(window, lateNight)).toBe(true);
+    expect(withinTimeWindow(window, earlyMorning)).toBe(true);
+    expect(withinTimeWindow(window, midday)).toBe(false);
   });
 });

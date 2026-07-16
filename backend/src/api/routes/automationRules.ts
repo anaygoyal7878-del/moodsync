@@ -31,15 +31,36 @@ const actionSchema = z.object({
   params: z.record(z.string(), z.unknown()),
 });
 
-const createRuleSchema = z.object({
-  name: z.string().min(1).max(200),
-  enabled: z.boolean().default(true),
-  conditions: z.array(conditionSchema).min(1, 'A rule needs at least one condition'),
-  actions: z.array(actionSchema).min(1, 'A rule needs at least one action'),
-  cooldownMinutes: z.number().int().min(0).max(1440).default(30),
-});
+const timeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Must be "HH:mm" 24-hour time');
+const timeWindowSchema = z.object({ start: timeSchema, end: timeSchema });
 
-const updateRuleSchema = createRuleSchema.partial();
+const createRuleSchema = z
+  .object({
+    name: z.string().min(1).max(200),
+    enabled: z.boolean().default(true),
+    // A schedule-only rule (Focus Mode, Sleep Preparation) has no
+    // biometric condition at all — only requires .min(1) when timeWindow
+    // isn't set, enforced by the refine below rather than here.
+    conditions: z.array(conditionSchema),
+    actions: z.array(actionSchema).min(1, 'A rule needs at least one action'),
+    cooldownMinutes: z.number().int().min(0).max(1440).default(30),
+    priority: z.number().int().min(0).max(100).default(50),
+    timeWindow: timeWindowSchema.optional(),
+  })
+  .refine((data) => data.conditions.length > 0 || data.timeWindow !== undefined, {
+    message: 'A rule needs at least one condition, or a scheduled time window',
+    path: ['conditions'],
+  });
+
+const updateRuleSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  enabled: z.boolean().optional(),
+  conditions: z.array(conditionSchema).optional(),
+  actions: z.array(actionSchema).min(1, 'A rule needs at least one action').optional(),
+  cooldownMinutes: z.number().int().min(0).max(1440).optional(),
+  priority: z.number().int().min(0).max(100).optional(),
+  timeWindow: timeWindowSchema.nullable().optional(),
+});
 
 export default async function automationRuleRoutes(app: FastifyInstance) {
   app.get('/automation-rules', { preHandler: app.authenticate }, async (request, reply) => {
@@ -51,7 +72,12 @@ export default async function automationRuleRoutes(app: FastifyInstance) {
     const parsed = createRuleSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
-    const rule = await automationRuleRepository.create({ userId: request.userId!, ...parsed.data });
+    const { timeWindow, ...rest } = parsed.data;
+    const rule = await automationRuleRepository.create({
+      userId: request.userId!,
+      ...rest,
+      ...(timeWindow !== undefined ? { timeWindow } : {}),
+    });
     return reply.code(201).send({ rule });
   });
 

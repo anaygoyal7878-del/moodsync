@@ -7,7 +7,7 @@ import {
   automationRuleRepository,
   automationExecutionLogRepository,
 } from '@moodsync/database';
-import { computeTrends, computeAutomationEffectiveness } from '@moodsync/ai';
+import { computeTrends, computeWellnessTrends, computeAutomationEffectiveness, computeWellnessScores } from '@moodsync/ai';
 
 const historyQuerySchema = z.object({ days: z.coerce.number().int().min(1).max(30).default(7) });
 const insightsQuerySchema = z.object({ days: z.coerce.number().int().min(1).max(30).default(14) });
@@ -70,13 +70,34 @@ export default async function dashboardRoutes(app: FastifyInstance) {
       automationExecutionLogRepository.listForUser(userId, 200),
     ]);
 
-    const trends = computeTrends(readingsWithId.map((r) => r.reading));
+    const readings = readingsWithId.map((r) => r.reading);
+    const trends = computeTrends(readings);
+    const wellnessTrends = computeWellnessTrends(readings);
     const automationEffectiveness = computeAutomationEffectiveness({
       rules,
       logs: logs.map((l) => ({ ruleId: l.ruleId, triggerReadingId: l.triggerReadingId, outcome: l.outcome })),
       readings: readingsWithId,
     });
 
-    return reply.send({ trends, automationEffectiveness });
+    return reply.send({ trends, wellnessTrends, automationEffectiveness });
+  });
+
+  /** Current wellness scores (ai/src/wellness.ts) for the dashboard's
+   * WellnessScoreCard — computed from the latest reading plus a 30-day
+   * trailing baseline window for the scores that need one (stress,
+   * heuristic recovery). Returns every score as `null` (not an error)
+   * when there's no reading yet, same "absence, not failure" convention
+   * as every other dashboard section. */
+  app.get('/wellness', { preHandler: app.authenticate }, async (request, reply) => {
+    const userId = request.userId!;
+    const latest = await biometricReadingRepository.findLatestNormalized(userId);
+    if (!latest) return reply.send({ scores: null });
+
+    const history = await biometricReadingRepository.listRecentNormalized(userId, 30);
+    const scores = computeWellnessScores(
+      latest.reading,
+      history.filter((r) => r.timestamp !== latest.reading.timestamp),
+    );
+    return reply.send({ scores });
   });
 }

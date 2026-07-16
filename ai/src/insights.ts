@@ -1,4 +1,5 @@
 import type { NormalizedBiometricReading, BiometricField, AutomationRuleDefinition, ComparisonOperator } from '@moodsync/shared';
+import { computeWellnessScores, type WellnessScores } from './wellness.js';
 
 const METRIC_FIELDS: BiometricField[] = [
   'heartRate',
@@ -24,13 +25,36 @@ function round2(value: number): number {
 }
 
 export interface TrendResult {
-  metric: BiometricField;
+  /** A `BiometricField` for raw-biometric trends, or a `WellnessScores`
+   * key (e.g. "stress", "recovery") for computed-score trends — widened
+   * to `string` so both series shapes share one result type rather than
+   * needing two near-identical interfaces. */
+  metric: string;
   /** Average over the newer half of the window. */
   current: number;
   /** Average over the older half of the window. */
   previous: number;
   delta: number;
   direction: 'up' | 'down' | 'flat';
+}
+
+/** Splits a series of (metric -> value-or-undefined) points in half by
+ * count and compares each half's average — the shared core both
+ * `computeTrends` (raw biometrics) and `computeWellnessTrends` (computed
+ * scores) build on, so the half-split/flat-epsilon logic can't drift
+ * between the two. */
+function computeSeriesTrend(metric: string, olderValues: number[], newerValues: number[]): TrendResult | null {
+  if (olderValues.length === 0 || newerValues.length === 0) return null;
+  const previous = average(olderValues);
+  const current = average(newerValues);
+  const delta = current - previous;
+  return {
+    metric,
+    current: round2(current),
+    previous: round2(previous),
+    delta: round2(delta),
+    direction: Math.abs(delta) < FLAT_EPSILON ? 'flat' : delta > 0 ? 'up' : 'down',
+  };
 }
 
 /**
@@ -51,19 +75,41 @@ export function computeTrends(readingsOldestFirst: NormalizedBiometricReading[])
   for (const metric of METRIC_FIELDS) {
     const olderValues = older.map((r) => r[metric]).filter((v): v is number => v !== undefined);
     const newerValues = newer.map((r) => r[metric]).filter((v): v is number => v !== undefined);
-    if (olderValues.length === 0 || newerValues.length === 0) continue;
+    const trend = computeSeriesTrend(metric, olderValues, newerValues);
+    if (trend) results.push(trend);
+  }
+  return results;
+}
 
-    const previous = average(olderValues);
-    const current = average(newerValues);
-    const delta = current - previous;
+const WELLNESS_SCORE_KEYS = ['stress', 'recovery', 'sleep', 'energy', 'fatigue', 'focus', 'relaxation', 'overall'] as const;
 
-    results.push({
-      metric,
-      current: round2(current),
-      previous: round2(previous),
-      delta: round2(delta),
-      direction: Math.abs(delta) < FLAT_EPSILON ? 'flat' : delta > 0 ? 'up' : 'down',
-    });
+/**
+ * Same half-split trend comparison as `computeTrends`, but over
+ * MoodSync's computed wellness scores (ai/src/wellness.ts) instead of raw
+ * biometric fields — e.g. "is stress trending down this week." Each input
+ * reading is scored independently using the *same* trailing-history
+ * window passed in (a reading only sees readings before it as its own
+ * baseline would be circular — see wellness.ts's baseline-history note),
+ * so this is O(n) score computations, not O(n^2); callers should pass a
+ * reasonably-sized window (the dashboard uses 14 days).
+ */
+export function computeWellnessTrends(readingsOldestFirst: NormalizedBiometricReading[]): TrendResult[] {
+  if (readingsOldestFirst.length < 2) return [];
+
+  const scored: WellnessScores[] = readingsOldestFirst.map((reading, i) =>
+    computeWellnessScores(reading, readingsOldestFirst.slice(0, i)),
+  );
+
+  const mid = Math.floor(scored.length / 2);
+  const older = scored.slice(0, mid);
+  const newer = scored.slice(mid);
+
+  const results: TrendResult[] = [];
+  for (const key of WELLNESS_SCORE_KEYS) {
+    const olderValues = older.map((s) => s[key].value).filter((v): v is number => v !== null);
+    const newerValues = newer.map((s) => s[key].value).filter((v): v is number => v !== null);
+    const trend = computeSeriesTrend(key, olderValues, newerValues);
+    if (trend) results.push(trend);
   }
   return results;
 }
@@ -90,7 +136,14 @@ export interface AutomationEffectivenessResult {
 interface ExecutionLogLike {
   ruleId: string;
   triggerReadingId: string | null;
-  outcome: 'EXECUTED' | 'SKIPPED_COOLDOWN' | 'SKIPPED_DISABLED' | 'FAILED';
+  outcome:
+    | 'EXECUTED'
+    | 'SKIPPED_COOLDOWN'
+    | 'SKIPPED_DISABLED'
+    | 'SKIPPED_CONFLICT'
+    | 'SKIPPED_MANUAL_PAUSE'
+    | 'SKIPPED_SAFETY_RATE_LIMIT'
+    | 'FAILED';
 }
 
 function isImprovement(operator: ComparisonOperator, before: number, after: number): boolean {

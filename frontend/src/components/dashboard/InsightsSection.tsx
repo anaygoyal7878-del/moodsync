@@ -4,14 +4,42 @@ import type { TrendResult, AutomationEffectivenessResult } from "@/lib/types";
 
 const DIRECTION_ARROW: Record<TrendResult["direction"], string> = { up: "↑", down: "↓", flat: "→" };
 
+function TrendGrid({ title, trends }: { title: string; trends: TrendResult[] }) {
+  if (trends.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-xs uppercase tracking-wide text-ink-muted">{title}</p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {trends.map((t) => (
+          <Card key={t.metric} className="py-4 transition-colors hover:bg-surface-hover">
+            <p className="text-xs uppercase tracking-wide text-ink-muted">{metricLabel(t.metric)}</p>
+            <p className="mt-1 flex items-baseline gap-1.5 text-2xl font-semibold tabular-nums">
+              {t.current}
+              <span
+                className={
+                  t.direction === "flat" ? "text-sm font-medium text-ink-muted" : "text-sm font-medium text-ink-secondary"
+                }
+              >
+                {DIRECTION_ARROW[t.direction]} {Math.abs(t.delta)}
+              </span>
+            </p>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function InsightsSection({
   trends,
+  wellnessTrends,
   automationEffectiveness,
 }: {
   trends: TrendResult[];
+  wellnessTrends: TrendResult[];
   automationEffectiveness: AutomationEffectivenessResult[];
 }) {
-  const hasData = trends.length > 0 || automationEffectiveness.length > 0;
+  const hasData = trends.length > 0 || wellnessTrends.length > 0 || automationEffectiveness.length > 0;
 
   return (
     <section className="flex flex-col gap-3">
@@ -27,27 +55,8 @@ export function InsightsSection({
         </Card>
       ) : (
         <>
-          {trends.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {trends.map((t) => (
-                <Card key={t.metric} className="py-4 transition-colors hover:bg-surface-hover">
-                  <p className="text-xs uppercase tracking-wide text-ink-muted">{metricLabel(t.metric)}</p>
-                  <p className="mt-1 flex items-baseline gap-1.5 text-2xl font-semibold tabular-nums">
-                    {t.current}
-                    <span
-                      className={
-                        t.direction === "flat"
-                          ? "text-sm font-medium text-ink-muted"
-                          : "text-sm font-medium text-ink-secondary"
-                      }
-                    >
-                      {DIRECTION_ARROW[t.direction]} {Math.abs(t.delta)}
-                    </span>
-                  </p>
-                </Card>
-              ))}
-            </div>
-          )}
+          <TrendGrid title="Wellness scores" trends={wellnessTrends} />
+          <TrendGrid title="Raw biometrics" trends={trends} />
 
           {automationEffectiveness.length > 0 && (
             <Card>

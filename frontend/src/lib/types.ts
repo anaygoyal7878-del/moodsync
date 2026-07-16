@@ -1,5 +1,7 @@
 import type { AutomationRuleDefinition } from "@moodsync/shared";
 
+export type { TimeWindow } from "@moodsync/shared";
+
 export type ConnectionStatus = "ACTIVE" | "EXPIRED" | "REVOKED" | "ERROR" | "NOT_YET_AVAILABLE";
 
 export interface WearableConnectionSummary {
@@ -38,7 +40,14 @@ export interface ConnectionsResponse {
   smartHome: SmartHomeConnectionSummary[];
 }
 
-export type AutomationOutcome = "EXECUTED" | "SKIPPED_COOLDOWN" | "SKIPPED_DISABLED" | "FAILED";
+export type AutomationOutcome =
+  | "EXECUTED"
+  | "SKIPPED_COOLDOWN"
+  | "SKIPPED_DISABLED"
+  | "SKIPPED_CONFLICT"
+  | "SKIPPED_MANUAL_PAUSE"
+  | "SKIPPED_SAFETY_RATE_LIMIT"
+  | "FAILED";
 
 export interface AutomationHistoryEntry {
   id: string;
@@ -47,7 +56,35 @@ export interface AutomationHistoryEntry {
   triggerReadingId: string | null;
   outcome: AutomationOutcome;
   failureReason: string | null;
+  reason: string | null;
   executedAt: string;
+}
+
+export interface NotificationEntry {
+  id: string;
+  title: string;
+  body: string;
+  ruleId: string | null;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export type ScoreBasis = "provider-native" | "evidence-informed-heuristic" | "heuristic";
+
+export interface WellnessScore {
+  value: number | null;
+  basis: ScoreBasis;
+}
+
+export interface WellnessScores {
+  stress: WellnessScore;
+  recovery: WellnessScore;
+  sleep: WellnessScore;
+  energy: WellnessScore;
+  fatigue: WellnessScore;
+  focus: WellnessScore;
+  relaxation: WellnessScore;
+  overall: WellnessScore;
 }
 
 export type { AutomationRuleDefinition };
@@ -72,5 +109,10 @@ export interface AutomationEffectivenessResult {
 
 export interface InsightsResponse {
   trends: TrendResult[];
+  wellnessTrends: TrendResult[];
   automationEffectiveness: AutomationEffectivenessResult[];
+}
+
+export interface WellnessResponse {
+  scores: WellnessScores | null;
 }

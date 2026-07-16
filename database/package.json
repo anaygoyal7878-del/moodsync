@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@moodsync/shared": "*",
-    "@prisma/client": "^6.2.1"
+    "@prisma/client": "^6.19.3"
   },
   "devDependencies": {
     "prisma": "^6.2.1",

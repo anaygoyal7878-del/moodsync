@@ -1,4 +1,4 @@
-export { evaluateRule, evaluateRules } from './ruleEngine.js';
+export { evaluateRule, evaluateRules, withinTimeWindow } from './ruleEngine.js';
 export { isWithinCooldown } from './cooldown.js';
 export { dispatchForReading, type DispatchResult } from './dispatch.js';
 export { executeHueAction } from './hueActionExecutor.js';
@@ -10,7 +10,20 @@ export { executeHueAction } from './hueActionExecutor.js';
 export { executeSpotifyAction } from './spotifyActionExecutor.js';
 export {
   computeTrends,
+  computeWellnessTrends,
   computeAutomationEffectiveness,
   type TrendResult,
   type AutomationEffectivenessResult,
 } from './insights.js';
+export {
+  computeWellnessScores,
+  computeStressScore,
+  computeRecoveryScore,
+  computeSleepScore,
+  computeEnergyScore,
+  type WellnessScore,
+  type WellnessScores,
+  type ScoreBasis,
+} from './wellness.js';
+export { explainTrigger, explainConflict, explainManualPause, explainRateLimit } from './explain.js';
+export { createNotification, type CreateNotificationInput } from './notificationExecutor.js';

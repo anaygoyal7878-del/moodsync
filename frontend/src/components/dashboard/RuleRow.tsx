@@ -41,8 +41,10 @@ export function RuleRow({ rule }: { rule: AutomationRuleDefinition }) {
       <div>
         <p className="text-sm font-medium">{rule.name}</p>
         <p className="text-xs text-ink-muted">
-          {rule.conditions.map(summarizeCondition).join(" and ")} &rarr;{" "}
-          {rule.actions.map(summarizeAction).join(", ")} &middot; {rule.cooldownMinutes}m cooldown
+          {rule.conditions.length > 0 ? rule.conditions.map(summarizeCondition).join(" and ") : "scheduled"}
+          {rule.timeWindow ? ` (${rule.timeWindow.start}-${rule.timeWindow.end})` : ""} &rarr;{" "}
+          {rule.actions.map(summarizeAction).join(", ")} &middot; {rule.cooldownMinutes}m cooldown &middot; priority{" "}
+          {rule.priority}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">

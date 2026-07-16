@@ -846,3 +846,86 @@ automated path — a real user would have to remember to click it.
   honestly in `zepp/MoodSyncCompanion/README.md`, same framing as the
   Apple Health iOS package's Xcode limitation.
 - Full monorepo build/typecheck/lint/test pass (78 tests, all packages).
+
+## Milestone 10 — Decision Engine core ✅
+
+- Scoped down from a full 12-section product spec (mathematical wellness
+  scoring, six-plus new engines, eight automation scenarios, a
+  smart-home abstraction redesign, music-preference learning, a new
+  dashboard) to a real, fully-verified "Decision Engine core," per this
+  project's one-milestone-at-a-time convention — everything deferred is
+  written up concretely in `docs/DECISION_ENGINE_ROADMAP.md`, tagged
+  with exactly what real research/integration work each item needs
+  first, rather than fabricated. See `docs/DECISION_ENGINE_ARCHITECTURE.md`
+  for the full design.
+- **Wellness scoring** (`ai/src/wellness.ts`): Stress, Recovery, Sleep,
+  Energy, Fatigue, Focus, Relaxation, Overall — each explicitly labeled
+  `provider-native`, `evidence-informed-heuristic`, or `heuristic`, never
+  presented as more scientific than it is. Stress/Recovery use a
+  real, cited methodology (own-baseline HRV z-scoring, 2024–2025
+  research) for the evidence-informed parts; the 0-100 mapping curves are
+  MoodSync's own documented heuristics. No sleep-stage formula was
+  invented since the schema doesn't collect stage-level data — see
+  `docs/WELLNESS_SCORING.md` for full citations and the summary table.
+- **Priority + conflict resolution**: `AutomationRuleDefinition.priority`
+  (0-100, default 50); `ai/src/dispatch.ts`'s `resolveConflicts` groups
+  matched rules by a coarse `provider:actionType` resource key and keeps
+  only the highest-priority rule per resource, logging
+  `SKIPPED_CONFLICT` with an explanation for the rest.
+- **Manual override**: `UserPreferences.automationsPausedUntil` +
+  `POST/DELETE /api/preferences/automation-pause`, a dashboard "Pause
+  automations for 1 hour" control. Dispatch checks this before anything
+  else, logging `SKIPPED_MANUAL_PAUSE`.
+- **Safety check**: a per-user hourly rate limit
+  (`RATE_LIMIT_PER_HOUR = 20`) independent of individual rule cooldowns,
+  logging `SKIPPED_SAFETY_RATE_LIMIT`.
+- **Explainability** (`ai/src/explain.ts`): every dispatch outcome gets a
+  human-readable reason built from the rule's actual matched
+  conditions/values, stored on `AutomationExecutionLog.reason`.
+- **Notification engine, real** (`ai/src/notificationExecutor.ts`, new
+  `Notification` Prisma model, `GET /api/notifications`): every dispatch
+  outcome — not just successes — generates a persisted, explainable
+  notification, closing the `notification.*` action gap that had been
+  modeled in the schema since Milestone 4 but never executed.
+- **Scheduling system** (`workers/src/scheduledDispatch.ts`): a periodic
+  tick (same cron-worker pattern as the wearable sync workers) for
+  schedule-triggered rules (`TimeWindow` on `AutomationRuleDefinition`) —
+  unlocks Focus Mode/Sleep Preparation-style automations with no
+  biometric trigger at all.
+- **Six of eight spec automation scenarios** shipped as real, selectable
+  rule templates in `RuleForm.tsx` (Elevated Stress, Focus Mode, Sleep
+  Preparation, Wake Up, Workout, Recovery) — still fully user-editable,
+  using only real, already-integrated actions (Hue, Spotify). Sleep
+  Detection's lock/security check and Travel/away-mode are deliberately
+  not built — no smart lock, security, or location integration exists in
+  this codebase; both are in the roadmap doc.
+- **AI insights extended**, not rewritten: `ai/src/insights.ts`'s
+  `computeTrends` core logic was factored into a shared
+  `computeSeriesTrend` helper and reused by a new `computeWellnessTrends`,
+  giving trend arrows for the new wellness scores alongside the existing
+  raw-biometric trends.
+- **Dashboard**: new `WellnessScoreCard` (every score + its basis label)
+  and `NotificationHistorySection` (+ the pause control); existing
+  automation history extended with priority display and the three new
+  outcome badges + explanation text.
+- **Verified for real, not just compiled**: applied the migration to a
+  live local Postgres; signed up a real disposable test account; created
+  two real rules targeting the same Hue resource at different
+  priorities, pushed a real triggering reading via the Apple Health
+  ingest endpoint, and confirmed live — the low-priority rule logged
+  `SKIPPED_CONFLICT` with the correct explanation naming the winner, the
+  high-priority rule attempted execution and genuinely `FAILED` (no real
+  Hue connection in this sandbox — an honest failure, not a bug).
+  Confirmed the manual pause live (both matched rules skipped with
+  `SKIPPED_MANUAL_PAUSE`). Confirmed the wellness scoring pipeline live,
+  including the 5-point HRV-history threshold (scores correctly `null`
+  below it, correctly computed once enough history existed). Every
+  outcome's real notification was confirmed via `GET /api/notifications`.
+  Screenshotted the actual dashboard in a real logged-in browser session
+  showing the live Wellness Scores card, automation history with
+  priority/conflict/pause badges, and the notification feed — all
+  matching the API responses exactly.
+- Full monorepo build/typecheck/lint/test pass (118 tests, all
+  packages) — new test files this round: `wellness.test.ts` (14),
+  `explain.test.ts` (7), `dispatch.test.ts` (5), plus `ruleEngine.test.ts`
+  extended with `timeWindow`/`withinTimeWindow` coverage.
