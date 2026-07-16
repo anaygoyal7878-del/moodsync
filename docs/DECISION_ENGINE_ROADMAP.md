@@ -10,14 +10,56 @@ first — none of it is presented as already supported.
 ## Automations requiring integrations that don't exist yet
 
 - **Sleep Detection's lock/security check** ("confirm smart locks report
-  as locked, confirm security system is armed") — needs a real smart lock
-  and/or security system integration. None exists in this codebase.
-  Research required: which vendor(s) to target (e.g. August, Schlage,
-  SimpliSafe, Ring), their real OAuth/API capabilities, and confirming
-  read-only "is locked/armed" query support before building any
-  automation that references it — matching this project's explicit rule
-  ("Do not claim to control or arm devices unless a supported integration
-  exists").
+  as locked, confirm security system is armed") — **correction (this
+  entry originally proposed a new direct lock-vendor integration; that's
+  now the wrong shape, per direction to route this through the existing
+  Alexa integration instead of adding a separate one)**. Verified against
+  real Amazon developer documentation before writing this: Alexa's
+  `Alexa.LockController`/`Alexa.SecurityPanelController` interfaces (see
+  [developer.amazon.com/.../alexa-lockcontroller.html](https://developer.amazon.com/en-US/docs/alexa/device-apis/alexa-lockcontroller.html))
+  let the skill that *owns* a lock/security device (e.g. August's own
+  Smart Home Skill) report its state to Alexa — but there is **no
+  cross-skill query API**. A third-party Custom Skill like MoodSync's
+  cannot ask Alexa "what's the state of the user's August lock," because
+  that lock's state is only ever reported to Alexa by August's own skill,
+  never exposed to other skills. This is a real, confirmed Alexa
+  platform constraint, not a MoodSync gap — so "MoodSync silently checks
+  your locks via Alexa" isn't buildable without MoodSync itself becoming
+  a certified Smart Home Skill partner for each lock/security vendor,
+  which is exactly the separate per-vendor integration work this
+  direction says to avoid.
+
+  **The real, buildable architecture that stays inside the existing
+  Alexa integration** (`integrations/alexa`,
+  `backend/src/api/routes/integrations/alexa.ts`, see
+  `docs/ALEXA_ARCHITECTURE.md`): a voice-driven confirmation loop, not
+  device polling — matching this project's explicit rule ("Do not claim
+  to control or arm devices unless a supported integration exists"):
+  1. A **Sleep Detected** rule template (biometric-triggered — e.g.
+     `sleepScore` newly present after a period of activity — buildable
+     today with zero new integration, since it only needs the real
+     notification engine already shipped in Milestone 10) generates a
+     dashboard notification asking the user to check their own locks —
+     no device state is queried or claimed.
+  2. A new Alexa intent, `CheckSecurityIntent` (sample utterance: "Alexa,
+     ask MoodSync if I locked up" / "...if my house is secure"), added to
+     the existing skill's interaction model
+     (`integrations/alexa/src/interactionModel.template.json`) and intent
+     handlers (`integrations/alexa/src/intents.ts`) — lets the user
+     *ask* MoodSync this instead of MoodSync ever polling anything.
+     MoodSync's honest response today: it has no lock/security
+     integration, so it says exactly that rather than guessing ("I don't
+     have any smart locks connected — check them yourself before bed.").
+     If MoodSync ever does become a certified partner for a specific
+     lock/security vendor's Smart Home Skill in the future, this same
+     intent's response is where that real state would surface — the
+     intent is the extension point, designed now, not implemented until
+     a real integration backs it.
+  This keeps the "lock stuff" entirely inside the one Alexa
+  integration MoodSync already has, as instructed, rather than adding a
+  second, separate smart-lock package — at the cost of never being able
+  to *automatically* confirm lock state, which Amazon's platform doesn't
+  allow for a third-party skill regardless of integration count.
 - **Travel/away-mode** — needs a real location integration (geofencing via
   a mobile companion app, or a location API). None exists. The iOS
   companion app (`ios/MoodSyncCompanion`) has no location code today;
