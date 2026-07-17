@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Nav } from "@/components/marketing/Nav";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import Lightfall from "@/components/effects/Lightfall";
 
 const integrations = [
   { name: "WHOOP", status: "Connect today" },
@@ -33,40 +34,60 @@ export default function Home() {
       <Nav />
 
       <main className="flex-1">
-        <section className="mx-auto max-w-4xl px-6 pt-24 pb-20 text-center sm:pt-32">
-          <p className="animate-fade-in-up mb-4 inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-xs font-medium text-ink-secondary">
-            <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden="true" />
-            Now connecting WHOOP, Fitbit, Hue &amp; Spotify
-          </p>
-          <h1
-            className="animate-fade-in-up text-4xl font-semibold tracking-tight text-balance sm:text-6xl"
-            style={{ animationDelay: "80ms" }}
-          >
-            The intelligence layer between your wearable and your home
-          </h1>
-          <p
-            className="animate-fade-in-up mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-ink-secondary"
-            style={{ animationDelay: "160ms" }}
-          >
-            MoodSync doesn&apos;t make hardware. It reads your biometric signals and automatically
-            adapts the smart home devices you already own — no new gadget required.
-          </p>
-          <div className="animate-fade-in-up mt-10 flex flex-wrap items-center justify-center gap-3" style={{ animationDelay: "240ms" }}>
-            <Link href="/signup">
-              <Button variant="primary" className="px-6 py-3 text-base">
-                Get started free
-              </Button>
-            </Link>
-            <Link href="/demo">
-              <Button variant="secondary" className="px-6 py-3 text-base">
-                Watch the demo
-              </Button>
-            </Link>
-            <Link href="#features">
-              <Button variant="ghost" className="px-6 py-3 text-base">
-                See how it works
-              </Button>
-            </Link>
+        <section className="relative overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 z-0" aria-hidden="true">
+            <Lightfall
+              colors={["#ff7a59", "#ffb37a", "#f5d0b8"]}
+              backgroundColor="#1f0d08"
+              speed={0.6}
+              streakCount={5}
+              streakWidth={0.8}
+              streakLength={1.1}
+              glow={0.85}
+              density={0.5}
+              twinkle={0.7}
+              zoom={3}
+              backgroundGlow={0.6}
+              opacity={0.55}
+              mouseInteraction={false}
+            />
+          </div>
+
+          <div className="relative z-10 mx-auto max-w-4xl px-6 pt-24 pb-20 text-center sm:pt-32">
+            <p className="animate-fade-in-up mb-4 inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-xs font-medium text-ink-secondary">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden="true" />
+              Now connecting WHOOP, Fitbit, Hue &amp; Spotify
+            </p>
+            <h1
+              className="animate-fade-in-up text-4xl font-semibold tracking-tight text-balance sm:text-6xl"
+              style={{ animationDelay: "80ms" }}
+            >
+              The intelligence layer between your wearable and your home
+            </h1>
+            <p
+              className="animate-fade-in-up mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-ink-secondary"
+              style={{ animationDelay: "160ms" }}
+            >
+              MoodSync doesn&apos;t make hardware. It reads your biometric signals and automatically
+              adapts the smart home devices you already own — no new gadget required.
+            </p>
+            <div className="animate-fade-in-up mt-10 flex flex-wrap items-center justify-center gap-3" style={{ animationDelay: "240ms" }}>
+              <Link href="/signup">
+                <Button variant="primary" className="px-6 py-3 text-base">
+                  Get started free
+                </Button>
+              </Link>
+              <Link href="/demo">
+                <Button variant="secondary" className="px-6 py-3 text-base">
+                  Watch the demo
+                </Button>
+              </Link>
+              <Link href="#features">
+                <Button variant="ghost" className="px-6 py-3 text-base">
+                  See how it works
+                </Button>
+              </Link>
+            </div>
           </div>
         </section>
 
