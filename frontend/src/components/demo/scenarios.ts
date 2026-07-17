@@ -12,7 +12,8 @@ import type { DemoScenario } from "./AutomationDemo";
  * scent/diffuser hardware have no real MoodSync API behind them yet. They
  * stay in the gallery because a demo is exactly the place to show where
  * the product is headed, but each carries a "Concept" badge (see
- * DemoGallery.tsx) so nobody mistakes it for a rule they can build today.
+ * ScenarioCard.tsx/DemoIndexGrid.tsx) so nobody mistakes it for a rule
+ * they can build today.
  */
 export const DEMO_SCENARIOS: DemoScenario[] = [
   {

@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Nav } from "@/components/marketing/Nav";
-import { Button } from "@/components/ui/Button";
-import { DemoGallery } from "@/components/demo/DemoGallery";
-import { DEMO_SCENARIOS } from "@/components/demo/scenarios";
+import { DemoIndexGrid } from "@/components/demo/DemoIndexGrid";
 
 export const metadata: Metadata = {
   title: "Demo — MoodSync",
@@ -25,42 +22,15 @@ export default function DemoPage() {
             Nine automations, one intelligence layer
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-ink-secondary">
-            Each walkthrough below plays out a MoodSync rule — a biometric or schedule condition, matched against
-            your wearable, driving your smart home. The first five run on real integrations shipping today (Hue,
-            Spotify, notifications); the rest are marked <span className="font-medium text-ink">Concept</span> —
-            product vision for capabilities MoodSync doesn&apos;t build against yet. The numbers are staged for the
-            demo either way, not a live account.
+            Each walkthrough plays out a MoodSync rule — a biometric or schedule condition, matched against your
+            wearable, driving your smart home. The first five run on real integrations shipping today (Hue, Spotify,
+            notifications); the rest are marked <span className="font-medium text-ink">Concept</span> — product
+            vision for capabilities MoodSync doesn&apos;t build against yet. Pick one below.
           </p>
-          <nav className="mt-6 flex flex-wrap items-center justify-center gap-2" aria-label="Jump to a demo">
-            {DEMO_SCENARIOS.map((scenario) => (
-              <a
-                key={scenario.id}
-                href={`#${scenario.id}`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-medium text-ink-secondary transition-colors hover:border-line-strong hover:text-ink"
-              >
-                <span aria-hidden="true">{scenario.emoji}</span>
-                {scenario.title}
-                {scenario.concept && <span className="text-ink-muted">·concept</span>}
-              </a>
-            ))}
-          </nav>
         </section>
 
-        <section className="mx-auto max-w-3xl px-6 pb-20">
-          <DemoGallery />
-        </section>
-
-        <section className="mx-auto max-w-2xl px-6 pb-24 text-center">
-          <h2 className="text-2xl font-semibold tracking-tight">Ready to connect your own?</h2>
-          <p className="mt-3 text-ink-secondary">
-            Create a free account and connect WHOOP, Fitbit, Philips Hue, or Spotify — every automation you build
-            runs against your real data from here on.
-          </p>
-          <Link href="/signup" className="mt-6 inline-block">
-            <Button variant="primary" className="px-6 py-3 text-base">
-              Get started free
-            </Button>
-          </Link>
+        <section className="mx-auto max-w-3xl px-6 pb-24">
+          <DemoIndexGrid />
         </section>
       </main>
 
