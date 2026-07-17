@@ -15,8 +15,10 @@ export function DevicesSection({ devices }: { devices: DeviceSummary[] }) {
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {devices.map((device) => (
-            <DeviceCard key={device.id} device={device} />
+          {devices.map((device, i) => (
+            <div key={device.id} className="animate-fade-in-up" style={{ animationDelay: `${i * 40}ms` }}>
+              <DeviceCard device={device} />
+            </div>
           ))}
         </div>
       )}

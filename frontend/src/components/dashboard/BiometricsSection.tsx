@@ -1,5 +1,7 @@
 import { Card } from "@/components/ui/Card";
 import { TrendChart } from "@/components/ui/charts/TrendChart";
+import { HeartRatePulse } from "./HeartRatePulse";
+import { WellnessTimeline } from "./WellnessTimeline";
 import { metricLabel, METRIC_UNITS } from "@/lib/metrics";
 import type { NormalizedBiometricReading } from "@moodsync/shared";
 
@@ -43,6 +45,7 @@ export function BiometricsSection({
         </Card>
       ) : (
         <>
+          <HeartRatePulse latest={latest} />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {METRIC_ORDER.filter((key) => latest[key] !== undefined).map((key) => (
               <Card key={key} className="py-4 transition-colors hover:bg-surface-hover">
@@ -66,6 +69,8 @@ export function BiometricsSection({
           <TrendChart data={heartRateSeries} label="Heart rate" unit="bpm" color="var(--brand)" />
         </Card>
       )}
+
+      <WellnessTimeline history={history} />
     </section>
   );
 }

@@ -45,10 +45,14 @@ export function DeviceCard({ device }: { device: DeviceSummary }) {
   const Icon = DEVICE_ICONS[device.deviceType] ?? Cpu;
 
   return (
-    <Card className="flex flex-col gap-2 py-4">
+    <Card className="flex flex-col gap-2 py-4 transition-colors hover:bg-surface-hover">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-raised text-ink-secondary">
+          <span
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+              device.isOnline ? "bg-brand/10 text-brand" : "bg-surface-raised text-ink-secondary"
+            }`}
+          >
             <Icon size={16} aria-hidden="true" />
           </span>
           <div>

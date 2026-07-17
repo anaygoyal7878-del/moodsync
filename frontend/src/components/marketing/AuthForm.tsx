@@ -47,7 +47,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         return;
       }
 
-      const returnTo = searchParams.get("returnTo") ?? "/dashboard";
+      const returnTo = searchParams.get("returnTo") ?? (isSignup ? "/onboarding" : "/dashboard");
       router.push(returnTo);
       router.refresh();
     } catch {
