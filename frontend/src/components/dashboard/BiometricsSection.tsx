@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/Card";
+import { TrendChart } from "@/components/ui/charts/TrendChart";
 import { metricLabel, METRIC_UNITS } from "@/lib/metrics";
 import type { NormalizedBiometricReading } from "@moodsync/shared";
 
@@ -13,6 +14,10 @@ const METRIC_ORDER: Array<keyof NormalizedBiometricReading> = [
   "calories",
 ];
 
+function shortTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric" });
+}
+
 export function BiometricsSection({
   latest,
   history,
@@ -20,6 +25,13 @@ export function BiometricsSection({
   latest: NormalizedBiometricReading | null;
   history: NormalizedBiometricReading[];
 }) {
+  // `history` arrives newest-first (see /api/biometrics/history) —
+  // TrendChart reads left-to-right chronologically, so reverse it.
+  const heartRateSeries = [...history]
+    .reverse()
+    .filter((r) => r.heartRate !== undefined)
+    .map((r) => ({ date: shortTime(r.timestamp), value: r.heartRate as number }));
+
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Today&apos;s biometrics</h2>
@@ -48,20 +60,10 @@ export function BiometricsSection({
         </>
       )}
 
-      {history.length > 1 && (
+      {heartRateSeries.length > 1 && (
         <Card>
-          <p className="mb-3 text-xs uppercase tracking-wide text-ink-muted">Last {history.length} readings</p>
-          <div className="flex flex-col gap-1.5">
-            {history.slice(0, 10).map((r, i) => (
-              <div key={i} className="flex items-center justify-between text-sm text-ink-secondary">
-                <span>{new Date(r.timestamp).toLocaleString()}</span>
-                <span className="tabular-nums">
-                  {r.recoveryScore !== undefined ? `Recovery ${r.recoveryScore}` : ""}
-                  {r.sleepScore !== undefined ? ` · Sleep ${r.sleepScore}` : ""}
-                </span>
-              </div>
-            ))}
-          </div>
+          <p className="mb-3 text-xs uppercase tracking-wide text-ink-muted">Heart rate · last {heartRateSeries.length} readings</p>
+          <TrendChart data={heartRateSeries} label="Heart rate" unit="bpm" color="var(--brand)" />
         </Card>
       )}
     </section>
