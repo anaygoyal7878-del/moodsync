@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Switch } from "@/components/ui/Switch";
 import type { NotificationPreferences } from "@/lib/types";
-
-const selectClass =
-  "w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink focus:border-line-strong focus:outline-none";
 
 /** Wires up `UserPreferences.notificationsEnabled`/`quietHoursStart`/
  * `quietHoursEnd` — modeled in the schema since before the Decision
@@ -42,37 +42,21 @@ export function NotificationPreferencesForm({ preferences }: { preferences: Noti
   }
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border border-line p-4">
-      <label className="flex items-center gap-2 text-sm text-ink-secondary">
-        <input
-          type="checkbox"
-          checked={notificationsEnabled}
-          onChange={(e) => setNotificationsEnabled(e.target.checked)}
-        />
-        Enable automation notifications
-      </label>
+    <Card className="flex flex-col gap-3">
+      <Switch checked={notificationsEnabled} onCheckedChange={setNotificationsEnabled} label="Enable automation notifications" />
 
-      <label className="flex items-center gap-2 text-sm text-ink-secondary">
-        <input type="checkbox" checked={quietHoursOn} onChange={(e) => setQuietHoursOn(e.target.checked)} />
-        Quiet hours (suppress notifications, not automations, during a window)
-      </label>
+      <Switch
+        checked={quietHoursOn}
+        onCheckedChange={setQuietHoursOn}
+        label="Quiet hours (suppress notifications, not automations, during a window)"
+      />
 
       {quietHoursOn && (
         <div className="flex flex-wrap items-center gap-2 text-sm text-ink-secondary">
           <span>Between</span>
-          <input
-            type="time"
-            className={selectClass}
-            value={quietHoursStart}
-            onChange={(e) => setQuietHoursStart(e.target.value)}
-          />
+          <Input type="time" className="w-auto" value={quietHoursStart} onChange={(e) => setQuietHoursStart(e.target.value)} />
           <span>and</span>
-          <input
-            type="time"
-            className={selectClass}
-            value={quietHoursEnd}
-            onChange={(e) => setQuietHoursEnd(e.target.value)}
-          />
+          <Input type="time" className="w-auto" value={quietHoursEnd} onChange={(e) => setQuietHoursEnd(e.target.value)} />
         </div>
       )}
 
@@ -82,6 +66,6 @@ export function NotificationPreferencesForm({ preferences }: { preferences: Noti
         </Button>
         {saved && !saving && <span className="text-xs text-ink-muted">Saved.</span>}
       </div>
-    </div>
+    </Card>
   );
 }
