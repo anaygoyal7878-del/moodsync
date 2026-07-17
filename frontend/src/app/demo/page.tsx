@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Nav } from "@/components/marketing/Nav";
 import { Button } from "@/components/ui/Button";
-import { DemoExperience } from "@/components/demo/DemoExperience";
+import { DemoGallery } from "@/components/demo/DemoGallery";
+import { DEMO_SCENARIOS } from "@/components/demo/scenarios";
 
 export const metadata: Metadata = {
   title: "Demo — MoodSync",
-  description: "See how MoodSync reacts to a real recovery drop by automating your Hue lights and Spotify — simulated data, no account needed.",
+  description: "See how MoodSync reacts to real biometric signals by automating your Hue lights, Spotify, and notifications — simulated data, no account needed.",
 };
 
 export default function DemoPage() {
@@ -21,16 +22,29 @@ export default function DemoPage() {
             Simulated data — no wearable or account required
           </p>
           <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-5xl">
-            Watch MoodSync react to a real morning
+            Five automations, one intelligence layer
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-ink-secondary">
-            This walkthrough plays out exactly what MoodSync does with your real WHOOP/Fitbit and Hue/Spotify
-            connections — the numbers below are staged for the demo, not a live account.
+            Each walkthrough below plays out a real MoodSync rule — a biometric or schedule condition, matched
+            against your wearable, driving your Hue lights, Spotify, and notifications. Every action shown is
+            something the product does today; the numbers are staged for the demo, not a live account.
           </p>
+          <nav className="mt-6 flex flex-wrap items-center justify-center gap-2" aria-label="Jump to a demo">
+            {DEMO_SCENARIOS.map((scenario) => (
+              <a
+                key={scenario.id}
+                href={`#${scenario.id}`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-medium text-ink-secondary transition-colors hover:border-line-strong hover:text-ink"
+              >
+                <span aria-hidden="true">{scenario.emoji}</span>
+                {scenario.title}
+              </a>
+            ))}
+          </nav>
         </section>
 
         <section className="mx-auto max-w-3xl px-6 pb-20">
-          <DemoExperience />
+          <DemoGallery />
         </section>
 
         <section className="mx-auto max-w-2xl px-6 pb-24 text-center">
