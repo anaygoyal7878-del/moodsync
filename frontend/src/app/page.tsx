@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Nav } from "@/components/marketing/Nav";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import Lightfall from "@/components/effects/Lightfall";
 
 const integrations = [
   { name: "WHOOP", status: "Connect today" },
@@ -35,22 +34,17 @@ export default function Home() {
 
       <main className="flex-1">
         <section className="relative overflow-hidden">
-          <div className="pointer-events-none absolute inset-0 z-0" aria-hidden="true">
-            <Lightfall
-              colors={["#ff7a59", "#ffb37a", "#f5d0b8"]}
-              backgroundColor="#1f0d08"
-              speed={0.6}
-              streakCount={5}
-              streakWidth={0.8}
-              streakLength={1.1}
-              glow={0.85}
-              density={0.5}
-              twinkle={0.7}
-              zoom={3}
-              backgroundGlow={0.6}
-              opacity={0.55}
-              mouseInteraction={false}
+          <div className="pointer-events-none absolute inset-0 z-0 bg-canvas" aria-hidden="true">
+            <video
+              className="h-full w-full object-cover opacity-60"
+              src="/video/metal-human.mp4"
+              poster="/video/metal-human.jpg"
+              autoPlay
+              loop
+              muted
+              playsInline
             />
+            <div className="absolute inset-0 bg-gradient-to-b from-canvas/40 via-canvas/70 to-canvas" />
           </div>
 
           <div className="relative z-10 mx-auto max-w-4xl px-6 pt-24 pb-20 text-center sm:pt-32">
