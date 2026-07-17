@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/Card";
+import { Sparkline } from "@/components/ui/charts/Sparkline";
 import { metricLabel } from "@/lib/metrics";
 import type { TrendResult, AutomationEffectivenessResult } from "@/lib/types";
 
@@ -23,6 +24,13 @@ function TrendGrid({ title, trends }: { title: string; trends: TrendResult[] }) 
                 {DIRECTION_ARROW[t.direction]} {Math.abs(t.delta)}
               </span>
             </p>
+            {/* TrendResult only carries a before/after pair (see
+             * ai/src/insights.ts), not a full time series — a 2-point
+             * sparkline is the honest visual extension of that, additive
+             * context alongside the arrow/number, not a replacement. */}
+            <div className="mt-2">
+              <Sparkline data={[{ value: t.previous }, { value: t.current }]} height={24} />
+            </div>
           </Card>
         ))}
       </div>
