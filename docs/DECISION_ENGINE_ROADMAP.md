@@ -120,11 +120,20 @@ another OAuth integration" would suggest:
     it can take the real action the scene defines.
 - **Google Home** — explicitly out of scope now that devices route
   through Alexa/HomeKit only; not researched further.
-- **Pluggable action-executor registry** — dispatch's provider routing is
-  still a hardcoded if/else (`ai/src/dispatch.ts`). Adding HomeKit as a
-  third action-taking provider (after Hue, Spotify) is the natural trigger
-  point to introduce a real `ActionExecutor` registry instead of extending
-  the if/else further — see `docs/HOMEKIT_ARCHITECTURE.md`.
+- **Pluggable action-executor registry** — shipped: `ai/src/actionExecutors.ts`
+  replaces dispatch's hardcoded if/else with a `Partial<Record<SmartHomeProviderId,
+  ActionExecutor>>` registry (`hue`/`spotify` execute synchronously,
+  `homekit` writes a `PendingDeviceCommand` and reports `queued: true`).
+  `dispatch.ts`'s action loop is now a single `executeAction(userId,
+  action, rule.id)` call per action; an unregistered provider still
+  throws the same "not yet implemented" error it did before (no silent
+  no-op). Adding a fourth action-taking provider is one registry entry,
+  not another branch. Live-verified against the running backend
+  post-refactor: a Hue rule still produces `FAILED` with "No Hue
+  connection for this user" and a HomeKit rule still produces
+  `QUEUED_FOR_DEVICE` with a real `PendingDeviceCommand` row — same
+  observable behavior as before the refactor, confirming it didn't
+  regress either path.
 
 ## Personalization
 

@@ -2,15 +2,13 @@ import {
   automationRuleRepository,
   automationExecutionLogRepository,
   userPreferencesRepository,
-  pendingDeviceCommandRepository,
   biometricReadingRepository,
   userTimezoneRepository,
 } from '@moodsync/database';
 import type { AutomationRuleDefinition, NormalizedBiometricReading } from '@moodsync/shared';
 import { evaluateRules } from './ruleEngine.js';
 import { isWithinCooldown } from './cooldown.js';
-import { executeHueAction } from './hueActionExecutor.js';
-import { executeSpotifyAction } from './spotifyActionExecutor.js';
+import { executeAction } from './actionExecutors.js';
 import { explainTrigger, explainConflict, explainManualPause, explainRateLimit } from './explain.js';
 import { createNotification, shouldNotify } from './notificationExecutor.js';
 import { computeWellnessScores } from './wellness.js';
@@ -208,25 +206,8 @@ export async function dispatchForReading(
     try {
       let anyQueued = false;
       for (const action of rule.actions) {
-        if (action.provider === 'hue') {
-          await executeHueAction(userId, action);
-        } else if (action.provider === 'spotify') {
-          await executeSpotifyAction(userId, action);
-        } else if (action.provider === 'homekit') {
-          // HomeKit has no cloud API — this can't be executed here at
-          // all, only queued for the iOS companion app to pick up and
-          // run locally via the HomeKit framework the next time it's
-          // opened. See docs/HOMEKIT_ARCHITECTURE.md.
-          await pendingDeviceCommandRepository.create({ userId, provider: 'HOMEKIT', action, ruleId: rule.id });
-          anyQueued = true;
-        } else {
-          // Notification-provider actions aren't a separate executor —
-          // every outcome already generates a notification (see
-          // recordAndNotify) — fail loudly for any other unimplemented
-          // provider so a misconfigured rule shows up in history instead
-          // of silently no-opping.
-          throw new Error(`Provider "${action.provider}" automation dispatch is not yet implemented`);
-        }
+        const { queued } = await executeAction(userId, action, rule.id);
+        if (queued) anyQueued = true;
       }
       const outcome = anyQueued ? 'QUEUED_FOR_DEVICE' : 'EXECUTED';
       const notifyTitle = anyQueued ? `${rule.name} queued for your device` : `${rule.name} triggered`;

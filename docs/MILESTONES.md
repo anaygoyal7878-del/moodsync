@@ -1098,3 +1098,36 @@ automated path — a real user would have to remember to click it.
   `ruleEngine.test.ts`'s `withinTimeWindow` suite, including one that
   explicitly asserts a UTC timestamp evaluates differently across
   `America/Chicago`/`UTC`/`Asia/Tokyo`).
+
+## Milestone 15: Pluggable action-executor registry
+
+- **Closes the gap flagged since HomeKit shipped**: `dispatch.ts`'s
+  action-execution step was a hardcoded if/else on `action.provider`
+  (`hue` → `executeHueAction`, `spotify` → `executeSpotifyAction`,
+  `homekit` → queue a `PendingDeviceCommand`, else → throw). Adding
+  HomeKit as a third action-taking provider was noted at the time as the
+  natural trigger to replace this with a real registry instead of
+  extending the if/else again for the next provider.
+- New `ai/src/actionExecutors.ts`: a `Partial<Record<SmartHomeProviderId,
+  ActionExecutor>>` registry, `ActionExecutor = (userId, action, ruleId)
+  => Promise<{ queued: boolean }>`. `hue`/`spotify` wrap the existing
+  `executeHueAction`/`executeSpotifyAction` (unchanged, still exported
+  from `ai/src/index.ts` for `backend/src/services/alexaService.ts`'s
+  direct use); `homekit` wraps the `pendingDeviceCommandRepository.create`
+  call that used to live inline in `dispatch.ts`. `dispatch.ts`'s action
+  loop is now `const { queued } = await executeAction(userId, action,
+  rule.id)` — a single call per action, provider-agnostic. An
+  unregistered provider (`ecobee`, `alexa`, `notification` — none have
+  action executors) still throws the same "not yet implemented" error,
+  preserved from the original if/else's `else` branch, so a
+  misconfigured rule still surfaces in history instead of silently
+  no-opping.
+- **Verified for real**: full monorepo build/lint/test green (130 tests
+  — 1 new in `actionExecutors.test.ts` covering the unregistered-provider
+  throw; Hue/HomeKit paths aren't unit-mocked, consistent with this
+  project's convention of live-verifying DB/network-touching code rather
+  than mocking it). Live, against the running backend, post-refactor: a
+  Hue rule still produces `FAILED` with "No Hue connection for this
+  user" and a HomeKit rule still produces `QUEUED_FOR_DEVICE` with a
+  real `PendingDeviceCommand` row — identical observable behavior to
+  before the refactor, confirming no regression on either path.
