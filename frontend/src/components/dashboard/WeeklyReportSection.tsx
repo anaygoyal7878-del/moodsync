@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/Card";
+import { Sparkline } from "@/components/ui/charts/Sparkline";
 import { metricLabel } from "@/lib/metrics";
 import type { PersistedInsight } from "@/lib/types";
 
@@ -39,9 +40,19 @@ export function WeeklyReportSection({ insights }: { insights: PersistedInsight[]
       <Card>
         <div className="flex flex-col gap-3">
           {latestBatch.map((insight) => (
-            <div key={insight.id} className="flex flex-col gap-0.5 border-b border-line pb-3 last:border-0 last:pb-0">
-              <p className="text-sm font-medium text-ink">{displayLabel(insight.metric)}</p>
-              <p className="text-sm text-ink-secondary">{insight.summary}</p>
+            <div
+              key={insight.id}
+              className="flex items-center justify-between gap-4 border-b border-line pb-3 last:border-0 last:pb-0"
+            >
+              <div className="flex flex-col gap-0.5">
+                <p className="text-sm font-medium text-ink">{displayLabel(insight.metric)}</p>
+                <p className="text-sm text-ink-secondary">{insight.summary}</p>
+              </div>
+              {insight.trend !== null && (
+                <div className="w-20 shrink-0">
+                  <Sparkline data={[{ value: insight.value - insight.trend }, { value: insight.value }]} height={24} />
+                </div>
+              )}
             </div>
           ))}
         </div>
