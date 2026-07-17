@@ -21,4 +21,42 @@ export const userPreferencesRepository = {
       update: { automationsPausedUntil: pausedUntil },
     });
   },
+
+  /** The notification-engine's quiet-hours/on-off check
+   * (ai/src/notificationExecutor.ts) — a missing row means every field
+   * is at its schema default (notificationsEnabled: true, no quiet
+   * hours), same "absence, not failure" convention as everywhere else. */
+  async getNotificationPreferences(
+    userId: string,
+  ): Promise<{ notificationsEnabled: boolean; quietHoursStart: string | null; quietHoursEnd: string | null }> {
+    const row = await prisma.userPreferences.findUnique({
+      where: { userId },
+      select: { notificationsEnabled: true, quietHoursStart: true, quietHoursEnd: true },
+    });
+    return {
+      notificationsEnabled: row?.notificationsEnabled ?? true,
+      quietHoursStart: row?.quietHoursStart ?? null,
+      quietHoursEnd: row?.quietHoursEnd ?? null,
+    };
+  },
+
+  async setNotificationPreferences(
+    userId: string,
+    input: { notificationsEnabled?: boolean | undefined; quietHoursStart?: string | null | undefined; quietHoursEnd?: string | null | undefined },
+  ): Promise<void> {
+    await prisma.userPreferences.upsert({
+      where: { userId },
+      create: {
+        userId,
+        notificationsEnabled: input.notificationsEnabled ?? true,
+        quietHoursStart: input.quietHoursStart ?? null,
+        quietHoursEnd: input.quietHoursEnd ?? null,
+      },
+      update: {
+        ...(input.notificationsEnabled !== undefined ? { notificationsEnabled: input.notificationsEnabled } : {}),
+        ...(input.quietHoursStart !== undefined ? { quietHoursStart: input.quietHoursStart } : {}),
+        ...(input.quietHoursEnd !== undefined ? { quietHoursEnd: input.quietHoursEnd } : {}),
+      },
+    });
+  },
 };

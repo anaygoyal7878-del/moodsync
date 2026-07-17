@@ -69,6 +69,12 @@ export interface NotificationEntry {
   readAt: string | null;
 }
 
+export interface NotificationPreferences {
+  notificationsEnabled: boolean;
+  quietHoursStart: string | null;
+  quietHoursEnd: string | null;
+}
+
 export type ScoreBasis = "provider-native" | "evidence-informed-heuristic" | "heuristic";
 
 export interface WellnessScore {

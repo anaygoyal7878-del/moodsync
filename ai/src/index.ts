@@ -26,4 +26,4 @@ export {
   type ScoreBasis,
 } from './wellness.js';
 export { explainTrigger, explainConflict, explainManualPause, explainRateLimit } from './explain.js';
-export { createNotification, type CreateNotificationInput } from './notificationExecutor.js';
+export { createNotification, shouldNotify, type CreateNotificationInput } from './notificationExecutor.js';

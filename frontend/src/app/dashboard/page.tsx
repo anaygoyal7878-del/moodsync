@@ -18,6 +18,7 @@ import type {
   InsightsResponse,
   WellnessResponse,
   NotificationEntry,
+  NotificationPreferences,
 } from "@/lib/types";
 import type { NormalizedBiometricReading } from "@moodsync/shared";
 
@@ -59,6 +60,7 @@ export default async function DashboardPage({
     wellnessResult,
     notificationsResult,
     pauseResult,
+    notificationPreferencesResult,
   ] = await Promise.all([
     backendFetch<ConnectionsResponse>("/api/connections"),
     backendFetch<{ reading: NormalizedBiometricReading | null }>("/api/biometrics/latest"),
@@ -69,6 +71,7 @@ export default async function DashboardPage({
     backendFetch<WellnessResponse>("/api/wellness"),
     backendFetch<{ notifications: NotificationEntry[] }>("/api/notifications?limit=20"),
     backendFetch<{ pausedUntil: string | null; isPaused: boolean }>("/api/preferences/automation-pause"),
+    backendFetch<NotificationPreferences>("/api/preferences/notifications"),
   ]);
 
   const connections: ConnectionsResponse = connectionsResult.ok
@@ -85,6 +88,9 @@ export default async function DashboardPage({
   const notifications = notificationsResult.ok ? notificationsResult.data.notifications : [];
   const pausedUntil = pauseResult.ok ? pauseResult.data.pausedUntil : null;
   const isAutomationPaused = pauseResult.ok ? pauseResult.data.isPaused : false;
+  const notificationPreferences: NotificationPreferences = notificationPreferencesResult.ok
+    ? notificationPreferencesResult.data
+    : { notificationsEnabled: true, quietHoursStart: null, quietHoursEnd: null };
   const devices = connections.smartHome.flatMap((c) => c.devices);
   const spotifyConnected = connections.smartHome.some((c) => c.provider === "SPOTIFY" && c.status === "ACTIVE");
 
@@ -113,7 +119,12 @@ export default async function DashboardPage({
       />
       <DevicesSection devices={devices} />
       <AutomationSection rules={rules} history={automationHistory} devices={devices} spotifyConnected={spotifyConnected} />
-      <NotificationHistorySection notifications={notifications} pausedUntil={pausedUntil} isPaused={isAutomationPaused} />
+      <NotificationHistorySection
+        notifications={notifications}
+        pausedUntil={pausedUntil}
+        isPaused={isAutomationPaused}
+        preferences={notificationPreferences}
+      />
     </div>
   );
 }

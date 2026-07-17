@@ -1,11 +1,13 @@
 import { Card } from "@/components/ui/Card";
-import type { NotificationEntry } from "@/lib/types";
+import type { NotificationEntry, NotificationPreferences } from "@/lib/types";
 import { PauseAutomationsButton } from "./PauseAutomationsButton";
+import { NotificationPreferencesForm } from "./NotificationPreferencesForm";
 
 export function NotificationHistorySection({
   notifications,
   pausedUntil,
   isPaused,
+  preferences,
 }: {
   notifications: NotificationEntry[];
   pausedUntil: string | null;
@@ -13,6 +15,7 @@ export function NotificationHistorySection({
    * against Date.now() during render — React's purity rule flags
    * impure calls like Date.now() inside a component body. */
   isPaused: boolean;
+  preferences: NotificationPreferences;
 }) {
   return (
     <section className="flex flex-col gap-3">
@@ -26,6 +29,8 @@ export function NotificationHistorySection({
           <p className="text-sm text-ink-secondary">Automations are paused until {new Date(pausedUntil).toLocaleString()}.</p>
         </Card>
       )}
+
+      <NotificationPreferencesForm preferences={preferences} />
 
       {notifications.length === 0 ? (
         <Card>

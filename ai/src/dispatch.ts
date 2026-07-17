@@ -11,7 +11,7 @@ import { isWithinCooldown } from './cooldown.js';
 import { executeHueAction } from './hueActionExecutor.js';
 import { executeSpotifyAction } from './spotifyActionExecutor.js';
 import { explainTrigger, explainConflict, explainManualPause, explainRateLimit } from './explain.js';
-import { createNotification } from './notificationExecutor.js';
+import { createNotification, shouldNotify } from './notificationExecutor.js';
 import { computeWellnessScores } from './wellness.js';
 
 /** Trailing window used to compute wellness scores' own-baseline
@@ -99,6 +99,7 @@ async function recordAndNotify(params: {
   reason: string;
   failureReason?: string;
   notifyTitle: string;
+  now: Date;
 }): Promise<void> {
   await automationExecutionLogRepository.record({
     userId: params.userId,
@@ -108,12 +109,17 @@ async function recordAndNotify(params: {
     reason: params.reason,
     ...(params.failureReason !== undefined ? { failureReason: params.failureReason } : {}),
   });
-  await createNotification({
-    userId: params.userId,
-    title: params.notifyTitle,
-    body: params.reason,
-    ruleId: params.rule.id,
-  });
+  // The audit trail above is always written regardless of notification
+  // preferences — only the interruptive notification is gated on
+  // quiet-hours/on-off (see ai/src/notificationExecutor.ts).
+  if (await shouldNotify(params.userId, params.now)) {
+    await createNotification({
+      userId: params.userId,
+      title: params.notifyTitle,
+      body: params.reason,
+      ruleId: params.rule.id,
+    });
+  }
 }
 
 /**
@@ -160,6 +166,7 @@ export async function dispatchForReading(
         outcome: 'SKIPPED_MANUAL_PAUSE',
         reason,
         notifyTitle: 'Automation paused',
+        now,
       });
       results.push({ ruleId: rule.id, ruleName: rule.name, outcome: 'SKIPPED_MANUAL_PAUSE', reason });
     }
@@ -169,7 +176,7 @@ export async function dispatchForReading(
   const { winners, losers } = resolveConflicts(matched);
   for (const { rule, winner, resourceKey } of losers) {
     const reason = explainConflict(rule, winner, resourceKey);
-    await recordAndNotify({ userId, rule, readingId, outcome: 'SKIPPED_CONFLICT', reason, notifyTitle: 'Automation skipped (conflict)' });
+    await recordAndNotify({ userId, rule, readingId, outcome: 'SKIPPED_CONFLICT', reason, notifyTitle: 'Automation skipped (conflict)', now });
     results.push({ ruleId: rule.id, ruleName: rule.name, outcome: 'SKIPPED_CONFLICT', reason });
   }
 
@@ -186,7 +193,7 @@ export async function dispatchForReading(
 
     if (executedInLastHour + executedThisPass >= RATE_LIMIT_PER_HOUR) {
       const reason = explainRateLimit(rule, RATE_LIMIT_PER_HOUR);
-      await recordAndNotify({ userId, rule, readingId, outcome: 'SKIPPED_SAFETY_RATE_LIMIT', reason, notifyTitle: 'Automation skipped (safety limit)' });
+      await recordAndNotify({ userId, rule, readingId, outcome: 'SKIPPED_SAFETY_RATE_LIMIT', reason, notifyTitle: 'Automation skipped (safety limit)', now });
       results.push({ ruleId: rule.id, ruleName: rule.name, outcome: 'SKIPPED_SAFETY_RATE_LIMIT', reason });
       continue;
     }
@@ -217,7 +224,7 @@ export async function dispatchForReading(
       }
       const outcome = anyQueued ? 'QUEUED_FOR_DEVICE' : 'EXECUTED';
       const notifyTitle = anyQueued ? `${rule.name} queued for your device` : `${rule.name} triggered`;
-      await recordAndNotify({ userId, rule, readingId, outcome, reason, notifyTitle });
+      await recordAndNotify({ userId, rule, readingId, outcome, reason, notifyTitle, now });
       results.push({ ruleId: rule.id, ruleName: rule.name, outcome, reason });
       executedThisPass++;
     } catch (error) {
@@ -230,6 +237,7 @@ export async function dispatchForReading(
         reason,
         failureReason,
         notifyTitle: `${rule.name} failed`,
+        now,
       });
       results.push({ ruleId: rule.id, ruleName: rule.name, outcome: 'FAILED', reason, failureReason });
     }

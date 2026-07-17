@@ -133,13 +133,30 @@ another OAuth integration" would suggest:
   touch my Hue lights for the next hour, but automations targeting
   Spotify are fine") needs a new data model (a resource-keyed override
   table) and UI, not just a flag.
-- **Quiet hours, notification frequency controls, automation
-  sensitivity** — `UserPreferences` already has `quietHoursStart/End` and
-  `notificationsEnabled` fields in the schema, unused by any code before
-  this round and still unused after it (only `automationsPausedUntil`
-  was wired up). Wiring quiet hours into the notification engine (suppress
-  or batch notifications during quiet hours) is a natural next step using
-  an already-modeled field.
+- **Quiet hours / notifications on-off** — shipped: `GET`/`PATCH
+  /api/preferences/notifications` plus `ai/src/notificationExecutor.ts`'s
+  `shouldNotify(userId, now)` (checked in `dispatch.ts`'s
+  `recordAndNotify` before creating a `Notification` row — the
+  `AutomationExecutionLog` audit trail is always written regardless).
+  Live-verified: disabling notifications suppresses new rows while
+  history keeps recording outcomes; a quiet-hours window spanning the
+  current time (including an overnight wrap, e.g. 22:33–00:33)
+  correctly suppresses; re-enabling immediately resumes.
+  **Known limitation surfaced during that verification**: `withinTimeWindow`
+  (`ai/src/ruleEngine.ts`) compares against `now.getHours()`/`getMinutes()`
+  — the Node process's local time — not the user's stored
+  `User.timezone` field. This affects quiet hours *and* every
+  `timeWindow`-based rule (Focus Mode, Sleep Preparation): a user whose
+  timezone differs from the server's will have their window evaluated
+  in the wrong offset. Fixing this means threading the user's IANA
+  timezone through to `withinTimeWindow` (e.g. via a library like
+  `Intl.DateTimeFormat` with `timeZone` option) at both call sites —
+  scoped out here since it's a correctness fix across an existing
+  feature, not new quiet-hours scope, but it should be the next thing
+  fixed before either feature is trusted for non-server-timezone users.
+- **Notification frequency controls, automation sensitivity** — no
+  batching/digest mode exists (every outcome is its own notification);
+  no per-rule notification opt-out (only the account-wide toggle).
 
 ## AI insights
 

@@ -1,0 +1,87 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import type { NotificationPreferences } from "@/lib/types";
+
+const selectClass =
+  "w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink focus:border-line-strong focus:outline-none";
+
+/** Wires up `UserPreferences.notificationsEnabled`/`quietHoursStart`/
+ * `quietHoursEnd` — modeled in the schema since before the Decision
+ * Engine round but never previously read or written by any code. Only
+ * the notification is suppressed during quiet hours (see
+ * ai/src/notificationExecutor.ts's `shouldNotify`) — automation history
+ * always still records what happened, so this is purely about what
+ * interrupts you, not what gets logged. */
+export function NotificationPreferencesForm({ preferences }: { preferences: NotificationPreferences }) {
+  const router = useRouter();
+  const [notificationsEnabled, setNotificationsEnabled] = useState(preferences.notificationsEnabled);
+  const [quietHoursOn, setQuietHoursOn] = useState(preferences.quietHoursStart !== null);
+  const [quietHoursStart, setQuietHoursStart] = useState(preferences.quietHoursStart ?? "22:00");
+  const [quietHoursEnd, setQuietHoursEnd] = useState(preferences.quietHoursEnd ?? "07:00");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    setSaved(false);
+    await fetch("/api/preferences/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        notificationsEnabled,
+        quietHoursStart: quietHoursOn ? quietHoursStart : null,
+        quietHoursEnd: quietHoursOn ? quietHoursEnd : null,
+      }),
+    });
+    router.refresh();
+    setSaving(false);
+    setSaved(true);
+  }
+
+  return (
+    <div className="flex flex-col gap-2.5 rounded-xl border border-line p-4">
+      <label className="flex items-center gap-2 text-sm text-ink-secondary">
+        <input
+          type="checkbox"
+          checked={notificationsEnabled}
+          onChange={(e) => setNotificationsEnabled(e.target.checked)}
+        />
+        Enable automation notifications
+      </label>
+
+      <label className="flex items-center gap-2 text-sm text-ink-secondary">
+        <input type="checkbox" checked={quietHoursOn} onChange={(e) => setQuietHoursOn(e.target.checked)} />
+        Quiet hours (suppress notifications, not automations, during a window)
+      </label>
+
+      {quietHoursOn && (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-ink-secondary">
+          <span>Between</span>
+          <input
+            type="time"
+            className={selectClass}
+            value={quietHoursStart}
+            onChange={(e) => setQuietHoursStart(e.target.value)}
+          />
+          <span>and</span>
+          <input
+            type="time"
+            className={selectClass}
+            value={quietHoursEnd}
+            onChange={(e) => setQuietHoursEnd(e.target.value)}
+          />
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" disabled={saving} onClick={save}>
+          {saving ? "Saving…" : "Save notification preferences"}
+        </Button>
+        {saved && !saving && <span className="text-xs text-ink-muted">Saved.</span>}
+      </div>
+    </div>
+  );
+}

@@ -1018,3 +1018,42 @@ automated path — a real user would have to remember to click it.
   identical baseline HRV values, which collapsed the z-score's standard
   deviation to 0 and forced a neutral score regardless of the trigger —
   caught and corrected before concluding anything.)
+
+## Milestone 13: Quiet hours / notifications on-off
+
+- **Closes a real gap**: `UserPreferences.notificationsEnabled` /
+  `quietHoursStart` / `quietHoursEnd` have existed in the schema since
+  before Milestone 10 but were never read or written by any code.
+- New `GET`/`PATCH /api/preferences/notifications` routes
+  (`backend/src/api/routes/preferences.ts`), Zod-validated (`HH:mm`
+  24-hour format; a `.refine()` requires quiet-hours start/end to be
+  both-set-or-both-null).
+- `ai/src/notificationExecutor.ts`'s new `shouldNotify(userId, now)`
+  checks both fields — reuses `withinTimeWindow` from `ruleEngine.ts`
+  rather than a second time-window implementation. `ai/src/dispatch.ts`'s
+  `recordAndNotify` calls it before creating a `Notification` row; the
+  `AutomationExecutionLog` audit trail is always written regardless of
+  whether a notification fires.
+- Frontend: new `NotificationPreferencesForm.tsx`, wired into
+  `NotificationHistorySection.tsx` and `dashboard/page.tsx`.
+- **Verified for real** against the running backend with a disposable
+  test account: `notificationsEnabled: false` suppressed a new
+  notification while `automation-history` still recorded the outcome;
+  re-enabling immediately produced a notification for the next trigger;
+  a quiet-hours window spanning the current time — including an
+  overnight wrap (22:33–00:33) — correctly suppressed, while history
+  kept logging. Full monorepo build/lint/test green (125 tests, no new
+  ones — this feature is DB-orchestration code, consistent with the
+  project's existing convention of live-verifying rather than
+  unit-testing that layer).
+- **Bug found and documented, not fixed here**: verification initially
+  used a UTC-based quiet-hours window and saw no suppression. Root cause
+  is pre-existing, not introduced by this milestone — `withinTimeWindow`
+  (`ai/src/ruleEngine.ts`) compares against the Node process's local
+  time (`now.getHours()`/`getMinutes()`), not the user's stored
+  `User.timezone`. This affects quiet hours *and* every `timeWindow`
+  rule condition (Focus Mode, Sleep Preparation). Re-verified using the
+  server's actual local time to confirm the suppression logic itself is
+  correct; the timezone-correctness gap is documented in
+  `docs/DECISION_ENGINE_ROADMAP.md` as the next thing to fix before
+  either feature is trusted for users outside the server's timezone.
