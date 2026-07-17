@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { HeartPulse, Apple, Watch, Lightbulb, Music, Mic } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { DisconnectButton } from "./DisconnectButton";
@@ -20,9 +21,46 @@ const SMART_HOME_LABELS: Record<string, string> = {
   ALEXA: "Amazon Alexa",
 };
 
+/** Neutral category pictograms, not brand marks — lucide has no literal
+ * WHOOP/Fitbit/Hue/etc. logos, so these represent the provider's
+ * category (wearable, smart light, music, voice) alongside the existing
+ * text label, never replacing it. */
+const PROVIDER_ICONS: Record<string, typeof HeartPulse> = {
+  WHOOP: HeartPulse,
+  GOOGLE_HEALTH: HeartPulse,
+  APPLE_HEALTH: Apple,
+  AMAZFIT: Watch,
+  HUE: Lightbulb,
+  SPOTIFY: Music,
+  ALEXA: Mic,
+};
+
+function ProviderIcon({ provider }: { provider: string }) {
+  const Icon = PROVIDER_ICONS[provider];
+  if (!Icon) return null;
+  return <Icon size={16} className="shrink-0 text-ink-muted" aria-hidden="true" />;
+}
+
+/** Absolute time, shown only as a `title=` tooltip on the relative-time
+ * text (see formatRelativeSync) rather than as the primary display —
+ * standardized on one relative-time format across every provider card
+ * (previously WHOOP/Fitbit used this as the primary display while
+ * Apple Health/Amazfit/Alexa used the relative one, an inconsistency
+ * flagged in the redesign audit). */
 function formatLastSynced(lastSyncedAt: string | null): string {
   if (!lastSyncedAt) return "Never synced";
   return `Last synced ${new Date(lastSyncedAt).toLocaleString()}`;
+}
+
+function formatRelativeSync(lastSyncedAt: string | null): string {
+  if (!lastSyncedAt) return "Never synced";
+  const ms = Date.now() - new Date(lastSyncedAt).getTime();
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return "Synced just now";
+  if (minutes < 60) return `Synced ${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `Synced ${hours}h ago`;
+  return `Synced ${Math.round(hours / 24)}d ago`;
 }
 
 /** Renders nothing when the provider doesn't expose device/battery info
@@ -37,7 +75,7 @@ function DeviceInfo({ connection }: { connection: WearableConnectionSummary }) {
       {connection.batteryLevel !== null && (
         <span className="inline-flex items-center gap-1">
           <span
-            className={`h-1.5 w-1.5 rounded-full ${connection.batteryLevel <= 20 ? "bg-red-400" : connection.batteryLevel <= 50 ? "bg-amber-400" : "bg-brand"}`}
+            className={`h-1.5 w-1.5 rounded-full ${connection.batteryLevel <= 20 ? "bg-danger" : connection.batteryLevel <= 50 ? "bg-warning" : "bg-brand"}`}
             aria-hidden="true"
           />
           {connection.batteryLevel}% battery
@@ -87,6 +125,79 @@ function ConnectAction({
   );
 }
 
+/** Shared header row (icon + label + status badge + relative sync time)
+ * every provider card renders identically — the one piece that was
+ * duplicated across WHOOP/Fitbit's inline JSX and re-implemented
+ * slightly differently in AppleHealthCard/AmazfitCard/AlexaCard before
+ * this refactor. */
+function ConnectionHeader({
+  provider,
+  label,
+  connection,
+}: {
+  provider: string;
+  label: string;
+  connection: WearableConnectionSummary | SmartHomeConnectionSummary | undefined;
+}) {
+  const isActive = connection?.status === "ACTIVE";
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <ProviderIcon provider={provider} />
+        <p className="text-sm font-medium">{label}</p>
+      </div>
+      {connection ? (
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <ConnectionStatusBadge status={connection.status} />
+          {isActive && (
+            <span className="text-xs text-ink-muted" title={formatLastSynced(connection.lastSyncedAt)}>
+              · {formatRelativeSync(connection.lastSyncedAt)}
+            </span>
+          )}
+        </div>
+      ) : (
+        <p className="mt-1 text-xs text-ink-muted">Not connected</p>
+      )}
+    </>
+  );
+}
+
+function WhoopCard({ connection }: { connection: WearableConnectionSummary | undefined }) {
+  return (
+    <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
+      <div className="min-w-0 flex-1">
+        <ConnectionHeader provider="WHOOP" label={WEARABLE_LABELS.WHOOP as string} connection={connection} />
+        {connection?.status === "ACTIVE" && <DeviceInfo connection={connection} />}
+      </div>
+      <ConnectAction
+        connection={connection}
+        connectHref="/api/integrations/whoop/connect"
+        connectLabel="Connect WHOOP"
+        provider="whoop"
+        extraActiveActions={<SyncButton provider="whoop" />}
+      />
+    </Card>
+  );
+}
+
+function FitbitCard({ connection }: { connection: WearableConnectionSummary | undefined }) {
+  return (
+    <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
+      <div className="min-w-0 flex-1">
+        <ConnectionHeader provider="GOOGLE_HEALTH" label={WEARABLE_LABELS.GOOGLE_HEALTH as string} connection={connection} />
+        {connection?.status === "ACTIVE" && <DeviceInfo connection={connection} />}
+      </div>
+      <ConnectAction
+        connection={connection}
+        connectHref="/api/integrations/google-health/connect"
+        connectLabel="Connect Fitbit"
+        provider="google-health"
+        extraActiveActions={<SyncButton provider="google-health" />}
+      />
+    </Card>
+  );
+}
+
 /** What MoodSync requests read access to via HealthKit — a fixed list,
  * not derived from any per-connection API response, because HealthKit
  * has no endpoint that reports which of these a user actually granted
@@ -105,34 +216,14 @@ const APPLE_HEALTH_REQUESTED_METRICS = [
   "Sleep stages",
 ];
 
-function formatRelativeSync(lastSyncedAt: string | null): string {
-  if (!lastSyncedAt) return "Never synced";
-  const ms = Date.now() - new Date(lastSyncedAt).getTime();
-  const minutes = Math.round(ms / 60_000);
-  if (minutes < 1) return "Synced just now";
-  if (minutes < 60) return `Synced ${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `Synced ${hours}h ago`;
-  return `Synced ${Math.round(hours / 24)}d ago`;
-}
-
 function AppleHealthCard({ connection }: { connection: WearableConnectionSummary | undefined }) {
   const isActive = connection?.status === "ACTIVE";
 
   return (
     <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">{WEARABLE_LABELS.APPLE_HEALTH}</p>
-
-        {connection ? (
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <ConnectionStatusBadge status={connection.status} />
-            {isActive && <span className="text-xs text-ink-muted">· {formatRelativeSync(connection.lastSyncedAt)}</span>}
-          </div>
-        ) : (
-          <p className="mt-1 text-xs text-ink-muted">Not connected</p>
-        )}
-        {isActive && <DeviceInfo connection={connection} />}
+        <ConnectionHeader provider="APPLE_HEALTH" label={WEARABLE_LABELS.APPLE_HEALTH as string} connection={connection} />
+        {isActive && <DeviceInfo connection={connection as WearableConnectionSummary} />}
 
         {isActive ? (
           <div className="mt-2 space-y-1">
@@ -173,16 +264,7 @@ function AmazfitCard({ connection }: { connection: WearableConnectionSummary | u
   return (
     <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">{WEARABLE_LABELS.AMAZFIT}</p>
-
-        {connection ? (
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <ConnectionStatusBadge status={connection.status} />
-            {isActive && <span className="text-xs text-ink-muted">· {formatRelativeSync(connection.lastSyncedAt)}</span>}
-          </div>
-        ) : (
-          <p className="mt-1 text-xs text-ink-muted">Not connected</p>
-        )}
+        <ConnectionHeader provider="AMAZFIT" label={WEARABLE_LABELS.AMAZFIT as string} connection={connection} />
 
         {isActive ? (
           <div className="mt-2 space-y-1">
@@ -209,6 +291,60 @@ function AmazfitCard({ connection }: { connection: WearableConnectionSummary | u
   );
 }
 
+function HueCard({ connection }: { connection: SmartHomeConnectionSummary | undefined }) {
+  return (
+    <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <ProviderIcon provider="HUE" />
+          <p className="text-sm font-medium">{SMART_HOME_LABELS.HUE}</p>
+        </div>
+        {connection ? (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <ConnectionStatusBadge status={connection.status} />
+            {connection.status === "ACTIVE" && (
+              <span className="text-xs text-ink-muted" title={formatLastSynced(connection.lastSyncedAt)}>
+                · {formatRelativeSync(connection.lastSyncedAt)} · {connection.devices.length} device
+                {connection.devices.length === 1 ? "" : "s"}
+              </span>
+            )}
+          </div>
+        ) : (
+          <p className="mt-1 text-xs text-ink-muted">Not connected</p>
+        )}
+      </div>
+      <ConnectAction connection={connection} connectHref="/api/integrations/hue/connect" connectLabel="Connect Hue" provider="hue" />
+    </Card>
+  );
+}
+
+function SpotifyCard({ connection }: { connection: SmartHomeConnectionSummary | undefined }) {
+  return (
+    <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <ProviderIcon provider="SPOTIFY" />
+          <p className="text-sm font-medium">{SMART_HOME_LABELS.SPOTIFY}</p>
+        </div>
+        {connection ? (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <ConnectionStatusBadge status={connection.status} />
+          </div>
+        ) : (
+          <p className="mt-1 text-xs text-ink-muted">Not connected</p>
+        )}
+        <p className="mt-1 text-xs text-ink-muted">Requires Spotify Premium — free accounts can&apos;t use remote playback.</p>
+      </div>
+      <ConnectAction
+        connection={connection}
+        connectHref="/api/integrations/spotify/connect"
+        connectLabel="Connect Spotify"
+        provider="spotify"
+      />
+    </Card>
+  );
+}
+
 /** Every voice command this skill supports — see
  * docs/ALEXA_ARCHITECTURE.md §9 for the full intent -> implementation
  * mapping. Shown as "available," not "granted": unlike account linking,
@@ -230,16 +366,7 @@ function AlexaCard({ connection }: { connection: SmartHomeConnectionSummary | un
   return (
     <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">{SMART_HOME_LABELS.ALEXA}</p>
-
-        {connection ? (
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <ConnectionStatusBadge status={connection.status} />
-            {isActive && <span className="text-xs text-ink-muted">· {formatRelativeSync(connection.lastSyncedAt)}</span>}
-          </div>
-        ) : (
-          <p className="mt-1 text-xs text-ink-muted">Not connected</p>
-        )}
+        <ConnectionHeader provider="ALEXA" label={SMART_HOME_LABELS.ALEXA as string} connection={connection} />
 
         {isActive ? (
           <div className="mt-2 space-y-1">
@@ -292,97 +419,12 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
     <section className="flex flex-col gap-3">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Connections</h2>
 
-      <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">{WEARABLE_LABELS.WHOOP}</p>
-          {whoop ? (
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <ConnectionStatusBadge status={whoop.status} />
-              {whoop.status === "ACTIVE" && (
-                <span className="text-xs text-ink-muted">· {formatLastSynced(whoop.lastSyncedAt)}</span>
-              )}
-            </div>
-          ) : (
-            <p className="mt-1 text-xs text-ink-muted">Not connected</p>
-          )}
-          {whoop?.status === "ACTIVE" && <DeviceInfo connection={whoop} />}
-        </div>
-        <ConnectAction
-          connection={whoop}
-          connectHref="/api/integrations/whoop/connect"
-          connectLabel="Connect WHOOP"
-          provider="whoop"
-          extraActiveActions={<SyncButton provider="whoop" />}
-        />
-      </Card>
-
-      <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">{WEARABLE_LABELS.GOOGLE_HEALTH}</p>
-          {fitbit ? (
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <ConnectionStatusBadge status={fitbit.status} />
-              {fitbit.status === "ACTIVE" && (
-                <span className="text-xs text-ink-muted">· {formatLastSynced(fitbit.lastSyncedAt)}</span>
-              )}
-            </div>
-          ) : (
-            <p className="mt-1 text-xs text-ink-muted">Not connected</p>
-          )}
-          {fitbit?.status === "ACTIVE" && <DeviceInfo connection={fitbit} />}
-        </div>
-        <ConnectAction
-          connection={fitbit}
-          connectHref="/api/integrations/google-health/connect"
-          connectLabel="Connect Fitbit"
-          provider="google-health"
-          extraActiveActions={<SyncButton provider="google-health" />}
-        />
-      </Card>
-
+      <WhoopCard connection={whoop} />
+      <FitbitCard connection={fitbit} />
       <AppleHealthCard connection={appleHealth} />
-
       <AmazfitCard connection={amazfit} />
-
-      <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">{SMART_HOME_LABELS.HUE}</p>
-          {hue ? (
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <ConnectionStatusBadge status={hue.status} />
-              {hue.status === "ACTIVE" && (
-                <span className="text-xs text-ink-muted">
-                  · {formatLastSynced(hue.lastSyncedAt)} · {hue.devices.length} device{hue.devices.length === 1 ? "" : "s"}
-                </span>
-              )}
-            </div>
-          ) : (
-            <p className="mt-1 text-xs text-ink-muted">Not connected</p>
-          )}
-        </div>
-        <ConnectAction connection={hue} connectHref="/api/integrations/hue/connect" connectLabel="Connect Hue" provider="hue" />
-      </Card>
-
-      <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">{SMART_HOME_LABELS.SPOTIFY}</p>
-          {spotify ? (
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <ConnectionStatusBadge status={spotify.status} />
-            </div>
-          ) : (
-            <p className="mt-1 text-xs text-ink-muted">Not connected</p>
-          )}
-          <p className="mt-1 text-xs text-ink-muted">Requires Spotify Premium — free accounts can&apos;t use remote playback.</p>
-        </div>
-        <ConnectAction
-          connection={spotify}
-          connectHref="/api/integrations/spotify/connect"
-          connectLabel="Connect Spotify"
-          provider="spotify"
-        />
-      </Card>
-
+      <HueCard connection={hue} />
+      <SpotifyCard connection={spotify} />
       <AlexaCard connection={alexa} />
     </section>
   );
