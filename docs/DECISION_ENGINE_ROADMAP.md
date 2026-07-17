@@ -178,13 +178,25 @@ another OAuth integration" would suggest:
 
 ## AI insights
 
-- **Weekly reports, persisted insights** — the `Insight` Prisma model
-  (`period: DAILY|WEEKLY`, `metric`, `value`, `trend`, `summary`) exists
-  in the schema and remains unwritten-to after this round; insights are
-  still computed on-the-fly per request (`computeTrends`/`computeWellnessTrends`),
-  not pre-aggregated. A real weekly-report feature would start by writing
-  to this table on a schedule (reusing the `workers/src/scheduledDispatch.ts`
-  cron pattern) rather than computing it in the request path.
+- **Weekly reports, persisted insights** — shipped: `ai/src/weeklyReport.ts`'s
+  `computeWeeklyInsights` reuses `computeTrends`/`computeWellnessTrends`
+  (the same functions the live `/api/insights` dashboard uses) and turns
+  their output into persistable `Insight` rows. New
+  `workers/src/weeklyReportWorker.ts` (`npm run start:weekly-report -w
+  workers`, same periodic-tick shape as `scheduledDispatch.ts`) finds
+  every user with recent readings and writes their rows via the new
+  `database/src/repositories/insightRepository.ts`. New `GET
+  /api/insights/history?period=WEEKLY` reads them back, distinct from
+  `/api/insights`'s on-the-fly computation — an empty result means the
+  worker hasn't run for that user yet, not an error. New
+  `WeeklyReportSection` renders the latest batch on the dashboard.
+  Live-verified end-to-end against the running backend and Postgres: a
+  disposable test account was given 14 real biometric readings with
+  genuine HRV/heart-rate variance, the worker was run directly, and both
+  `GET /api/insights/history` and the actual rendered dashboard (browser
+  session, real login) showed the persisted rows with correct summary
+  text, correctly matching the same wellness-score computation the live
+  dashboard already trusted.
 - **Recommendations** — the `Recommendation` Prisma model (`suggestedActions:
   Json`, `status: PENDING|ACCEPTED|DISMISSED|EXPIRED`) exists in the
   schema and is read/written by zero code, before and after this round.

@@ -11,6 +11,7 @@ import { InsightsSection } from "@/components/dashboard/InsightsSection";
 import { AutomationSection } from "@/components/dashboard/AutomationSection";
 import { WellnessScoreCard } from "@/components/dashboard/WellnessScoreCard";
 import { NotificationHistorySection } from "@/components/dashboard/NotificationHistorySection";
+import { WeeklyReportSection } from "@/components/dashboard/WeeklyReportSection";
 import { TimezoneSync } from "@/components/dashboard/TimezoneSync";
 import type {
   ConnectionsResponse,
@@ -20,6 +21,7 @@ import type {
   WellnessResponse,
   NotificationEntry,
   NotificationPreferences,
+  PersistedInsight,
 } from "@/lib/types";
 import type { NormalizedBiometricReading } from "@moodsync/shared";
 
@@ -62,6 +64,7 @@ export default async function DashboardPage({
     notificationsResult,
     pauseResult,
     notificationPreferencesResult,
+    weeklyInsightsResult,
   ] = await Promise.all([
     backendFetch<ConnectionsResponse>("/api/connections"),
     backendFetch<{ reading: NormalizedBiometricReading | null }>("/api/biometrics/latest"),
@@ -73,6 +76,7 @@ export default async function DashboardPage({
     backendFetch<{ notifications: NotificationEntry[] }>("/api/notifications?limit=20"),
     backendFetch<{ pausedUntil: string | null; isPaused: boolean }>("/api/preferences/automation-pause"),
     backendFetch<NotificationPreferences>("/api/preferences/notifications"),
+    backendFetch<{ insights: PersistedInsight[] }>("/api/insights/history?period=WEEKLY&limit=50"),
   ]);
 
   const connections: ConnectionsResponse = connectionsResult.ok
@@ -92,6 +96,7 @@ export default async function DashboardPage({
   const notificationPreferences: NotificationPreferences = notificationPreferencesResult.ok
     ? notificationPreferencesResult.data
     : { notificationsEnabled: true, quietHoursStart: null, quietHoursEnd: null };
+  const weeklyInsights = weeklyInsightsResult.ok ? weeklyInsightsResult.data.insights : [];
   const devices = connections.smartHome.flatMap((c) => c.devices);
   const spotifyConnected = connections.smartHome.some((c) => c.provider === "SPOTIFY" && c.status === "ACTIVE");
 
@@ -120,6 +125,7 @@ export default async function DashboardPage({
         automationEffectiveness={insights.automationEffectiveness}
       />
       <DevicesSection devices={devices} />
+      <WeeklyReportSection insights={weeklyInsights} />
       <AutomationSection rules={rules} history={automationHistory} devices={devices} spotifyConnected={spotifyConnected} />
       <NotificationHistorySection
         notifications={notifications}

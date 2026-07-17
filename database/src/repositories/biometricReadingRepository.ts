@@ -125,4 +125,17 @@ export const biometricReadingRepository = {
     });
     return rows.map((row) => ({ id: row.id, reading: toNormalized(row) }));
   },
+
+  /** Which users have synced anything in the window — the scheduled
+   * weekly-report worker (workers/src/weeklyReportWorker.ts) only
+   * touches users with real data instead of scanning every account. */
+  async listUserIdsWithRecentReadings(sinceDays: number): Promise<string[]> {
+    const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
+    const rows = await prisma.biometricReading.findMany({
+      where: { timestamp: { gte: since } },
+      distinct: ['userId'],
+      select: { userId: true },
+    });
+    return rows.map((r) => r.userId);
+  },
 };

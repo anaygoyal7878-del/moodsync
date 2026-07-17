@@ -1131,3 +1131,44 @@ automated path — a real user would have to remember to click it.
   user" and a HomeKit rule still produces `QUEUED_FOR_DEVICE` with a
   real `PendingDeviceCommand` row — identical observable behavior to
   before the refactor, confirming no regression on either path.
+
+## Milestone 16: Weekly reports / persisted insights
+
+- **Closes a real gap**: the `Insight` Prisma model (`period:
+  DAILY|WEEKLY`, `metric`, `value`, `trend`, `summary`) has existed in
+  the schema since the original design and was never written to —
+  `/api/insights` computed everything on-the-fly per request instead.
+- New `ai/src/weeklyReport.ts`: `computeWeeklyInsights` reuses
+  `computeTrends`/`computeWellnessTrends` (unchanged — the same
+  functions `/api/insights` already uses) and maps their `TrendResult[]`
+  output into `CreateInsightInput[]`, with a human summary sentence per
+  row (e.g. "Stress increased this week (47 → 78.43, +31.43)."). New
+  `database/src/repositories/insightRepository.ts` (`createMany`/
+  `listForUser`), new `biometricReadingRepository.listUserIdsWithRecentReadings`
+  so the worker only touches users with real data. New
+  `workers/src/weeklyReportWorker.ts` — same periodic-tick, "only
+  touch active users" shape as `scheduledDispatch.ts`, run via `npm run
+  start:weekly-report -w workers`.
+- New `GET /api/insights/history?period=WEEKLY&limit=` — deliberately
+  separate from `/api/insights`, which stays request-time computation;
+  this one only ever returns what the worker has actually persisted, so
+  an empty result honestly means "the report hasn't run for this user
+  yet," not an error. New `WeeklyReportSection` renders the latest
+  batch on the dashboard, stripping the `wellness.` metric prefix
+  (added to disambiguate a computed score from a same-named raw field,
+  e.g. `wellness.stress` vs. `stressLevel`) before reusing the existing
+  `metricLabel` map.
+- **Verified for real**: full monorepo build/lint/test green (133
+  tests — 3 new in `weeklyReport.test.ts`, including one that
+  specifically builds a 14-reading history deep enough to clear
+  `wellness.ts`'s 5-point baseline requirement in *both* trend halves,
+  the same category of mistake caught and documented in Milestone 12's
+  verification). Live, end-to-end, against the running backend and
+  Postgres: gave a disposable test account 14 real biometric readings
+  with genuine HRV/heart-rate variance, ran the worker directly against
+  the live database (it correctly scoped to only the 4 users in the DB
+  with recent readings, inserted real rows), confirmed via `GET
+  /api/insights/history` and — going one step further than a curl
+  check — via an actual browser session logged into the real dashboard,
+  where the Weekly Report section rendered the exact persisted summary
+  text.

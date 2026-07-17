@@ -6,11 +6,16 @@ import {
   biometricReadingRepository,
   automationRuleRepository,
   automationExecutionLogRepository,
+  insightRepository,
 } from '@moodsync/database';
 import { computeTrends, computeWellnessTrends, computeAutomationEffectiveness, computeWellnessScores } from '@moodsync/ai';
 
 const historyQuerySchema = z.object({ days: z.coerce.number().int().min(1).max(30).default(7) });
 const insightsQuerySchema = z.object({ days: z.coerce.number().int().min(1).max(30).default(14) });
+const insightsHistoryQuerySchema = z.object({
+  period: z.enum(['DAILY', 'WEEKLY']).default('WEEKLY'),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
 
 export default async function dashboardRoutes(app: FastifyInstance) {
   app.get('/connections', { preHandler: app.authenticate }, async (request, reply) => {
@@ -80,6 +85,21 @@ export default async function dashboardRoutes(app: FastifyInstance) {
     });
 
     return reply.send({ trends, wellnessTrends, automationEffectiveness });
+  });
+
+  /** Persisted history — distinct from `/insights` above, which computes
+   * trends on-the-fly from raw readings every request. These rows come
+   * from `workers/src/weeklyReportWorker.ts`'s periodic run (see
+   * docs/DECISION_ENGINE_ROADMAP.md's "Weekly reports, persisted
+   * insights" entry) and only exist once that worker has run for a
+   * given user at least once — an empty array here means "no report has
+   * run yet," not an error. */
+  app.get('/insights/history', { preHandler: app.authenticate }, async (request, reply) => {
+    const parsed = insightsHistoryQuerySchema.safeParse(request.query);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const insights = await insightRepository.listForUser(request.userId!, parsed.data.period, parsed.data.limit);
+    return reply.send({ insights });
   });
 
   /** Current wellness scores (ai/src/wellness.ts) for the dashboard's

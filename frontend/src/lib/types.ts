@@ -122,3 +122,15 @@ export interface InsightsResponse {
 export interface WellnessResponse {
   scores: WellnessScores | null;
 }
+
+export interface PersistedInsight {
+  id: string;
+  period: "DAILY" | "WEEKLY";
+  metric: string;
+  periodStart: string;
+  periodEnd: string;
+  value: number;
+  trend: number | null;
+  summary: string | null;
+  createdAt: string;
+}

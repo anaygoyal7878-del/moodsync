@@ -9,6 +9,7 @@
     "start:fitbit-sync": "node dist/fitbitSync.js",
     "start:sync-all": "node dist/syncAll.js",
     "start:scheduled-dispatch": "node dist/scheduledDispatch.js",
+    "start:weekly-report": "node dist/weeklyReportWorker.js",
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
