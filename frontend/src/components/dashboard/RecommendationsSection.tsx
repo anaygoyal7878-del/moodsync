@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import type { RecommendationEntry } from "@/lib/types";
@@ -52,16 +53,25 @@ function RecommendationCard({ recommendation, onResponded }: { recommendation: R
 export function RecommendationsSection({ recommendations }: { recommendations: RecommendationEntry[] }) {
   const router = useRouter();
 
-  if (recommendations.length === 0) return null;
-
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Suggested for you</h2>
-      <div className="flex flex-col gap-2">
-        {recommendations.map((r) => (
-          <RecommendationCard key={r.id} recommendation={r} onResponded={() => router.refresh()} />
-        ))}
-      </div>
+      {recommendations.length === 0 ? (
+        <Card className="flex flex-col items-start gap-1.5 py-6">
+          <Sparkles size={18} className="mb-1 text-ink-muted" aria-hidden="true" />
+          <p className="text-sm font-medium text-ink">No suggestions yet</p>
+          <p className="text-sm text-ink-secondary">
+            MoodSync looks for patterns in your wellness trends and suggests automations that might help — check back
+            after your next sync.
+          </p>
+        </Card>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {recommendations.map((r) => (
+            <RecommendationCard key={r.id} recommendation={r} onResponded={() => router.refresh()} />
+          ))}
+        </div>
+      )}
     </section>
   );
 }
