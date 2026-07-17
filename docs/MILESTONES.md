@@ -984,3 +984,37 @@ automated path — a real user would have to remember to click it.
     actual HomeKit home — the Simulator has no HomeKit hub/accessories
     of its own, so this needs a physical device. Flagged, not silently
     skipped — see `docs/HOMEKIT_ARCHITECTURE.md` §5, §7.
+
+## Milestone 12: Wire computed wellness scores into the rule engine
+
+- **Closes a real gap**: Milestone 10 built 8 wellness scores but never
+  let a rule's condition actually reference one — only raw provider
+  fields (`heartRate`, `sleepScore`, etc.) were usable, so "when Stress >
+  70" wasn't buildable despite Stress existing as a real computed score.
+- `shared/src/automation.ts`'s `RuleCondition.field` widened to accept a
+  new `WellnessField` union (`wellness.stress`, `wellness.recovery`, …)
+  alongside `BiometricField`. `ai/src/ruleEngine.ts`'s `conditionMatches`
+  branches on the `wellness.` prefix to read from a passed-in
+  `WellnessScores` object instead of the raw reading.
+  `ai/src/dispatch.ts` computes wellness scores (same 30-day trailing
+  window as `/api/wellness`) only when some enabled rule actually
+  references one — the common biometric-only case skips the extra DB
+  round-trip entirely. `ai/src/explain.ts` updated so notification/history
+  text correctly cites the computed score value.
+- `ai/src/insights.ts`'s `computeAutomationEffectiveness` explicitly
+  skips wellness-field conditions rather than guessing — documented in
+  `docs/DECISION_ENGINE_ROADMAP.md` as deliberately deferred, not
+  silently broken.
+- Backend Zod schema and `RuleForm`'s condition-field dropdown (grouped
+  "Raw biometrics" / "MoodSync wellness scores") both updated to match.
+- **Verified for real**: full monorepo build/lint/test green (125 tests
+  — 7 new: 5 in `ruleEngine.test.ts`, 2 in `explain.test.ts`). Live
+  end-to-end: built a real HRV baseline with genuine variance for a
+  disposable test account, pushed a real low-HRV trigger reading,
+  confirmed the computed Stress score (100, correctly clamped) matched a
+  live `wellness.stress > 60` rule and produced the exact reason
+  `"Triggered because 100 Stress score exceeded your threshold of 60."`
+  — against the running backend, not a fake. (First attempt at this used
+  identical baseline HRV values, which collapsed the z-score's standard
+  deviation to 0 and forced a neutral score regardless of the trigger —
+  caught and corrected before concluding anything.)

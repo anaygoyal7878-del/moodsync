@@ -13,8 +13,21 @@ const biometricFieldSchema = z.enum([
   'calories',
 ]);
 
+/** MoodSync's own computed wellness scores (ai/src/wellness.ts) — see
+ * shared/src/automation.ts's `WellnessField` for the naming rationale. */
+const wellnessFieldSchema = z.enum([
+  'wellness.stress',
+  'wellness.recovery',
+  'wellness.sleep',
+  'wellness.energy',
+  'wellness.fatigue',
+  'wellness.focus',
+  'wellness.relaxation',
+  'wellness.overall',
+]);
+
 const conditionSchema = z.object({
-  field: biometricFieldSchema,
+  field: z.union([biometricFieldSchema, wellnessFieldSchema]),
   operator: z.enum(['lt', 'lte', 'gt', 'gte', 'eq']),
   value: z.number(),
 });

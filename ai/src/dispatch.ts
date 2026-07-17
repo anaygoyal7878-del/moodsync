@@ -3,6 +3,7 @@ import {
   automationExecutionLogRepository,
   userPreferencesRepository,
   pendingDeviceCommandRepository,
+  biometricReadingRepository,
 } from '@moodsync/database';
 import type { AutomationRuleDefinition, NormalizedBiometricReading } from '@moodsync/shared';
 import { evaluateRules } from './ruleEngine.js';
@@ -11,6 +12,13 @@ import { executeHueAction } from './hueActionExecutor.js';
 import { executeSpotifyAction } from './spotifyActionExecutor.js';
 import { explainTrigger, explainConflict, explainManualPause, explainRateLimit } from './explain.js';
 import { createNotification } from './notificationExecutor.js';
+import { computeWellnessScores } from './wellness.js';
+
+/** Trailing window used to compute wellness scores' own-baseline
+ * comparisons (see ai/src/wellness.ts) — same 30-day window the
+ * dashboard's `/api/wellness` endpoint uses, so a rule's `wellness.*`
+ * condition sees the same score a user sees on their dashboard. */
+const WELLNESS_HISTORY_DAYS = 30;
 
 export type DispatchOutcome =
   | 'EXECUTED'
@@ -129,7 +137,16 @@ export async function dispatchForReading(
   const results: DispatchResult[] = [];
 
   const rules = await automationRuleRepository.listEnabledForUser(userId);
-  const matched = evaluateRules(rules, reading, now);
+
+  // Only fetch history and compute wellness scores when some enabled
+  // rule actually references one — the common case (biometric-only
+  // rules) skips this extra DB round-trip entirely.
+  const needsWellnessScores = rules.some((rule) => rule.conditions.some((c) => c.field.startsWith('wellness.')));
+  const wellnessScores = needsWellnessScores
+    ? computeWellnessScores(reading, (await biometricReadingRepository.listRecentNormalized(userId, WELLNESS_HISTORY_DAYS)).filter((r) => r.timestamp !== reading.timestamp))
+    : undefined;
+
+  const matched = evaluateRules(rules, reading, now, wellnessScores);
   if (matched.length === 0) return results;
 
   const pausedUntil = await userPreferencesRepository.getAutomationsPausedUntil(userId);
@@ -174,7 +191,7 @@ export async function dispatchForReading(
       continue;
     }
 
-    const reason = explainTrigger(rule, reading);
+    const reason = explainTrigger(rule, reading, wellnessScores);
     try {
       let anyQueued = false;
       for (const action of rule.actions) {

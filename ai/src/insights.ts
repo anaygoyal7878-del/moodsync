@@ -120,8 +120,12 @@ export interface AutomationEffectivenessResult {
   /** The rule's first condition's field — what "improvement" is measured
    * against. Rules AND multiple conditions together (see
    * shared/src/automation.ts), so the first is used as the primary
-   * trigger metric rather than trying to score a multi-field composite. */
-  metric: BiometricField;
+   * trigger metric rather than trying to score a multi-field composite.
+   * Widened to `string` (not `BiometricField`) because a rule's first
+   * condition can now be a `wellness.*` field too — though see the
+   * `computeAutomationEffectiveness` scoping note below for why those
+   * aren't actually scored yet. */
+  metric: string;
   executedCount: number;
   /** Executions where both a trigger reading and a subsequent reading for
    * the same metric existed to compare — always <= executedCount. */
@@ -143,6 +147,7 @@ interface ExecutionLogLike {
     | 'SKIPPED_CONFLICT'
     | 'SKIPPED_MANUAL_PAUSE'
     | 'SKIPPED_SAFETY_RATE_LIMIT'
+    | 'QUEUED_FOR_DEVICE'
     | 'FAILED';
 }
 
@@ -196,6 +201,14 @@ export function computeAutomationEffectiveness(params: {
     const rule = ruleById.get(ruleId);
     const condition = rule?.conditions[0];
     if (!rule || !condition) continue;
+    // A wellness.* condition's "value" isn't stored on the raw reading
+    // (it's computed from a trailing history, see ai/src/wellness.ts) —
+    // scoring effectiveness against it would need to recompute wellness
+    // scores for both the trigger and next reading, which needs the same
+    // history-fetching this module deliberately doesn't do (kept
+    // DB-free/pure). Skipped rather than guessed at; see
+    // docs/DECISION_ENGINE_ROADMAP.md for wiring this up properly.
+    if (condition.field.startsWith('wellness.')) continue;
 
     let comparableCount = 0;
     let improvedCount = 0;
@@ -203,12 +216,12 @@ export function computeAutomationEffectiveness(params: {
     for (const log of executions) {
       if (!log.triggerReadingId) continue;
       const triggerReading = readingById.get(log.triggerReadingId);
-      const triggerValue = triggerReading?.[condition.field];
+      const triggerValue = triggerReading?.[condition.field as BiometricField];
       if (!triggerReading || triggerValue === undefined) continue;
 
       const triggerTime = new Date(triggerReading.timestamp).getTime();
       const next = readings.find((r) => new Date(r.reading.timestamp).getTime() > triggerTime);
-      const nextValue = next?.reading[condition.field];
+      const nextValue = next?.reading[condition.field as BiometricField];
       if (nextValue === undefined) continue;
 
       comparableCount++;

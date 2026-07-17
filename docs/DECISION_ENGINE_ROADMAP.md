@@ -185,13 +185,32 @@ another OAuth integration" would suggest:
   does distinguish stages; confirm Google Health/Fitbit's equivalent)
   before adding the fields.
 
-## Wiring wellness scores into the rule engine
+## Wellness scores wired into the rule engine — done
 
-Currently `RuleCondition.field` only references raw `BiometricField`
-values (`heartRate`, `sleepScore`, etc.) — a user cannot write a rule
-condition against a *computed* wellness score (e.g. "when Stress > 70").
-Wiring `computeWellnessScores()`'s output into the condition-matching
-path (extending `BiometricField` or adding a parallel `WellnessField`
-union) would let automations react to MoodSync's own scores directly,
-not just raw provider fields — a natural next step once the scoring
-methodology itself has more real-world usage to validate against.
+**Shipped**: `RuleCondition.field` now accepts a `WellnessField`
+(`wellness.stress`, `wellness.recovery`, etc. — see
+`shared/src/automation.ts`) alongside raw `BiometricField` values, so a
+rule can react to MoodSync's own computed scores directly (e.g. "when
+Stress > 70"), not just raw provider fields. `ai/src/dispatch.ts`
+computes wellness scores (30-day trailing history, same window the
+dashboard's `/api/wellness` uses) only when some enabled rule actually
+references one, and passes them through `evaluateRules` →
+`ruleEngine.ts`'s `conditionMatches` → `explain.ts`'s `explainTrigger`,
+so the notification/history text correctly cites the computed score
+value, not `undefined`.
+
+**Verified live**: built a real HRV baseline (6 readings with genuine
+variance) for a disposable test account, pushed a real low-HRV trigger
+reading, confirmed the computed Stress score (100 — correctly clamped)
+matched a `wellness.stress > 60` rule and produced the exact reason
+`"Triggered because 100 Stress score exceeded your threshold of 60."` —
+against the live backend, not a unit-test fake.
+
+**Deliberately out of scope this round**: `computeAutomationEffectiveness`
+(`ai/src/insights.ts`) skips wellness-field conditions entirely rather
+than guessing — scoring "did this rule's outcome improve" against a
+computed score would need to recompute wellness scores for both the
+trigger and a subsequent reading, which needs the same history-fetching
+this module deliberately doesn't do (kept DB-free/pure). A real version
+of this would pass pre-computed score series in, mirroring how
+`computeWellnessTrends` already works.

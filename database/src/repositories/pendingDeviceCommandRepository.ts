@@ -33,7 +33,7 @@ export const pendingDeviceCommandRepository = {
   /** `updateMany` (not `update`) so the userId ownership check is
    * enforced by the query itself — same pattern as every other
    * user-scoped repository in this codebase. */
-  async markCompleted(id: string, userId: string, outcome: { status: 'EXECUTED' | 'FAILED'; failureReason?: string }): Promise<boolean> {
+  async markCompleted(id: string, userId: string, outcome: { status: 'EXECUTED' | 'FAILED'; failureReason?: string | undefined }): Promise<boolean> {
     const result = await prisma.pendingDeviceCommand.updateMany({
       where: { id, userId, status: 'PENDING' },
       data: {

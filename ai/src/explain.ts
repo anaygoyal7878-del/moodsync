@@ -1,6 +1,7 @@
-import type { AutomationRuleDefinition, NormalizedBiometricReading, RuleCondition } from '@moodsync/shared';
+import type { AutomationRuleDefinition, BiometricField, NormalizedBiometricReading, RuleCondition, WellnessField } from '@moodsync/shared';
+import type { WellnessScores } from './wellness.js';
 
-const FIELD_LABELS: Record<RuleCondition['field'], string> = {
+const BIOMETRIC_FIELD_LABELS: Record<BiometricField, string> = {
   heartRate: 'heart rate',
   restingHeartRate: 'resting heart rate',
   sleepScore: 'sleep score',
@@ -11,6 +12,21 @@ const FIELD_LABELS: Record<RuleCondition['field'], string> = {
   calories: 'calories',
 };
 
+/** Labeled distinctly from the raw-biometric fields above ("Stress
+ * score" vs. "stress level") so a notification never leaves it ambiguous
+ * whether it's citing a provider-reported value or MoodSync's own
+ * computed score — see docs/WELLNESS_SCORING.md. */
+const WELLNESS_FIELD_LABELS: Record<WellnessField, string> = {
+  'wellness.stress': 'Stress score',
+  'wellness.recovery': 'Recovery score',
+  'wellness.sleep': 'Sleep score',
+  'wellness.energy': 'Energy score',
+  'wellness.fatigue': 'Fatigue score',
+  'wellness.focus': 'Focus score',
+  'wellness.relaxation': 'Relaxation score',
+  'wellness.overall': 'Overall wellness score',
+};
+
 const OPERATOR_PHRASES: Record<RuleCondition['operator'], string> = {
   lt: 'was below',
   lte: 'was at or below',
@@ -19,10 +35,23 @@ const OPERATOR_PHRASES: Record<RuleCondition['operator'], string> = {
   eq: 'equaled',
 };
 
-function describeCondition(condition: RuleCondition, reading: NormalizedBiometricReading): string {
-  const actual = reading[condition.field];
-  const label = FIELD_LABELS[condition.field];
+function isWellnessField(field: RuleCondition['field']): field is WellnessField {
+  return field.startsWith('wellness.');
+}
+
+function describeCondition(condition: RuleCondition, reading: NormalizedBiometricReading, wellnessScores: WellnessScores | undefined): string {
   const phrase = OPERATOR_PHRASES[condition.operator];
+
+  if (isWellnessField(condition.field)) {
+    const key = condition.field.slice('wellness.'.length) as keyof WellnessScores;
+    const actual = wellnessScores?.[key].value;
+    const label = WELLNESS_FIELD_LABELS[condition.field];
+    const actualPart = actual !== undefined && actual !== null ? `${actual} ` : '';
+    return `${actualPart}${label} ${phrase} your threshold of ${condition.value}`;
+  }
+
+  const actual = reading[condition.field];
+  const label = BIOMETRIC_FIELD_LABELS[condition.field];
   const actualPart = actual !== undefined ? `${actual} ` : '';
   return `${actualPart}${label} ${phrase} your threshold of ${condition.value}`;
 }
@@ -35,14 +64,14 @@ function describeCondition(condition: RuleCondition, reading: NormalizedBiometri
  * body text, so a user always sees *why* an automation fired, not just
  * that it did.
  */
-export function explainTrigger(rule: AutomationRuleDefinition, reading: NormalizedBiometricReading): string {
+export function explainTrigger(rule: AutomationRuleDefinition, reading: NormalizedBiometricReading, wellnessScores?: WellnessScores): string {
   if (rule.conditions.length === 0) {
     return rule.timeWindow
       ? `Triggered because it's within "${rule.name}"'s scheduled time window (${rule.timeWindow.start}-${rule.timeWindow.end}).`
       : `Triggered by "${rule.name}".`;
   }
 
-  const parts = rule.conditions.map((c) => describeCondition(c, reading));
+  const parts = rule.conditions.map((c) => describeCondition(c, reading, wellnessScores));
   const conditionsText = parts.length === 1 ? parts[0] : parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1];
   const timeText = rule.timeWindow ? ` (within your scheduled ${rule.timeWindow.start}-${rule.timeWindow.end} window)` : '';
   return `Triggered because ${conditionsText}${timeText}.`;

@@ -13,10 +13,26 @@ export type BiometricField =
   | 'steps'
   | 'calories';
 
+/** MoodSync's own computed wellness scores (ai/src/wellness.ts), prefixed
+ * `wellness.` so a condition can unambiguously target a computed score
+ * instead of a raw provider field (e.g. `wellness.stress` vs. the
+ * provider-reported `stressLevel`, which almost no provider actually
+ * populates — see shared/src/wearables.ts). The suffix after the dot
+ * matches a `WellnessScores` key exactly. */
+export type WellnessField =
+  | 'wellness.stress'
+  | 'wellness.recovery'
+  | 'wellness.sleep'
+  | 'wellness.energy'
+  | 'wellness.fatigue'
+  | 'wellness.focus'
+  | 'wellness.relaxation'
+  | 'wellness.overall';
+
 export type ComparisonOperator = 'lt' | 'lte' | 'gt' | 'gte' | 'eq';
 
 export interface RuleCondition {
-  field: BiometricField;
+  field: BiometricField | WellnessField;
   operator: ComparisonOperator;
   value: number;
 }

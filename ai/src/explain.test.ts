@@ -50,6 +50,32 @@ describe('explainTrigger', () => {
     const text = explainTrigger(rule({ conditions: [], timeWindow: { start: '22:00', end: '23:00' } }), reading);
     expect(text).toContain('scheduled time window');
   });
+
+  it('describes a wellness.* condition using the computed score, not the raw reading', () => {
+    const text = explainTrigger(
+      rule({ conditions: [{ field: 'wellness.stress', operator: 'gt', value: 70 }] }),
+      reading,
+      {
+        stress: { value: 88, basis: 'evidence-informed-heuristic' },
+        recovery: { value: null, basis: 'heuristic' },
+        sleep: { value: null, basis: 'heuristic' },
+        energy: { value: null, basis: 'heuristic' },
+        fatigue: { value: null, basis: 'heuristic' },
+        focus: { value: null, basis: 'heuristic' },
+        relaxation: { value: null, basis: 'heuristic' },
+        overall: { value: null, basis: 'heuristic' },
+      },
+    );
+    expect(text).toContain('88');
+    expect(text).toContain('Stress score');
+    expect(text).toContain('exceeded');
+  });
+
+  it('omits the actual value for a wellness.* condition when no scores were passed', () => {
+    const text = explainTrigger(rule({ conditions: [{ field: 'wellness.stress', operator: 'gt', value: 70 }] }), reading);
+    expect(text).toContain('Stress score');
+    expect(text).not.toMatch(/\d+ Stress score/);
+  });
 });
 
 describe('explainConflict / explainManualPause / explainRateLimit', () => {

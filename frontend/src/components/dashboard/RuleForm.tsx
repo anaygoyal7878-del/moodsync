@@ -17,6 +17,42 @@ const BIOMETRIC_FIELDS = [
   "calories",
 ] as const;
 
+/** MoodSync's own computed wellness scores (ai/src/wellness.ts) — kept as
+ * a separate list (not merged into BIOMETRIC_FIELDS) so the dropdown can
+ * group them under a distinct label, since a `wellness.*` condition
+ * means something different from a raw provider field even when the
+ * names are similar (e.g. `wellness.stress` vs. `stressLevel`, which
+ * almost no provider actually populates). */
+const WELLNESS_FIELDS = [
+  "wellness.stress",
+  "wellness.recovery",
+  "wellness.sleep",
+  "wellness.energy",
+  "wellness.fatigue",
+  "wellness.focus",
+  "wellness.relaxation",
+  "wellness.overall",
+] as const;
+
+const FIELD_LABELS: Record<(typeof BIOMETRIC_FIELDS)[number] | (typeof WELLNESS_FIELDS)[number], string> = {
+  heartRate: "heartRate",
+  restingHeartRate: "restingHeartRate",
+  sleepScore: "sleepScore",
+  recoveryScore: "recoveryScore",
+  stressLevel: "stressLevel",
+  activityLevel: "activityLevel",
+  steps: "steps",
+  calories: "calories",
+  "wellness.stress": "Stress score (MoodSync)",
+  "wellness.recovery": "Recovery score (MoodSync)",
+  "wellness.sleep": "Sleep score (MoodSync)",
+  "wellness.energy": "Energy score (MoodSync)",
+  "wellness.fatigue": "Fatigue score (MoodSync)",
+  "wellness.focus": "Focus score (MoodSync)",
+  "wellness.relaxation": "Relaxation score (MoodSync)",
+  "wellness.overall": "Overall wellness (MoodSync)",
+};
+
 const OPERATORS = [
   { value: "lt", label: "is below" },
   { value: "lte", label: "is at or below" },
@@ -145,7 +181,7 @@ export function RuleForm({
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [field, setField] = useState<(typeof BIOMETRIC_FIELDS)[number]>("recoveryScore");
+  const [field, setField] = useState<(typeof BIOMETRIC_FIELDS)[number] | (typeof WELLNESS_FIELDS)[number]>("recoveryScore");
   const [operator, setOperator] = useState<(typeof OPERATORS)[number]["value"]>("lt");
   const [value, setValue] = useState("50");
   const [actionType, setActionType] = useState<ActionType>("hue.set_brightness");
@@ -292,11 +328,20 @@ export function RuleForm({
         <div className="flex flex-wrap items-center gap-2 text-sm text-ink-secondary">
           <span>When</span>
           <select className={selectClass} value={field} onChange={(e) => setField(e.target.value as typeof field)}>
-            {BIOMETRIC_FIELDS.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
+            <optgroup label="Raw biometrics">
+              {BIOMETRIC_FIELDS.map((f) => (
+                <option key={f} value={f}>
+                  {FIELD_LABELS[f]}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="MoodSync wellness scores">
+              {WELLNESS_FIELDS.map((f) => (
+                <option key={f} value={f}>
+                  {FIELD_LABELS[f]}
+                </option>
+              ))}
+            </optgroup>
           </select>
           <select className={selectClass} value={operator} onChange={(e) => setOperator(e.target.value as typeof operator)}>
             {OPERATORS.map((o) => (

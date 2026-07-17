@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AutomationRuleDefinition, NormalizedBiometricReading } from '@moodsync/shared';
 import { evaluateRule, evaluateRules, withinTimeWindow } from './ruleEngine.js';
+import type { WellnessScores } from './wellness.js';
 
 function makeReading(overrides: Partial<NormalizedBiometricReading> = {}): NormalizedBiometricReading {
   return {
@@ -129,5 +130,57 @@ describe('withinTimeWindow', () => {
     expect(withinTimeWindow(window, lateNight)).toBe(true);
     expect(withinTimeWindow(window, earlyMorning)).toBe(true);
     expect(withinTimeWindow(window, midday)).toBe(false);
+  });
+});
+
+function makeWellnessScores(overrides: Partial<WellnessScores> = {}): WellnessScores {
+  const empty = { value: null, basis: 'heuristic' as const };
+  return {
+    stress: empty,
+    recovery: empty,
+    sleep: empty,
+    energy: empty,
+    fatigue: empty,
+    focus: empty,
+    relaxation: empty,
+    overall: empty,
+    ...overrides,
+  };
+}
+
+describe('wellness-field conditions', () => {
+  it('matches a wellness.* condition against the computed score, not the raw reading', () => {
+    const rule = makeRule({ conditions: [{ field: 'wellness.stress', operator: 'gt', value: 70 }] });
+    const scores = makeWellnessScores({ stress: { value: 85, basis: 'evidence-informed-heuristic' } });
+    expect(evaluateRule(rule, makeReading(), new Date(), scores)).toBe(true);
+  });
+
+  it('does not match when the computed score is below the threshold', () => {
+    const rule = makeRule({ conditions: [{ field: 'wellness.stress', operator: 'gt', value: 70 }] });
+    const scores = makeWellnessScores({ stress: { value: 40, basis: 'evidence-informed-heuristic' } });
+    expect(evaluateRule(rule, makeReading(), new Date(), scores)).toBe(false);
+  });
+
+  it('never matches when no wellnessScores were passed in at all', () => {
+    const rule = makeRule({ conditions: [{ field: 'wellness.stress', operator: 'gt', value: 70 }] });
+    expect(evaluateRule(rule, makeReading())).toBe(false);
+  });
+
+  it('never matches when the score itself is null (couldn\'t be computed)', () => {
+    const rule = makeRule({ conditions: [{ field: 'wellness.stress', operator: 'gt', value: 70 }] });
+    const scores = makeWellnessScores(); // stress.value is null
+    expect(evaluateRule(rule, makeReading(), new Date(), scores)).toBe(false);
+  });
+
+  it('AND-combines a wellness.* condition with a raw biometric condition', () => {
+    const rule = makeRule({
+      conditions: [
+        { field: 'wellness.stress', operator: 'gt', value: 70 },
+        { field: 'activityLevel', operator: 'lt', value: 20 },
+      ],
+    });
+    const scores = makeWellnessScores({ stress: { value: 85, basis: 'evidence-informed-heuristic' } });
+    expect(evaluateRule(rule, makeReading({ activityLevel: 10 }), new Date(), scores)).toBe(true);
+    expect(evaluateRule(rule, makeReading({ activityLevel: 50 }), new Date(), scores)).toBe(false);
   });
 });
