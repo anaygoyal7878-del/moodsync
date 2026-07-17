@@ -69,20 +69,62 @@ first — none of it is presented as already supported.
 
 ## Smart-home integrations
 
-- **Apple Home, Google Home** — no integration exists. Both would need
-  their own OAuth/API research phase (matching the process every existing
-  integration in this repo went through — see `docs/INTEGRATIONS_RESEARCH.md`)
-  before any code is written.
-- **Smart thermostats, blinds, air purifiers, other Matter-compatible
-  devices** — same: research-first, no invented capabilities. Ecobee
-  exists in the schema as `not_yet_available` (see
-  `integrations/ecobee`) — closed registration at the time it was
-  researched; worth re-checking before any thermostat automation is built.
+**Correction: all future device integration goes through Alexa and Apple
+HomeKit specifically — not new per-vendor packages (Google Home, direct
+lock/thermostat vendor APIs, etc.), per direction.** Both were verified
+against real platform documentation before writing this, and they have
+meaningfully different — and more limited — real capabilities than "just
+another OAuth integration" would suggest:
+
+- **Alexa stays voice-only, as already built.** MoodSync's Alexa
+  integration is a **Custom Skill** (`integrations/alexa`) — it can run
+  voice commands that trigger MoodSync's *own* already-configured
+  automation rules (Hue/Spotify actions it already owns), and now answer
+  `CheckSecurityIntent` honestly. It has **no path to controlling new
+  device categories** (locks, thermostats, etc.) — that would require
+  becoming a fundamentally different skill type (a **Smart Home Skill**,
+  which owns and reports its own devices to Alexa) and real per-vendor
+  device-cloud infrastructure, which is exactly the separate-integration
+  work this direction says to avoid. So "integrate through Alexa" means
+  *voice control of what MoodSync already has*, not a new device gateway
+  — documented here so this isn't silently overpromised later.
+- **Apple HomeKit is the real, buildable path to everything else** (locks,
+  thermostats, blinds, air purifiers, other Matter-certified accessories
+  — HomeKit is vendor-agnostic within a user's own Home, unlike Alexa's
+  skill-siloed model). Verified against real Apple developer
+  documentation and forum threads before writing this:
+  - Third-party HomeKit apps can only trigger **pre-configured Scenes**
+    (e.g. a user-created "MoodSync Relax" or "MoodSync Bedtime" scene
+    that bundles lights + a lock + a thermostat) — **not** arbitrary
+    per-accessory control the way Apple's own Home app can. This is a
+    real Apple platform restriction, not a MoodSync gap.
+  - Controlling HomeKit accessories **in the background, without the app
+    open, requires a special entitlement Apple grants case-by-case**
+    (via Developer Technical Support request) — not a standard
+    capability available by default. Without it, HomeKit control only
+    works while the companion app is actively open/foregrounded.
+  - Net effect: this is architecturally the same shape as Apple Health
+    (`ios/MoodSyncCompanion`) — device-side, user-initiated, not a
+    server-side push. See `docs/HOMEKIT_ARCHITECTURE.md` (once built)
+    for the full design: the backend records a *pending* automation
+    action, the companion app polls for and executes it via HomeKit's
+    `HMHome`/`HMActionSet` when opened, and reports the outcome back —
+    reusing the polling shape already proven by
+    `workers/src/scheduledDispatch.ts`, just inverted (device polls
+    server, not server polls device).
+  - This also gives Sleep Detection's lock/security check a real,
+    non-voice path: if the user includes their HomeKit-compatible lock
+    in a "MoodSync Bedtime" scene, activating that scene *does* lock it
+    — MoodSync still can't independently *query* arbitrary lock state
+    (no such HomeKit API for that either, outside scene activation), but
+    it can take the real action the scene defines.
+- **Google Home** — explicitly out of scope now that devices route
+  through Alexa/HomeKit only; not researched further.
 - **Pluggable action-executor registry** — dispatch's provider routing is
-  still a hardcoded if/else (`ai/src/dispatch.ts`). A real registry/interface
-  pattern (`ActionExecutor` type, a lookup map) would make adding new
-  providers not require editing dispatch's core loop — worth doing before
-  a third or fourth action-taking integration is added, not urgent at two.
+  still a hardcoded if/else (`ai/src/dispatch.ts`). Adding HomeKit as a
+  third action-taking provider (after Hue, Spotify) is the natural trigger
+  point to introduce a real `ActionExecutor` registry instead of extending
+  the if/else further — see `docs/HOMEKIT_ARCHITECTURE.md`.
 
 ## Personalization
 

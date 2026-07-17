@@ -35,6 +35,7 @@ model User {
   recommendations      Recommendation[]
   automationLogs       AutomationExecutionLog[]
   notifications        Notification[]
+  pendingDeviceCommands PendingDeviceCommand[]
   preferences          UserPreferences?
 
   @@map("users")
@@ -71,6 +72,7 @@ enum SmartHomeProvider {
   SPOTIFY
   ECOBEE
   ALEXA
+  HOMEKIT
 }
 
 enum ConnectionStatus {
@@ -258,6 +260,11 @@ enum ExecutionOutcome {
   /// Hit the per-user hourly action-execution rate limit — a safety check,
   /// not a user preference (see ai/src/dispatch.ts's RATE_LIMIT constant).
   SKIPPED_SAFETY_RATE_LIMIT
+  /// A homekit.* action can't execute server-side at all — queued as a
+  /// PendingDeviceCommand for the iOS companion app instead. Distinct
+  /// from EXECUTED because dispatch genuinely doesn't know the outcome
+  /// yet (see ai/src/dispatch.ts, docs/HOMEKIT_ARCHITECTURE.md).
+  QUEUED_FOR_DEVICE
   FAILED
 }
 
@@ -299,6 +306,38 @@ model Notification {
 
   @@index([userId, createdAt])
   @@map("notifications")
+}
+
+enum PendingDeviceCommandStatus {
+  PENDING
+  EXECUTED
+  FAILED
+}
+
+/// A HomeKit action dispatch couldn't execute server-side — HomeKit has
+/// no cloud API, only the native framework running on the user's own
+/// device (see docs/HOMEKIT_ARCHITECTURE.md) — so this is the queue the
+/// iOS companion app polls (GET /api/devices/pending-commands) and
+/// reports back to (POST .../:id/complete) the next time it's opened.
+/// Same "device polls server" shape as Apple Health's ingest, inverted:
+/// there the device pushes data up, here the device pulls commands down.
+model PendingDeviceCommand {
+  id            String                     @id @default(uuid())
+  userId        String
+  user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider      SmartHomeProvider
+  /// AutomationAction from shared/src/automation.ts — today always a
+  /// `homekit.activate_scene` action, kept as the general shape in case
+  /// a second device-polled provider is ever added.
+  action        Json
+  ruleId        String?
+  status        PendingDeviceCommandStatus @default(PENDING)
+  failureReason String?
+  createdAt     DateTime                   @default(now())
+  completedAt   DateTime?
+
+  @@index([userId, status, createdAt])
+  @@map("pending_device_commands")
 }
 
 enum InsightPeriod {

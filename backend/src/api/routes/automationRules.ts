@@ -26,8 +26,9 @@ const actionSchema = z.object({
     'hue.set_color_temperature',
     'spotify.play_playlist',
     'notification.reduce_intensity',
+    'homekit.activate_scene',
   ]),
-  provider: z.enum(['hue', 'spotify', 'ecobee', 'notification']),
+  provider: z.enum(['hue', 'spotify', 'ecobee', 'notification', 'homekit']),
   params: z.record(z.string(), z.unknown()),
 });
 

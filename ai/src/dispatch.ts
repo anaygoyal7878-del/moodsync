@@ -2,6 +2,7 @@ import {
   automationRuleRepository,
   automationExecutionLogRepository,
   userPreferencesRepository,
+  pendingDeviceCommandRepository,
 } from '@moodsync/database';
 import type { AutomationRuleDefinition, NormalizedBiometricReading } from '@moodsync/shared';
 import { evaluateRules } from './ruleEngine.js';
@@ -17,6 +18,7 @@ export type DispatchOutcome =
   | 'SKIPPED_CONFLICT'
   | 'SKIPPED_MANUAL_PAUSE'
   | 'SKIPPED_SAFETY_RATE_LIMIT'
+  | 'QUEUED_FOR_DEVICE'
   | 'FAILED';
 
 export interface DispatchResult {
@@ -174,11 +176,19 @@ export async function dispatchForReading(
 
     const reason = explainTrigger(rule, reading);
     try {
+      let anyQueued = false;
       for (const action of rule.actions) {
         if (action.provider === 'hue') {
           await executeHueAction(userId, action);
         } else if (action.provider === 'spotify') {
           await executeSpotifyAction(userId, action);
+        } else if (action.provider === 'homekit') {
+          // HomeKit has no cloud API — this can't be executed here at
+          // all, only queued for the iOS companion app to pick up and
+          // run locally via the HomeKit framework the next time it's
+          // opened. See docs/HOMEKIT_ARCHITECTURE.md.
+          await pendingDeviceCommandRepository.create({ userId, provider: 'HOMEKIT', action, ruleId: rule.id });
+          anyQueued = true;
         } else {
           // Notification-provider actions aren't a separate executor —
           // every outcome already generates a notification (see
@@ -188,8 +198,10 @@ export async function dispatchForReading(
           throw new Error(`Provider "${action.provider}" automation dispatch is not yet implemented`);
         }
       }
-      await recordAndNotify({ userId, rule, readingId, outcome: 'EXECUTED', reason, notifyTitle: `${rule.name} triggered` });
-      results.push({ ruleId: rule.id, ruleName: rule.name, outcome: 'EXECUTED', reason });
+      const outcome = anyQueued ? 'QUEUED_FOR_DEVICE' : 'EXECUTED';
+      const notifyTitle = anyQueued ? `${rule.name} queued for your device` : `${rule.name} triggered`;
+      await recordAndNotify({ userId, rule, readingId, outcome, reason, notifyTitle });
+      results.push({ ruleId: rule.id, ruleName: rule.name, outcome, reason });
       executedThisPass++;
     } catch (error) {
       const failureReason = error instanceof Error ? error.message : String(error);

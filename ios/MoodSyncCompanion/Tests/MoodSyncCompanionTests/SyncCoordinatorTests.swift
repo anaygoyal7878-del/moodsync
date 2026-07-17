@@ -32,6 +32,19 @@ private final class FakeAPIClient: MoodSyncAPIClientProtocol, @unchecked Sendabl
         lastIngestedDeviceName = deviceName
         return insertedCount
     }
+
+    var pendingCommands: [PendingDeviceCommand] = []
+    var fetchPendingError: MoodSyncAPIError?
+    private(set) var completedCommandIDs: [(id: String, outcome: PendingDeviceCommandOutcome)] = []
+
+    func fetchPendingDeviceCommands(accessToken: String) async throws -> [PendingDeviceCommand] {
+        if let fetchPendingError { throw fetchPendingError }
+        return pendingCommands
+    }
+
+    func completePendingDeviceCommand(id: String, status: PendingDeviceCommandOutcome, accessToken: String) async throws {
+        completedCommandIDs.append((id, status))
+    }
 }
 
 final class SyncCoordinatorTests: XCTestCase {

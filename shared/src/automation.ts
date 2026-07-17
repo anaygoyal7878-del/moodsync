@@ -26,7 +26,16 @@ export type ActionType =
   | 'hue.set_brightness'
   | 'hue.set_color_temperature'
   | 'spotify.play_playlist'
-  | 'notification.reduce_intensity';
+  | 'notification.reduce_intensity'
+  /** Activates a HomeKit Scene the user has pre-configured in Apple's
+   * Home app — the only control surface a third-party app has over
+   * HomeKit (no per-accessory control, no arbitrary state queries — see
+   * docs/HOMEKIT_ARCHITECTURE.md). Unlike hue/spotify actions, this
+   * can't be executed server-side at all: HomeKit has no cloud API,
+   * only the native framework running on the user's own device, so
+   * dispatch queues this as a `PendingDeviceCommand` for the iOS
+   * companion app to pick up and execute the next time it's opened. */
+  | 'homekit.activate_scene';
 
 export interface AutomationAction {
   type: ActionType;

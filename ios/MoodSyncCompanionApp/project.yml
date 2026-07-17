@@ -1,0 +1,39 @@
+name: MoodSyncCompanionApp
+options:
+  bundleIdPrefix: com.moodsync
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  MoodSyncCompanion:
+    path: ../MoodSyncCompanion
+targets:
+  MoodSyncCompanionApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: MoodSyncCompanionApp
+    dependencies:
+      - package: MoodSyncCompanion
+        product: MoodSyncCompanion
+      - package: MoodSyncCompanion
+        product: MoodSyncCompanionUI
+    info:
+      path: MoodSyncCompanionApp/Info.plist
+      properties:
+        UILaunchScreen: {}
+        NSHealthShareUsageDescription: "MoodSync reads your heart rate, sleep, and activity data to automate your smart home based on how you're feeling."
+        NSHomeKitUsageDescription: "MoodSync activates HomeKit scenes you've configured (like \"Relax\" or \"Focus\") based on your biometrics."
+        UIBackgroundModes:
+          - fetch
+    settings:
+      base:
+        # Placeholder — replace with your own explicit bundle ID once
+        # you register an App ID with the HealthKit capability (see
+        # docs/APPLE_HEALTH_DEVELOPER_GUIDE.md §2). Without a paid
+        # Apple Developer Program account this can stay as-is for
+        # Simulator builds, which don't need HealthKit entitlement
+        # provisioning the same way a physical device does.
+        PRODUCT_BUNDLE_IDENTIFIER: com.moodsync.companion
+        CODE_SIGN_ENTITLEMENTS: MoodSyncCompanionApp/MoodSyncCompanionApp.entitlements
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic

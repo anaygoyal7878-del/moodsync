@@ -11,3 +11,4 @@ export { automationRuleRepository, type AutomationRuleUpdateInput } from './repo
 export { automationExecutionLogRepository } from './repositories/automationExecutionLogRepository.js';
 export { notificationRepository } from './repositories/notificationRepository.js';
 export { userPreferencesRepository } from './repositories/userPreferencesRepository.js';
+export { pendingDeviceCommandRepository } from './repositories/pendingDeviceCommandRepository.js';

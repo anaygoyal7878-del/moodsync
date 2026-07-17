@@ -929,3 +929,58 @@ automated path — a real user would have to remember to click it.
   packages) — new test files this round: `wellness.test.ts` (14),
   `explain.test.ts` (7), `dispatch.test.ts` (5), plus `ruleEngine.test.ts`
   extended with `timeWindow`/`withinTimeWindow` coverage.
+
+## Milestone 11: Apple HomeKit integration + Alexa's real ceiling documented
+
+- **Correction, per direction**: all future device integration routes
+  through Alexa (already built) and Apple HomeKit specifically, not new
+  per-vendor packages. Verified via live web search against real Amazon
+  and Apple developer documentation before building anything:
+  - Alexa's real ceiling is documented honestly in
+    `docs/DECISION_ENGINE_ROADMAP.md` — MoodSync's Custom Skill can run
+    voice commands against rules it already owns (Hue/Spotify), but has
+    no path to controlling new device categories (that needs a
+    fundamentally different Smart Home Skill type + per-vendor device
+    cloud, exactly the separate-integration work this direction avoids).
+  - HomeKit is the real path to locks/thermostats/blinds/purifiers/Matter
+    — vendor-agnostic within a user's own Home, unlike Alexa's
+    skill-siloed model — but with two confirmed real constraints: **scene
+    activation only** (no per-accessory control, no arbitrary state
+    queries) and **no background control without a special Apple
+    entitlement** (request-based, not default). See
+    `docs/HOMEKIT_ARCHITECTURE.md` for the full design and citations.
+- **Implemented for real**: `homekit.activate_scene` action type
+  (`shared/src/automation.ts`); `PendingDeviceCommand` Prisma model +
+  migration (HomeKit has no cloud API, so dispatch queues instead of
+  executing); `QUEUED_FOR_DEVICE` execution outcome; backend polling
+  routes (`GET/POST /api/devices/pending-commands*`); iOS companion app
+  additions — `HomeKitController` (real `HMHomeManager`/`HMHome`/
+  `HMActionSet` usage behind `#if canImport(HomeKit)`),
+  `DeviceCommandCoordinator` (the inverse of `SyncCoordinator` — device
+  polls server, not server polls device), `PendingDeviceCommand.swift`,
+  and new `MoodSyncAPIClient` methods.
+- **Verified for real, not just compiled**:
+  - TypeScript side: full monorepo build/lint/test (118 tests) green
+    after the schema/dispatch/route changes; migration applied to the
+    real local Postgres.
+  - Live backend round-trip: created a real rule with a
+    `homekit.activate_scene` action, pushed a real triggering reading via
+    the Apple Health ingest endpoint, confirmed the automation logged
+    `QUEUED_FOR_DEVICE` with a correct explanation, confirmed the
+    `PendingDeviceCommand` was retrievable via the polling endpoint, then
+    confirmed completing it removed it from the pending list — the full
+    queue → poll → complete cycle, against a live server.
+  - iOS side: **this session got real Xcode installed** (previously this
+    sandbox only had Command Line Tools, which can't run XCTest at all —
+    see `ios/MoodSyncCompanion/README.md`'s original "what wasn't
+    verified" section). `swift test` now runs for real: **17 tests pass**,
+    including 5 new `DeviceCommandCoordinatorTests` against fakes of both
+    HomeKit and the API client. The full Xcode app project
+    (`ios/MoodSyncCompanionApp`, with the new
+    `com.apple.developer.homekit` entitlement) rebuilds and code-signs
+    successfully for the iOS Simulator with the real HomeKit framework
+    linked in.
+  - **Not verifiable in this sandbox**: real scene activation against an
+    actual HomeKit home — the Simulator has no HomeKit hub/accessories
+    of its own, so this needs a physical device. Flagged, not silently
+    skipped — see `docs/HOMEKIT_ARCHITECTURE.md` §5, §7.
