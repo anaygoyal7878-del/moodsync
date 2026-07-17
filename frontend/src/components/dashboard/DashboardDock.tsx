@@ -1,28 +1,31 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import Dock from "@/components/effects/Dock";
-import { Link2, Activity, Sparkles, Zap, Bell, TrendingUp, Cpu } from "lucide-react";
+import { Link2, Activity, Sparkles, Zap, Bell, TrendingUp, Cpu, Wand2, CalendarClock } from "lucide-react";
 
-/** Quick-jump navigation for the dashboard's long scrolling page — each
- * item scrolls its matching section (ids set on the sections themselves
- * in dashboard/page.tsx) into view rather than firing an alert like the
- * component's own demo usage. Icons are lucide-react (see DockIcons.tsx'
- * removal note) rather than hand-drawn, now that an icon library exists. */
+/** Quick nav across the dashboard's per-feature pages (see
+ * dashboard/page.tsx for the full index) — each item navigates to that
+ * feature's own route rather than scrolling a shared long page. */
 const SECTIONS = [
-  { id: "connections", label: "Connections", icon: <Link2 size={18} /> },
-  { id: "biometrics", label: "Biometrics", icon: <Activity size={18} /> },
-  { id: "wellness", label: "Wellness", icon: <Sparkles size={18} /> },
-  { id: "insights", label: "Insights", icon: <TrendingUp size={18} /> },
-  { id: "devices", label: "Devices", icon: <Cpu size={18} /> },
-  { id: "automation-rules", label: "Automations", icon: <Zap size={18} /> },
-  { id: "notifications", label: "Notifications", icon: <Bell size={18} /> },
+  { href: "/dashboard/connections", label: "Connections", icon: <Link2 size={18} /> },
+  { href: "/dashboard/biometrics", label: "Biometrics", icon: <Activity size={18} /> },
+  { href: "/dashboard/wellness", label: "Wellness", icon: <Sparkles size={18} /> },
+  { href: "/dashboard/recommendations", label: "Recommendations", icon: <Wand2 size={18} /> },
+  { href: "/dashboard/insights", label: "Insights", icon: <TrendingUp size={18} /> },
+  { href: "/dashboard/devices", label: "Devices", icon: <Cpu size={18} /> },
+  { href: "/dashboard/weekly-report", label: "Weekly report", icon: <CalendarClock size={18} /> },
+  { href: "/dashboard/automation", label: "Automations", icon: <Zap size={18} /> },
+  { href: "/dashboard/notifications", label: "Notifications", icon: <Bell size={18} /> },
 ];
 
 export function DashboardDock() {
+  const router = useRouter();
+
   const items = SECTIONS.map((section) => ({
     icon: section.icon,
     label: section.label,
-    onClick: () => document.getElementById(section.id)?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    onClick: () => router.push(section.href),
   }));
 
   return (

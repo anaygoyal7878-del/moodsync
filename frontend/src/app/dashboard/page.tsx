@@ -1,161 +1,38 @@
-import { redirect } from "next/navigation";
-import { BACKEND_API_URL } from "@/lib/env";
-import { getAccessToken } from "@/lib/session";
-import { backendFetch } from "@/lib/api";
-import { LogoutButton } from "@/components/marketing/LogoutButton";
-import { ConnectErrorBanner } from "@/components/dashboard/ConnectErrorBanner";
-import { ConnectionsSection } from "@/components/dashboard/ConnectionsSection";
-import { DevicesSection } from "@/components/dashboard/DevicesSection";
-import { BiometricsSection } from "@/components/dashboard/BiometricsSection";
-import { InsightsSection } from "@/components/dashboard/InsightsSection";
-import { AutomationSection } from "@/components/dashboard/AutomationSection";
-import { WellnessScoreCard } from "@/components/dashboard/WellnessScoreCard";
-import { NotificationHistorySection } from "@/components/dashboard/NotificationHistorySection";
-import { WeeklyReportSection } from "@/components/dashboard/WeeklyReportSection";
-import { RecommendationsSection } from "@/components/dashboard/RecommendationsSection";
-import { TimezoneSync } from "@/components/dashboard/TimezoneSync";
-import { DashboardDock } from "@/components/dashboard/DashboardDock";
-import type {
-  ConnectionsResponse,
-  AutomationRuleDefinition,
-  AutomationHistoryEntry,
-  InsightsResponse,
-  WellnessResponse,
-  NotificationEntry,
-  NotificationPreferences,
-  PersistedInsight,
-  RecommendationEntry,
-} from "@/lib/types";
-import type { NormalizedBiometricReading } from "@moodsync/shared";
+import Link from "next/link";
+import { Card } from "@/components/ui/Card";
+import { Link2, Activity, Sparkles, TrendingUp, Cpu, Zap, Bell, Wand2, CalendarClock } from "lucide-react";
 
-interface MeResponse {
-  id: string;
-  email: string;
-  displayName: string | null;
-  timezone: string;
-  createdAt: string;
-}
+const SECTIONS = [
+  { href: "/dashboard/connections", label: "Connections", description: "Wearables and smart home providers.", icon: Link2 },
+  { href: "/dashboard/biometrics", label: "Biometrics", description: "Today's readings and trend charts.", icon: Activity },
+  { href: "/dashboard/wellness", label: "Wellness", description: "Computed stress, recovery, sleep scores.", icon: Sparkles },
+  { href: "/dashboard/recommendations", label: "Recommendations", description: "Automations MoodSync suggests for you.", icon: Wand2 },
+  { href: "/dashboard/insights", label: "Insights", description: "Trends and automation effectiveness.", icon: TrendingUp },
+  { href: "/dashboard/devices", label: "Devices", description: "Synced smart home devices.", icon: Cpu },
+  { href: "/dashboard/weekly-report", label: "Weekly report", description: "Your automatic weekly summary.", icon: CalendarClock },
+  { href: "/dashboard/automation", label: "Automations", description: "Rules and their firing history.", icon: Zap },
+  { href: "/dashboard/notifications", label: "Notifications", description: "History and delivery preferences.", icon: Bell },
+];
 
-async function fetchCurrentUser(): Promise<MeResponse | null> {
-  const accessToken = await getAccessToken();
-  if (!accessToken) return null;
-
-  const response = await fetch(`${BACKEND_API_URL}/api/me`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    cache: "no-store",
-  });
-  if (!response.ok) return null;
-  return response.json();
-}
-
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
-  const [user, { error }] = await Promise.all([fetchCurrentUser(), searchParams]);
-  if (!user) redirect("/login");
-
-  const [
-    connectionsResult,
-    latestResult,
-    historyResult,
-    rulesResult,
-    automationHistoryResult,
-    insightsResult,
-    wellnessResult,
-    notificationsResult,
-    pauseResult,
-    notificationPreferencesResult,
-    weeklyInsightsResult,
-    recommendationsResult,
-  ] = await Promise.all([
-    backendFetch<ConnectionsResponse>("/api/connections"),
-    backendFetch<{ reading: NormalizedBiometricReading | null }>("/api/biometrics/latest"),
-    backendFetch<{ readings: NormalizedBiometricReading[] }>("/api/biometrics/history?days=7"),
-    backendFetch<{ rules: AutomationRuleDefinition[] }>("/api/automation-rules"),
-    backendFetch<{ entries: AutomationHistoryEntry[] }>("/api/automation-history?limit=20"),
-    backendFetch<InsightsResponse>("/api/insights?days=14"),
-    backendFetch<WellnessResponse>("/api/wellness"),
-    backendFetch<{ notifications: NotificationEntry[] }>("/api/notifications?limit=20"),
-    backendFetch<{ pausedUntil: string | null; isPaused: boolean }>("/api/preferences/automation-pause"),
-    backendFetch<NotificationPreferences>("/api/preferences/notifications"),
-    backendFetch<{ insights: PersistedInsight[] }>("/api/insights/history?period=WEEKLY&limit=50"),
-    backendFetch<{ recommendations: RecommendationEntry[] }>("/api/recommendations"),
-  ]);
-
-  const connections: ConnectionsResponse = connectionsResult.ok
-    ? connectionsResult.data
-    : { wearables: [], smartHome: [] };
-  const latest = latestResult.ok ? latestResult.data.reading : null;
-  const history = historyResult.ok ? historyResult.data.readings : [];
-  const rules = rulesResult.ok ? rulesResult.data.rules : [];
-  const automationHistory = automationHistoryResult.ok ? automationHistoryResult.data.entries : [];
-  const insights: InsightsResponse = insightsResult.ok
-    ? insightsResult.data
-    : { trends: [], wellnessTrends: [], automationEffectiveness: [] };
-  const wellnessScores = wellnessResult.ok ? wellnessResult.data.scores : null;
-  const notifications = notificationsResult.ok ? notificationsResult.data.notifications : [];
-  const pausedUntil = pauseResult.ok ? pauseResult.data.pausedUntil : null;
-  const isAutomationPaused = pauseResult.ok ? pauseResult.data.isPaused : false;
-  const notificationPreferences: NotificationPreferences = notificationPreferencesResult.ok
-    ? notificationPreferencesResult.data
-    : { notificationsEnabled: true, quietHoursStart: null, quietHoursEnd: null };
-  const weeklyInsights = weeklyInsightsResult.ok ? weeklyInsightsResult.data.insights : [];
-  const recommendations = recommendationsResult.ok ? recommendationsResult.data.recommendations : [];
-  const devices = connections.smartHome.flatMap((c) => c.devices);
-  const spotifyConnected = connections.smartHome.some((c) => c.provider === "SPOTIFY" && c.status === "ACTIVE");
-
+export default function DashboardIndexPage() {
   return (
-    <div className="mx-auto flex max-w-3xl flex-1 flex-col gap-10 px-6 py-12 pb-28 sm:py-16 sm:pb-28">
-      <TimezoneSync serverTimezone={user.timezone} />
-      <header className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-brand" aria-hidden="true" />
-          <span className="text-[15px] font-semibold tracking-tight">MoodSync</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="hidden text-sm text-ink-secondary sm:inline">{user.email}</span>
-          <LogoutButton />
-        </div>
-      </header>
-
-      {error && <ConnectErrorBanner error={error} />}
-
-      <div id="connections">
-        <ConnectionsSection connections={connections} />
-      </div>
-      <div id="biometrics">
-        <BiometricsSection latest={latest} history={history} />
-      </div>
-      <div id="wellness">
-        <WellnessScoreCard scores={wellnessScores} />
-      </div>
-      <RecommendationsSection recommendations={recommendations} />
-      <div id="insights">
-        <InsightsSection
-          trends={insights.trends}
-          wellnessTrends={insights.wellnessTrends}
-          automationEffectiveness={insights.automationEffectiveness}
-        />
-      </div>
-      <div id="devices">
-        <DevicesSection devices={devices} />
-      </div>
-      <WeeklyReportSection insights={weeklyInsights} />
-      <div id="automation-rules">
-        <AutomationSection rules={rules} history={automationHistory} devices={devices} spotifyConnected={spotifyConnected} />
-      </div>
-      <div id="notifications">
-        <NotificationHistorySection
-          notifications={notifications}
-          pausedUntil={pausedUntil}
-          isPaused={isAutomationPaused}
-          preferences={notificationPreferences}
-        />
-      </div>
-
-      <DashboardDock />
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {SECTIONS.map((section) => (
+        <Link key={section.href} href={section.href}>
+          <Card
+            raised
+            className="flex h-full items-start gap-3 py-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-raised text-brand">
+              <section.icon size={16} aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-sm font-medium">{section.label}</p>
+              <p className="mt-0.5 text-xs text-ink-secondary">{section.description}</p>
+            </div>
+          </Card>
+        </Link>
+      ))}
     </div>
   );
 }

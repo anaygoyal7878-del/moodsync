@@ -27,7 +27,10 @@ export function ConnectErrorBanner({ error }: { error: string }) {
       className="flex items-center justify-between gap-4 rounded-xl border border-red-900/40 bg-red-950/30 px-4 py-3 text-sm text-red-200"
     >
       <span>{messageFor(error)}</span>
-      <Link href="/dashboard" className="shrink-0 text-red-200/70 underline-offset-2 hover:text-red-100 hover:underline">
+      <Link
+        href="/dashboard/connections"
+        className="shrink-0 text-red-200/70 underline-offset-2 hover:text-red-100 hover:underline"
+      >
         Dismiss
       </Link>
     </div>

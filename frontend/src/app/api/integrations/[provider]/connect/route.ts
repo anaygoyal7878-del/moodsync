@@ -24,7 +24,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
   const accessToken = await getAccessToken();
   if (!accessToken) return Response.redirect(new URL("/login", request.url));
 
-  const returnTo = new URL("/dashboard", request.url).toString();
+  const returnTo = new URL("/dashboard/connections", request.url).toString();
   const authorizeUrl = new URL(`${BACKEND_API_URL}/api/integrations/${provider}/authorize`);
   authorizeUrl.searchParams.set("returnTo", returnTo);
 
@@ -34,7 +34,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
   });
 
   if (!response.ok) {
-    return Response.redirect(new URL(`/dashboard?error=${provider}_unavailable`, request.url));
+    return Response.redirect(new URL(`/dashboard/connections?error=${provider}_unavailable`, request.url));
   }
 
   const { authorizationUrl } = (await response.json()) as { authorizationUrl: string };
