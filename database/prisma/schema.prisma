@@ -377,7 +377,11 @@ model Recommendation {
   user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   title            String
   description      String
-  /// AutomationAction[] this recommendation would create if accepted
+  /// { templateId: string } pointing at a RuleForm.tsx rule template —
+  /// not a raw AutomationAction[] blueprint, since a Hue action needs a
+  /// concrete deviceId this heuristic (ai/src/recommendations.ts) has no
+  /// way to know. See docs/DECISION_ENGINE_ROADMAP.md's Recommendations
+  /// entry.
   suggestedActions Json
   status           RecommendationStatus @default(PENDING)
   createdAt        DateTime             @default(now())

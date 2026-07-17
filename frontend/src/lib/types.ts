@@ -123,6 +123,16 @@ export interface WellnessResponse {
   scores: WellnessScores | null;
 }
 
+export interface RecommendationEntry {
+  id: string;
+  title: string;
+  description: string;
+  status: "PENDING" | "ACCEPTED" | "DISMISSED" | "EXPIRED";
+  suggestedActions: { templateId: string };
+  createdAt: string;
+  respondedAt: string | null;
+}
+
 export interface PersistedInsight {
   id: string;
   period: "DAILY" | "WEEKLY";

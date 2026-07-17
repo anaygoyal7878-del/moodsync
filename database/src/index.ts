@@ -14,3 +14,4 @@ export { userPreferencesRepository } from './repositories/userPreferencesReposit
 export { pendingDeviceCommandRepository } from './repositories/pendingDeviceCommandRepository.js';
 export { userTimezoneRepository } from './repositories/userTimezoneRepository.js';
 export { insightRepository, type CreateInsightInput } from './repositories/insightRepository.js';
+export { recommendationRepository, type CreateRecommendationInput } from './repositories/recommendationRepository.js';

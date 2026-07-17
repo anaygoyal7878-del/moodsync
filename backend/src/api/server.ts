@@ -19,6 +19,7 @@ import dashboardRoutes from './routes/dashboard.js';
 import notificationRoutes from './routes/notifications.js';
 import preferencesRoutes from './routes/preferences.js';
 import deviceRoutes from './routes/devices.js';
+import recommendationRoutes from './routes/recommendations.js';
 
 export async function buildServer() {
   const app = Fastify({ loggerInstance: logger, trustProxy: true });
@@ -59,6 +60,7 @@ export async function buildServer() {
   await app.register(notificationRoutes, { prefix: '/api' });
   await app.register(preferencesRoutes, { prefix: '/api' });
   await app.register(deviceRoutes, { prefix: '/api' });
+  await app.register(recommendationRoutes, { prefix: '/api' });
 
   return app;
 }

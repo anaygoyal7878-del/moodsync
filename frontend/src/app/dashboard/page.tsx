@@ -12,6 +12,7 @@ import { AutomationSection } from "@/components/dashboard/AutomationSection";
 import { WellnessScoreCard } from "@/components/dashboard/WellnessScoreCard";
 import { NotificationHistorySection } from "@/components/dashboard/NotificationHistorySection";
 import { WeeklyReportSection } from "@/components/dashboard/WeeklyReportSection";
+import { RecommendationsSection } from "@/components/dashboard/RecommendationsSection";
 import { TimezoneSync } from "@/components/dashboard/TimezoneSync";
 import type {
   ConnectionsResponse,
@@ -22,6 +23,7 @@ import type {
   NotificationEntry,
   NotificationPreferences,
   PersistedInsight,
+  RecommendationEntry,
 } from "@/lib/types";
 import type { NormalizedBiometricReading } from "@moodsync/shared";
 
@@ -65,6 +67,7 @@ export default async function DashboardPage({
     pauseResult,
     notificationPreferencesResult,
     weeklyInsightsResult,
+    recommendationsResult,
   ] = await Promise.all([
     backendFetch<ConnectionsResponse>("/api/connections"),
     backendFetch<{ reading: NormalizedBiometricReading | null }>("/api/biometrics/latest"),
@@ -77,6 +80,7 @@ export default async function DashboardPage({
     backendFetch<{ pausedUntil: string | null; isPaused: boolean }>("/api/preferences/automation-pause"),
     backendFetch<NotificationPreferences>("/api/preferences/notifications"),
     backendFetch<{ insights: PersistedInsight[] }>("/api/insights/history?period=WEEKLY&limit=50"),
+    backendFetch<{ recommendations: RecommendationEntry[] }>("/api/recommendations"),
   ]);
 
   const connections: ConnectionsResponse = connectionsResult.ok
@@ -97,6 +101,7 @@ export default async function DashboardPage({
     ? notificationPreferencesResult.data
     : { notificationsEnabled: true, quietHoursStart: null, quietHoursEnd: null };
   const weeklyInsights = weeklyInsightsResult.ok ? weeklyInsightsResult.data.insights : [];
+  const recommendations = recommendationsResult.ok ? recommendationsResult.data.recommendations : [];
   const devices = connections.smartHome.flatMap((c) => c.devices);
   const spotifyConnected = connections.smartHome.some((c) => c.provider === "SPOTIFY" && c.status === "ACTIVE");
 
@@ -119,6 +124,7 @@ export default async function DashboardPage({
       <ConnectionsSection connections={connections} />
       <BiometricsSection latest={latest} history={history} />
       <WellnessScoreCard scores={wellnessScores} />
+      <RecommendationsSection recommendations={recommendations} />
       <InsightsSection
         trends={insights.trends}
         wellnessTrends={insights.wellnessTrends}

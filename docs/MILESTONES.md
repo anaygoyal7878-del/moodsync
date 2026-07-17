@@ -1172,3 +1172,44 @@ automated path — a real user would have to remember to click it.
   check — via an actual browser session logged into the real dashboard,
   where the Weekly Report section rendered the exact persisted summary
   text.
+
+## Milestone 17: Recommendations
+
+- **Closes a real gap**: the `Recommendation` Prisma model
+  (`suggestedActions: Json`, `status: PENDING|ACCEPTED|DISMISSED|EXPIRED`)
+  existed in the schema and was read/written by zero code.
+- New `ai/src/recommendations.ts`'s `generateRecommendations` — two
+  heuristic rules (Elevated Stress on a rising computed Stress trend
+  past 65 with no existing reactive rule; Recovery on a falling computed
+  Recovery trend past 40, same check) reusing `computeWellnessTrends`
+  unchanged. Each candidate points at a `templateId` from `RuleForm.tsx`'s
+  existing template catalog rather than a raw action blueprint — a Hue
+  action needs a concrete `deviceId` this heuristic can't know, so it
+  suggests a real, already-verified path (the rule builder's own device
+  picker) instead of building something that would fail immediately.
+- New `database/src/repositories/recommendationRepository.ts`
+  (`create`/`listForUser`/`hasBeenSuggested`/`updateStatus`). New
+  `backend/src/api/routes/recommendations.ts`: `GET /api/recommendations`
+  generates fresh candidates from current trends + existing rules,
+  persists any not already suggested, returns pending ones;
+  `POST /:id/accept` and `.../dismiss` close the loop. New
+  `RecommendationsSection` on the dashboard.
+- **Bug found and fixed during live verification**: the first
+  implementation's dedupe check only looked for a `PENDING` row with
+  the same title — a dismissed or accepted suggestion regenerated as a
+  fresh duplicate on the very next page load, since the trend that
+  triggered it hadn't changed. Fixed `hasBeenSuggested` to check
+  `PENDING`/`ACCEPTED`/`DISMISSED` together; a responded-to suggestion
+  now never resurfaces. Documented in
+  `docs/DECISION_ENGINE_ROADMAP.md` alongside the fix.
+- **Verified for real**: full monorepo build/lint/test green (136
+  tests — 6 new in `recommendations.test.ts`). Live, end-to-end,
+  against the running backend and Postgres: gave a disposable test
+  account real stress-up/recovery-down biometric history, confirmed
+  both suggestions generated with correct summary text, confirmed
+  repeated `GET`s don't duplicate, dismissed one and accepted the
+  other, confirmed two subsequent `GET`s both returned zero pending
+  (verifying the fix), confirmed a double-accept correctly 404s, and
+  confirmed via an actual logged-in browser session that the "Suggested
+  for you" section renders the real recommendation text with working
+  accept/dismiss controls.

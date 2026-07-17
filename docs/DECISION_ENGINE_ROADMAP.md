@@ -197,15 +197,42 @@ another OAuth integration" would suggest:
   session, real login) showed the persisted rows with correct summary
   text, correctly matching the same wellness-score computation the live
   dashboard already trusted.
-- **Recommendations** — the `Recommendation` Prisma model (`suggestedActions:
-  Json`, `status: PENDING|ACCEPTED|DISMISSED|EXPIRED`) exists in the
-  schema and is read/written by zero code, before and after this round.
-  A real "AI suggests a rule, user accepts or dismisses it" feature would
-  start here.
-- **Observations vs. recommendations, distinguished in the UI** — the
-  current `InsightsSection`/wellness trends are observations only
-  (what happened), not recommendations (what to do about it). Building
-  real recommendations needs the `Recommendation` model wired up first.
+- **Recommendations** — shipped: `ai/src/recommendations.ts`'s
+  `generateRecommendations` is a small heuristic (MoodSync's own
+  engineering thresholds, not clinical) that reads the same
+  `computeWellnessTrends` output the live dashboard already trusts —
+  currently two rules: suggest the "Elevated Stress" template when
+  computed Stress has trended up past 65 and no enabled rule already
+  reacts to `heartRate`/`wellness.stress`; suggest "Recovery" when
+  computed Recovery has trended down past 40 and no rule reacts to
+  `activityLevel`/`wellness.recovery`. Points at a `templateId` (the
+  same catalog `RuleForm.tsx` already offers) rather than a raw
+  `AutomationAction[]` blueprint, since a Hue action needs a concrete
+  `deviceId` this heuristic has no way to know — MoodSync suggests, it
+  doesn't silently build a rule that would fail with a missing-device
+  error. New `GET /api/recommendations` generates + persists + returns
+  pending suggestions (deduped so calling it repeatedly never spams
+  duplicates); `POST /api/recommendations/:id/accept` and `.../dismiss`
+  close the loop. New `RecommendationsSection` renders them on the
+  dashboard with an explanatory "how to use this" line rather than
+  implying one-click automatic rule creation.
+  **Bug found and fixed during live verification**: the dedupe check
+  originally only looked for an existing `PENDING` row with the same
+  title, so a recommendation the user had just dismissed or accepted
+  came right back on the very next page load (the underlying trend
+  hadn't gone away). Fixed by checking for `PENDING`, `ACCEPTED`, or
+  `DISMISSED` — once a suggestion has been responded to, it doesn't
+  resurface. Live-verified end-to-end against the running backend: gave
+  a disposable test account real stress-up/recovery-down trend data, got
+  both suggestions, dismissed one and accepted the other, confirmed a
+  second and third `GET` both returned zero pending — and confirmed via
+  an actual logged-in browser session that the section renders the real
+  suggestion text.
+- **Observations vs. recommendations, distinguished in the UI** — done:
+  `InsightsSection`/wellness trends stayed observation-only; the new
+  "Suggested for you" section is visually and structurally separate
+  (its own dashboard section, explicit accept/dismiss actions) rather
+  than folded into the trends view.
 
 ## Music intelligence
 
