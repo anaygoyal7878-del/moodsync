@@ -14,6 +14,7 @@ import { NotificationHistorySection } from "@/components/dashboard/NotificationH
 import { WeeklyReportSection } from "@/components/dashboard/WeeklyReportSection";
 import { RecommendationsSection } from "@/components/dashboard/RecommendationsSection";
 import { TimezoneSync } from "@/components/dashboard/TimezoneSync";
+import { DashboardDock } from "@/components/dashboard/DashboardDock";
 import type {
   ConnectionsResponse,
   AutomationRuleDefinition,
@@ -106,7 +107,7 @@ export default async function DashboardPage({
   const spotifyConnected = connections.smartHome.some((c) => c.provider === "SPOTIFY" && c.status === "ACTIVE");
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-1 flex-col gap-10 px-6 py-12 sm:py-16">
+    <div className="mx-auto flex max-w-3xl flex-1 flex-col gap-10 px-6 py-12 pb-28 sm:py-16 sm:pb-28">
       <TimezoneSync serverTimezone={user.timezone} />
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -121,9 +122,15 @@ export default async function DashboardPage({
 
       {error && <ConnectErrorBanner error={error} />}
 
-      <ConnectionsSection connections={connections} />
-      <BiometricsSection latest={latest} history={history} />
-      <WellnessScoreCard scores={wellnessScores} />
+      <div id="connections">
+        <ConnectionsSection connections={connections} />
+      </div>
+      <div id="biometrics">
+        <BiometricsSection latest={latest} history={history} />
+      </div>
+      <div id="wellness">
+        <WellnessScoreCard scores={wellnessScores} />
+      </div>
       <RecommendationsSection recommendations={recommendations} />
       <InsightsSection
         trends={insights.trends}
@@ -132,13 +139,19 @@ export default async function DashboardPage({
       />
       <DevicesSection devices={devices} />
       <WeeklyReportSection insights={weeklyInsights} />
-      <AutomationSection rules={rules} history={automationHistory} devices={devices} spotifyConnected={spotifyConnected} />
-      <NotificationHistorySection
-        notifications={notifications}
-        pausedUntil={pausedUntil}
-        isPaused={isAutomationPaused}
-        preferences={notificationPreferences}
-      />
+      <div id="automation-rules">
+        <AutomationSection rules={rules} history={automationHistory} devices={devices} spotifyConnected={spotifyConnected} />
+      </div>
+      <div id="notifications">
+        <NotificationHistorySection
+          notifications={notifications}
+          pausedUntil={pausedUntil}
+          isPaused={isAutomationPaused}
+          preferences={notificationPreferences}
+        />
+      </div>
+
+      <DashboardDock />
     </div>
   );
 }
