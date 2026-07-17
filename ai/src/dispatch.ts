@@ -4,6 +4,7 @@ import {
   userPreferencesRepository,
   pendingDeviceCommandRepository,
   biometricReadingRepository,
+  userTimezoneRepository,
 } from '@moodsync/database';
 import type { AutomationRuleDefinition, NormalizedBiometricReading } from '@moodsync/shared';
 import { evaluateRules } from './ruleEngine.js';
@@ -152,7 +153,12 @@ export async function dispatchForReading(
     ? computeWellnessScores(reading, (await biometricReadingRepository.listRecentNormalized(userId, WELLNESS_HISTORY_DAYS)).filter((r) => r.timestamp !== reading.timestamp))
     : undefined;
 
-  const matched = evaluateRules(rules, reading, now, wellnessScores);
+  // Only fetch the user's timezone when some enabled rule actually has a
+  // timeWindow — biometric-only rules (the common case) never consult it.
+  const needsTimezone = rules.some((rule) => rule.timeWindow != null);
+  const timezone = needsTimezone ? await userTimezoneRepository.getTimezone(userId) : 'UTC';
+
+  const matched = evaluateRules(rules, reading, now, wellnessScores, timezone);
   if (matched.length === 0) return results;
 
   const pausedUntil = await userPreferencesRepository.getAutomationsPausedUntil(userId);

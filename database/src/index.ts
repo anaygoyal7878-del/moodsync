@@ -12,3 +12,4 @@ export { automationExecutionLogRepository } from './repositories/automationExecu
 export { notificationRepository } from './repositories/notificationRepository.js';
 export { userPreferencesRepository } from './repositories/userPreferencesRepository.js';
 export { pendingDeviceCommandRepository } from './repositories/pendingDeviceCommandRepository.js';
+export { userTimezoneRepository } from './repositories/userTimezoneRepository.js';

@@ -63,16 +63,39 @@ function minutesOfDay(hhmm: string): number {
   return h * 60 + m;
 }
 
+/** Minutes-since-midnight for `now` as observed in the given IANA
+ * timezone (e.g. "America/Chicago") — not the Node process's local
+ * timezone, which is what `now.getHours()` would give. */
+function zonedMinutesOfDay(now: Date, timezone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hourCycle: 'h23',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(now);
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? 0);
+  const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? 0);
+  return hour * 60 + minute;
+}
+
 /**
  * True when `now` falls within a rule's optional daily local-time window.
  * A window where `start > end` (e.g. 22:00-06:00) wraps past midnight —
- * see `TimeWindow`'s doc comment in shared/src/automation.ts. `now`
- * should already be in the user's local time (the caller — the scheduled
- * dispatch tick — is responsible for the timezone conversion, this
- * function just compares minute-of-day numbers).
+ * see `TimeWindow`'s doc comment in shared/src/automation.ts. `timezone`
+ * is the user's stored `User.timezone` (an IANA name, e.g.
+ * "America/Chicago") — falls back to "UTC" if omitted or invalid, same
+ * as the Prisma column's default. This function does the zoning itself
+ * via `Intl.DateTimeFormat` rather than requiring the caller to have
+ * pre-converted `now`, so every call site (dispatch, notifications,
+ * scheduled ticks) evaluates the same way.
  */
-export function withinTimeWindow(window: TimeWindow, now: Date): boolean {
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+export function withinTimeWindow(window: TimeWindow, now: Date, timezone: string = 'UTC'): boolean {
+  let nowMinutes: number;
+  try {
+    nowMinutes = zonedMinutesOfDay(now, timezone);
+  } catch {
+    nowMinutes = zonedMinutesOfDay(now, 'UTC');
+  }
   const start = minutesOfDay(window.start);
   const end = minutesOfDay(window.end);
   if (start <= end) return nowMinutes >= start && nowMinutes <= end;
@@ -98,10 +121,11 @@ export function evaluateRule(
   reading: NormalizedBiometricReading,
   now: Date = new Date(),
   wellnessScores?: WellnessScores,
+  timezone: string = 'UTC',
 ): boolean {
   if (!rule.enabled) return false;
   if (rule.conditions.length === 0 && !rule.timeWindow) return false;
-  if (rule.timeWindow && !withinTimeWindow(rule.timeWindow, now)) return false;
+  if (rule.timeWindow && !withinTimeWindow(rule.timeWindow, now, timezone)) return false;
   return rule.conditions.every((condition) => conditionMatches(condition, reading, wellnessScores));
 }
 
@@ -113,6 +137,7 @@ export function evaluateRules(
   reading: NormalizedBiometricReading,
   now: Date = new Date(),
   wellnessScores?: WellnessScores,
+  timezone: string = 'UTC',
 ): AutomationRuleDefinition[] {
-  return rules.filter((rule) => evaluateRule(rule, reading, now, wellnessScores));
+  return rules.filter((rule) => evaluateRule(rule, reading, now, wellnessScores, timezone));
 }

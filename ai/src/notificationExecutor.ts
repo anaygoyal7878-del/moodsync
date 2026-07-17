@@ -1,4 +1,4 @@
-import { notificationRepository, userPreferencesRepository } from '@moodsync/database';
+import { notificationRepository, userPreferencesRepository, userTimezoneRepository } from '@moodsync/database';
 import { withinTimeWindow } from './ruleEngine.js';
 
 export interface CreateNotificationInput {
@@ -22,12 +22,18 @@ export interface CreateNotificationInput {
  * `AutomationExecutionLog` row (with its `reason` text) is always
  * written regardless, so the audit trail/dashboard history is never
  * affected by notification preferences, only what interrupts the user.
+ *
+ * Quiet hours are evaluated in the user's stored `User.timezone`
+ * (fetched here, not passed in) — comparing "22:00-07:00" against the
+ * server process's local clock would suppress notifications at the
+ * wrong wall-clock time for any user outside the server's timezone.
  */
 export async function shouldNotify(userId: string, now: Date = new Date()): Promise<boolean> {
   const prefs = await userPreferencesRepository.getNotificationPreferences(userId);
   if (!prefs.notificationsEnabled) return false;
   if (prefs.quietHoursStart && prefs.quietHoursEnd) {
-    if (withinTimeWindow({ start: prefs.quietHoursStart, end: prefs.quietHoursEnd }, now)) return false;
+    const timezone = await userTimezoneRepository.getTimezone(userId);
+    if (withinTimeWindow({ start: prefs.quietHoursStart, end: prefs.quietHoursEnd }, now, timezone)) return false;
   }
   return true;
 }

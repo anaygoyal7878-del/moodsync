@@ -1057,3 +1057,44 @@ automated path — a real user would have to remember to click it.
   correct; the timezone-correctness gap is documented in
   `docs/DECISION_ENGINE_ROADMAP.md` as the next thing to fix before
   either feature is trusted for users outside the server's timezone.
+
+## Milestone 14: Fix timeWindow/quiet-hours timezone evaluation
+
+- **Fixes the bug found and documented in Milestone 13**:
+  `withinTimeWindow` (`ai/src/ruleEngine.ts`) used the Node process's
+  local time instead of the user's stored `User.timezone`, so quiet
+  hours and `timeWindow` rules (Focus Mode, Sleep Preparation) evaluated
+  in the wrong offset for any user outside the server's own timezone.
+- `withinTimeWindow` now takes an IANA timezone string and computes
+  wall-clock minutes-of-day via `Intl.DateTimeFormat` (falls back to UTC
+  on an invalid zone rather than throwing). `evaluateRule`/`evaluateRules`
+  thread a `timezone` param through to it. New
+  `database/src/repositories/userTimezoneRepository.ts` (`getTimezone`/
+  `setTimezone`) — separate from backend's auth-focused
+  `userRepository.ts` because the `ai` package (which has no dependency
+  on `backend`) needs to read it too. `dispatch.ts` and
+  `notificationExecutor.ts`'s `shouldNotify` each fetch it only when
+  actually needed (a rule has a `timeWindow`, or quiet hours are set) —
+  the common case skips the extra query.
+- New `PATCH /api/me` accepts `timezone`, validated against
+  `Intl.supportedValuesOf('timeZone')` (the runtime's real IANA
+  database, not a hand-maintained list or regex). New frontend
+  `TimezoneSync.tsx` (a silent, no-UI client component mounted on the
+  dashboard) detects the browser's real zone via
+  `Intl.DateTimeFormat().resolvedOptions().timeZone` and PATCHes it on
+  mismatch — otherwise `User.timezone` would stay "UTC" forever for
+  every real signup, since nothing else in the product ever asks for it.
+- **Verified for real** against the running backend: set a disposable
+  test account's timezone to `Asia/Tokyo` via `PATCH /api/me` (confirmed
+  a garbage timezone string is rejected with 400 first); a quiet-hours
+  window expressed in Tokyo-local time correctly suppressed a
+  notification, and a window that excluded the current Tokyo-local time
+  correctly did not — while the server process itself ran in
+  `America/Chicago`, proving the fix isn't accidentally working because
+  the two zones happened to agree. Also verified a `timeWindow`-only
+  rule (the Focus Mode/Sleep Preparation shape) matches using the same
+  Tokyo-local evaluation via `dispatchForReading`. Full monorepo
+  build/lint/test green (129 tests — 3 new/updated in
+  `ruleEngine.test.ts`'s `withinTimeWindow` suite, including one that
+  explicitly asserts a UTC timestamp evaluates differently across
+  `America/Chicago`/`UTC`/`Asia/Tokyo`).

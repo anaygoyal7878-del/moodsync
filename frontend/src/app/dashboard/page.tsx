@@ -11,6 +11,7 @@ import { InsightsSection } from "@/components/dashboard/InsightsSection";
 import { AutomationSection } from "@/components/dashboard/AutomationSection";
 import { WellnessScoreCard } from "@/components/dashboard/WellnessScoreCard";
 import { NotificationHistorySection } from "@/components/dashboard/NotificationHistorySection";
+import { TimezoneSync } from "@/components/dashboard/TimezoneSync";
 import type {
   ConnectionsResponse,
   AutomationRuleDefinition,
@@ -96,6 +97,7 @@ export default async function DashboardPage({
 
   return (
     <div className="mx-auto flex max-w-3xl flex-1 flex-col gap-10 px-6 py-12 sm:py-16">
+      <TimezoneSync serverTimezone={user.timezone} />
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-brand" aria-hidden="true" />

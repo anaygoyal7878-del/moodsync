@@ -142,18 +142,27 @@ another OAuth integration" would suggest:
   history keeps recording outcomes; a quiet-hours window spanning the
   current time (including an overnight wrap, e.g. 22:33–00:33)
   correctly suppresses; re-enabling immediately resumes.
-  **Known limitation surfaced during that verification**: `withinTimeWindow`
-  (`ai/src/ruleEngine.ts`) compares against `now.getHours()`/`getMinutes()`
-  — the Node process's local time — not the user's stored
-  `User.timezone` field. This affects quiet hours *and* every
-  `timeWindow`-based rule (Focus Mode, Sleep Preparation): a user whose
-  timezone differs from the server's will have their window evaluated
-  in the wrong offset. Fixing this means threading the user's IANA
-  timezone through to `withinTimeWindow` (e.g. via a library like
-  `Intl.DateTimeFormat` with `timeZone` option) at both call sites —
-  scoped out here since it's a correctness fix across an existing
-  feature, not new quiet-hours scope, but it should be the next thing
-  fixed before either feature is trusted for non-server-timezone users.
+  **Timezone bug found during that verification, and fixed in the same
+  round**: `withinTimeWindow` originally compared against
+  `now.getHours()`/`getMinutes()` — the Node process's local time — not
+  the user's stored `User.timezone`. Fixed: `withinTimeWindow` now takes
+  an IANA timezone argument and computes wall-clock minutes-of-day via
+  `Intl.DateTimeFormat` with `timeZone` set, falling back to UTC on an
+  invalid zone. `dispatch.ts` and `notificationExecutor.ts`'s
+  `shouldNotify` both fetch the user's timezone (via the new
+  `userTimezoneRepository`, `database/src/repositories/userTimezoneRepository.ts`)
+  only when some rule/quiet-hours check actually needs it. `PATCH /api/me`
+  now accepts `timezone`, validated against the runtime's real IANA
+  database (`Intl.supportedValuesOf('timeZone')`); the dashboard's new
+  `TimezoneSync` client component auto-detects the browser's zone
+  (`Intl.DateTimeFormat().resolvedOptions().timeZone`) and PATCHes it on
+  mismatch, so a real signup ends up with a real timezone instead of the
+  schema's permanent "UTC" default. Live-verified: a test account set to
+  `Asia/Tokyo` correctly suppressed a notification inside a Tokyo-local
+  quiet-hours window and correctly allowed one outside it, while the
+  server process itself ran in `America/Chicago` — and a `timeWindow`
+  rule (the Focus Mode/Sleep Preparation shape) matched using the same
+  Tokyo-local evaluation.
 - **Notification frequency controls, automation sensitivity** — no
   batching/digest mode exists (every outcome is its own notification);
   no per-rule notification opt-out (only the account-wide toggle).

@@ -82,14 +82,14 @@ describe('timeWindow', () => {
   it('matches a schedule-only rule (no biometric conditions) within its window', () => {
     const rule = makeRule({ conditions: [], timeWindow: { start: '09:00', end: '17:00' } });
     const noon = new Date();
-    noon.setHours(12, 0, 0, 0);
+    noon.setUTCHours(12, 0, 0, 0);
     expect(evaluateRule(rule, makeReading(), noon)).toBe(true);
   });
 
   it('does not match a schedule-only rule outside its window', () => {
     const rule = makeRule({ conditions: [], timeWindow: { start: '09:00', end: '17:00' } });
     const midnight = new Date();
-    midnight.setHours(0, 0, 0, 0);
+    midnight.setUTCHours(0, 0, 0, 0);
     expect(evaluateRule(rule, makeReading(), midnight)).toBe(false);
   });
 
@@ -99,22 +99,25 @@ describe('timeWindow', () => {
       timeWindow: { start: '09:00', end: '17:00' },
     });
     const noon = new Date();
-    noon.setHours(12, 0, 0, 0);
+    noon.setUTCHours(12, 0, 0, 0);
     expect(evaluateRule(rule, makeReading({ recoveryScore: 32 }), noon)).toBe(true);
     expect(evaluateRule(rule, makeReading({ recoveryScore: 90 }), noon)).toBe(false);
     const midnight = new Date();
-    midnight.setHours(0, 0, 0, 0);
+    midnight.setUTCHours(0, 0, 0, 0);
     expect(evaluateRule(rule, makeReading({ recoveryScore: 32 }), midnight)).toBe(false);
   });
 });
 
 describe('withinTimeWindow', () => {
+  // Uses setUTCHours + the default 'UTC' timezone param (rather than
+  // setHours/process-local time) so these assertions are deterministic
+  // regardless of the machine/CI runner's local timezone.
   it('handles a same-day window', () => {
     const window = { start: '09:00', end: '17:00' };
     const inWindow = new Date();
-    inWindow.setHours(10, 0, 0, 0);
+    inWindow.setUTCHours(10, 0, 0, 0);
     const outOfWindow = new Date();
-    outOfWindow.setHours(20, 0, 0, 0);
+    outOfWindow.setUTCHours(20, 0, 0, 0);
     expect(withinTimeWindow(window, inWindow)).toBe(true);
     expect(withinTimeWindow(window, outOfWindow)).toBe(false);
   });
@@ -122,14 +125,24 @@ describe('withinTimeWindow', () => {
   it('handles an overnight-wrapping window', () => {
     const window = { start: '22:00', end: '06:00' };
     const lateNight = new Date();
-    lateNight.setHours(23, 0, 0, 0);
+    lateNight.setUTCHours(23, 0, 0, 0);
     const earlyMorning = new Date();
-    earlyMorning.setHours(5, 0, 0, 0);
+    earlyMorning.setUTCHours(5, 0, 0, 0);
     const midday = new Date();
-    midday.setHours(12, 0, 0, 0);
+    midday.setUTCHours(12, 0, 0, 0);
     expect(withinTimeWindow(window, lateNight)).toBe(true);
     expect(withinTimeWindow(window, earlyMorning)).toBe(true);
     expect(withinTimeWindow(window, midday)).toBe(false);
+  });
+
+  it('evaluates in the given timezone rather than the process-local one', () => {
+    const window = { start: '09:00', end: '17:00' };
+    // 14:30 UTC = 09:30 in America/Chicago (UTC-5 in July) — inside the
+    // window in that timezone even though 14:30 itself is not.
+    const summerAfternoonUtc = new Date('2026-07-16T14:30:00Z');
+    expect(withinTimeWindow(window, summerAfternoonUtc, 'America/Chicago')).toBe(true);
+    expect(withinTimeWindow(window, summerAfternoonUtc, 'UTC')).toBe(true);
+    expect(withinTimeWindow(window, summerAfternoonUtc, 'Asia/Tokyo')).toBe(false); // 23:30 JST
   });
 });
 
