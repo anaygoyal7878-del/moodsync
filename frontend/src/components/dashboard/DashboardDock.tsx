@@ -1,18 +1,21 @@
 "use client";
 
 import Dock from "@/components/effects/Dock";
-import { LinkIcon, PulseIcon, SparkleIcon, BoltIcon, BellIcon } from "./DockIcons";
+import { Link2, Activity, Sparkles, Zap, Bell, TrendingUp, Cpu } from "lucide-react";
 
 /** Quick-jump navigation for the dashboard's long scrolling page — each
  * item scrolls its matching section (ids set on the sections themselves
  * in dashboard/page.tsx) into view rather than firing an alert like the
- * component's own demo usage. */
+ * component's own demo usage. Icons are lucide-react (see DockIcons.tsx'
+ * removal note) rather than hand-drawn, now that an icon library exists. */
 const SECTIONS = [
-  { id: "connections", label: "Connections", icon: <LinkIcon /> },
-  { id: "biometrics", label: "Biometrics", icon: <PulseIcon /> },
-  { id: "wellness", label: "Wellness", icon: <SparkleIcon /> },
-  { id: "automation-rules", label: "Automations", icon: <BoltIcon /> },
-  { id: "notifications", label: "Notifications", icon: <BellIcon /> },
+  { id: "connections", label: "Connections", icon: <Link2 size={18} /> },
+  { id: "biometrics", label: "Biometrics", icon: <Activity size={18} /> },
+  { id: "wellness", label: "Wellness", icon: <Sparkles size={18} /> },
+  { id: "insights", label: "Insights", icon: <TrendingUp size={18} /> },
+  { id: "devices", label: "Devices", icon: <Cpu size={18} /> },
+  { id: "automation-rules", label: "Automations", icon: <Zap size={18} /> },
+  { id: "notifications", label: "Notifications", icon: <Bell size={18} /> },
 ];
 
 export function DashboardDock() {

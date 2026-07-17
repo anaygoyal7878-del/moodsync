@@ -24,6 +24,27 @@
   --ink-muted: #726a80;
   --brand: #ff7a59;
   --brand-hover: #ff9075;
+
+  /* Status colors — used by Badge and anywhere a state needs semantic
+   * (not brand) color: connection health, rule enabled/disabled,
+   * notification severity. --brand itself covers "active/primary"
+   * status, so there's no separate 5th color for that. */
+  --success: #34d399;
+  --success-bg: rgba(52, 211, 153, 0.12);
+  --warning: #fbbf24;
+  --warning-bg: rgba(251, 191, 36, 0.12);
+  --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.12);
+  --info: #60a5fa;
+  --info-bg: rgba(96, 165, 250, 0.12);
+
+  /* Radius scale — Card/Button/Input each hardcoded a different radius
+   * (2xl/full/xl) before this existed. New primitives should reference
+   * these names instead of picking another arbitrary value. */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-full: 9999px;
 }
 
 @theme inline {
@@ -38,6 +59,18 @@
   --color-ink-muted: var(--ink-muted);
   --color-brand: var(--brand);
   --color-brand-hover: var(--brand-hover);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-full: var(--radius-full);
   --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 

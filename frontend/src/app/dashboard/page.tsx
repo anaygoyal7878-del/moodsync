@@ -132,12 +132,16 @@ export default async function DashboardPage({
         <WellnessScoreCard scores={wellnessScores} />
       </div>
       <RecommendationsSection recommendations={recommendations} />
-      <InsightsSection
-        trends={insights.trends}
-        wellnessTrends={insights.wellnessTrends}
-        automationEffectiveness={insights.automationEffectiveness}
-      />
-      <DevicesSection devices={devices} />
+      <div id="insights">
+        <InsightsSection
+          trends={insights.trends}
+          wellnessTrends={insights.wellnessTrends}
+          automationEffectiveness={insights.automationEffectiveness}
+        />
+      </div>
+      <div id="devices">
+        <DevicesSection devices={devices} />
+      </div>
       <WeeklyReportSection insights={weeklyInsights} />
       <div id="automation-rules">
         <AutomationSection rules={rules} history={automationHistory} devices={devices} spotifyConnected={spotifyConnected} />
