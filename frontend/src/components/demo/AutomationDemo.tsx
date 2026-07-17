@@ -3,6 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 
+export interface DemoChip {
+  label: string;
+  /** Falsy (null/undefined) renders the chip in its dim, "no change yet" state. */
+  value?: string | null;
+}
+
 export interface DemoStep {
   caption: string;
   /** 0-100, drives the metric bar + number */
@@ -10,9 +16,10 @@ export interface DemoStep {
   /** true once the metric is in the range that trips the rule — flips the metric to the brand accent color */
   alert: boolean;
   ruleMatched: boolean;
-  light: { on: boolean; warm: boolean; brightness: number };
-  playlist?: string | null;
-  notification?: string | null;
+  /** The animated light orb — omit entirely for a scenario that doesn't touch lighting. */
+  light?: { on: boolean; warm: boolean; brightness: number } | null;
+  /** Any other device/signal rows (Spotify, notifications, locks, thermostat, scent, calendar...). */
+  chips?: DemoChip[];
   logged: boolean;
 }
 
@@ -25,6 +32,10 @@ export interface DemoScenario {
   ruleLabel: string;
   deviceLabel: string;
   steps: DemoStep[];
+  /** Set for scenarios that showcase a capability MoodSync doesn't build against
+   * yet (no real API integration exists) — rendered with a clear "Concept" badge
+   * so the demo can show product vision without claiming it ships today. */
+  concept?: boolean;
 }
 
 const STEP_DURATION_MS = 3200;
@@ -54,6 +65,7 @@ export function AutomationDemo({ scenario }: { scenario: DemoScenario }) {
   }, [autoPlay, steps.length]);
 
   const step = steps[index]!;
+  const chipLabels = Array.from(new Set(steps.flatMap((s) => (s.chips ?? []).map((c) => c.label))));
 
   return (
     <div className="flex flex-col gap-6">
@@ -85,53 +97,46 @@ export function AutomationDemo({ scenario }: { scenario: DemoScenario }) {
         {/* Home reaction card */}
         <div className="rounded-2xl border border-line bg-surface p-6">
           <p className="text-xs uppercase tracking-wide text-ink-muted">Your home</p>
-          <div className="mt-3 flex items-center gap-4">
-            <div
-              className="h-12 w-12 shrink-0 rounded-full transition-all duration-700"
-              style={{
-                backgroundColor: step.light.warm ? "#ffb37a" : "#f5f1ec",
-                opacity: step.light.brightness / 100,
-                boxShadow: step.light.on
-                  ? `0 0 ${step.light.brightness / 2.5}px ${step.light.brightness / 6}px ${step.light.warm ? "#ffb37a55" : "#f5f1ec55"}`
-                  : "none",
-              }}
-              aria-hidden="true"
-            />
-            <div>
-              <p className="text-sm font-medium">{deviceLabel}</p>
-              <p className="text-xs text-ink-muted">
-                {step.light.warm ? `Warm · ${step.light.brightness}% brightness` : `Bright · ${step.light.brightness}% brightness`}
-              </p>
-            </div>
-          </div>
 
-          {scenario.steps.some((s) => s.playlist !== undefined) && (
-            <div
-              className={`mt-4 flex items-center gap-3 rounded-lg border px-3 py-2 transition-all duration-500 ${
-                step.playlist ? "border-line-strong bg-surface-raised opacity-100" : "border-line opacity-40"
-              }`}
-            >
-              <span className="h-2 w-2 shrink-0 rounded-full bg-brand" aria-hidden="true" />
+          {step.light && (
+            <div className="mt-3 flex items-center gap-4">
+              <div
+                className="h-12 w-12 shrink-0 rounded-full transition-all duration-700"
+                style={{
+                  backgroundColor: step.light.warm ? "#ffb37a" : "#f5f1ec",
+                  opacity: step.light.brightness / 100,
+                  boxShadow: step.light.on
+                    ? `0 0 ${step.light.brightness / 2.5}px ${step.light.brightness / 6}px ${step.light.warm ? "#ffb37a55" : "#f5f1ec55"}`
+                    : "none",
+                }}
+                aria-hidden="true"
+              />
               <div>
-                <p className="text-xs text-ink-muted">Spotify</p>
-                <p className="text-sm font-medium">{step.playlist ?? "No playback yet"}</p>
+                <p className="text-sm font-medium">{deviceLabel}</p>
+                <p className="text-xs text-ink-muted">
+                  {step.light.warm ? `Warm · ${step.light.brightness}% brightness` : `Bright · ${step.light.brightness}% brightness`}
+                </p>
               </div>
             </div>
           )}
 
-          {scenario.steps.some((s) => s.notification !== undefined) && (
-            <div
-              className={`mt-3 flex items-center gap-3 rounded-lg border px-3 py-2 transition-all duration-500 ${
-                step.notification ? "border-line-strong bg-surface-raised opacity-100" : "border-line opacity-40"
-              }`}
-            >
-              <span className="h-2 w-2 shrink-0 rounded-full bg-brand" aria-hidden="true" />
-              <div>
-                <p className="text-xs text-ink-muted">Notifications</p>
-                <p className="text-sm font-medium">{step.notification ?? "No change"}</p>
+          {chipLabels.map((label) => {
+            const chip = step.chips?.find((c) => c.label === label);
+            return (
+              <div
+                key={label}
+                className={`mt-3 flex items-center gap-3 rounded-lg border px-3 py-2 transition-all duration-500 ${
+                  chip?.value ? "border-line-strong bg-surface-raised opacity-100" : "border-line opacity-40"
+                }`}
+              >
+                <span className="h-2 w-2 shrink-0 rounded-full bg-brand" aria-hidden="true" />
+                <div>
+                  <p className="text-xs text-ink-muted">{label}</p>
+                  <p className="text-sm font-medium">{chip?.value ?? "No change yet"}</p>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })}
         </div>
       </div>
 

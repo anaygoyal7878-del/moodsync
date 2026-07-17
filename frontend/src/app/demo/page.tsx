@@ -22,12 +22,14 @@ export default function DemoPage() {
             Simulated data — no wearable or account required
           </p>
           <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-5xl">
-            Five automations, one intelligence layer
+            Nine automations, one intelligence layer
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-ink-secondary">
-            Each walkthrough below plays out a real MoodSync rule — a biometric or schedule condition, matched
-            against your wearable, driving your Hue lights, Spotify, and notifications. Every action shown is
-            something the product does today; the numbers are staged for the demo, not a live account.
+            Each walkthrough below plays out a MoodSync rule — a biometric or schedule condition, matched against
+            your wearable, driving your smart home. The first five run on real integrations shipping today (Hue,
+            Spotify, notifications); the rest are marked <span className="font-medium text-ink">Concept</span> —
+            product vision for capabilities MoodSync doesn&apos;t build against yet. The numbers are staged for the
+            demo either way, not a live account.
           </p>
           <nav className="mt-6 flex flex-wrap items-center justify-center gap-2" aria-label="Jump to a demo">
             {DEMO_SCENARIOS.map((scenario) => (
@@ -38,6 +40,7 @@ export default function DemoPage() {
               >
                 <span aria-hidden="true">{scenario.emoji}</span>
                 {scenario.title}
+                {scenario.concept && <span className="text-ink-muted">·concept</span>}
               </a>
             ))}
           </nav>
