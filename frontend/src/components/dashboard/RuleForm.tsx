@@ -71,16 +71,27 @@ const ACTION_TYPES = [
   { value: "hue.set_brightness", label: "Set a light's brightness", provider: "hue" },
   { value: "hue.set_color_temperature", label: "Set a light's color temperature", provider: "hue" },
   { value: "spotify.play_playlist", label: "Play a Spotify playlist", provider: "spotify" },
+  // No OAuth "connection" exists for this the way Hue/Spotify have one —
+  // HomeKit is device-side only (see docs/HOMEKIT_ARCHITECTURE.md), so
+  // this always queues for the iOS companion app rather than needing a
+  // connect step first.
+  { value: "homekit.activate_scene", label: "Activate a HomeKit scene (via iOS app)", provider: "homekit" },
 ] as const;
 
 type ActionType = (typeof ACTION_TYPES)[number]["value"];
 
-/** Six of the eight Decision Engine automation scenarios (see
+/** Seven of the eight Decision Engine automation scenarios (see
  * docs/DECISION_ENGINE_ARCHITECTURE.md) as selectable starting points —
  * still fully user-editable after applying, not hardcoded system rules.
- * Sleep Detection's lock/security check and Travel/away-mode are
- * deliberately absent: no smart lock, security, or location integration
- * exists in this codebase (see docs/DECISION_ENGINE_ROADMAP.md).
+ * Only Travel/away-mode is absent: no location integration exists in
+ * this codebase (see docs/DECISION_ENGINE_ROADMAP.md). Sleep Detection
+ * is here as a HomeKit scene activation — it can't automatically confirm
+ * lock/security state (see docs/HOMEKIT_ARCHITECTURE.md and the real
+ * CheckSecurityIntent voice command for why), but activating a
+ * user-configured "MoodSync Sleep" scene (which can itself include
+ * locking a HomeKit-compatible lock, if the user built the scene that
+ * way) plus the automatic notification every dispatch outcome already
+ * generates is the real, honest version of this scenario.
  *
  * Each template uses a single condition to fit this form's current
  * single-condition builder, even where the underlying rule shape
@@ -165,6 +176,24 @@ const TEMPLATES = [
     priority: "60",
     timeWindow: null,
   },
+  {
+    id: "sleep-detected",
+    label: "Sleep Detected — activate your bedtime HomeKit scene",
+    name: "Sleep Detected",
+    // A new sleepScore only appears once a sleep session has completed
+    // and synced — the closest real proxy this schema has for "the user
+    // fell asleep" (there's no live "currently asleep" boolean from any
+    // provider). See docs/HOMEKIT_ARCHITECTURE.md/docs/DECISION_ENGINE_ROADMAP.md
+    // for why this can't also auto-confirm locks — that's CheckSecurityIntent's job.
+    field: "sleepScore" as const,
+    operator: "gte" as const,
+    value: "0",
+    actionType: "homekit.activate_scene" as ActionType,
+    sceneName: "MoodSync Sleep",
+    cooldownMinutes: "480",
+    priority: "80",
+    timeWindow: null,
+  },
 ] as const;
 
 const selectClass =
@@ -190,6 +219,7 @@ export function RuleForm({
   const [brightness, setBrightness] = useState("40");
   const [mirek, setMirek] = useState("370");
   const [playlistUri, setPlaylistUri] = useState("");
+  const [sceneName, setSceneName] = useState("");
   const [cooldownMinutes, setCooldownMinutes] = useState("30");
   const [priority, setPriority] = useState("50");
   const [timeWindowEnabled, setTimeWindowEnabled] = useState(false);
@@ -213,6 +243,7 @@ export function RuleForm({
     setActionType(template.actionType);
     if ("brightness" in template) setBrightness(template.brightness);
     if ("mirek" in template) setMirek(template.mirek);
+    if ("sceneName" in template) setSceneName(template.sceneName);
     setCooldownMinutes(template.cooldownMinutes);
     setPriority(template.priority);
     setTimeWindowEnabled(template.timeWindow !== null);
@@ -237,6 +268,8 @@ export function RuleForm({
         return { deviceId, mirek: Number(mirek) };
       case "spotify.play_playlist":
         return { playlistUri };
+      case "homekit.activate_scene":
+        return { sceneName };
     }
   }
 
@@ -412,12 +445,29 @@ export function RuleForm({
           ) : (
             <span className="text-xs text-ink-muted">Connect Spotify first</span>
           ))}
+
+        {actionType === "homekit.activate_scene" && (
+          <Input
+            placeholder='Scene name, e.g. "MoodSync Relax"'
+            value={sceneName}
+            onChange={(e) => setSceneName(e.target.value)}
+            required
+          />
+        )}
       </div>
 
       {actionType === "spotify.play_playlist" && (
         <p className="text-xs text-ink-muted">
           Requires Spotify Premium and an already-active Spotify session on some device — playback can&apos;t be
           started remotely on a free account or when nothing is open.
+        </p>
+      )}
+
+      {actionType === "homekit.activate_scene" && (
+        <p className="text-xs text-ink-muted">
+          Must exactly match a scene you&apos;ve already created in Apple&apos;s Home app — MoodSync can only
+          activate existing scenes, not create or control individual accessories. Runs the next time you open the
+          MoodSync companion app on your iPhone, not instantly (see the HomeKit developer guide for why).
         </p>
       )}
 
