@@ -1,16 +1,10 @@
 import Link from "next/link";
 import { backendFetch } from "@/lib/api";
-import { buildHomeInsights } from "@/lib/homeInsights";
-import { WelcomeBanner } from "@/components/dashboard/WelcomeBanner";
-import { SearchBar } from "@/components/dashboard/SearchBar";
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { RecentActivity } from "@/components/dashboard/RecentActivity";
-import { MetricTile } from "@/components/dashboard/MetricTile";
-import { HeartRatePulse } from "@/components/dashboard/HeartRatePulse";
-import { WellnessTimeline } from "@/components/dashboard/WellnessTimeline";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Cpu, Zap, Wand2 } from "lucide-react";
+import { LuxuryWeekBars } from "@/components/luxury/LuxuryWeekBars";
+import { LuxuryActivityRow } from "@/components/luxury/LuxuryActivityRow";
+import { iconForRuleName } from "@/lib/activityDisplay";
+import { Zap, Cpu, Wand2, TrendingUp, TrendingDown } from "lucide-react";
 import type {
   WellnessResponse,
   InsightsResponse,
@@ -21,144 +15,193 @@ import type {
 } from "@/lib/types";
 import type { NormalizedBiometricReading } from "@moodsync/shared";
 
-interface MeResponse {
-  displayName: string | null;
-  email: string;
-}
-
-/** The same per-metric wellness-state color mapping WellnessScoreCard
- * uses (see that file's doc comment) — kept in sync manually since this
- * grid is a different, smaller subset of the same scores, not a shared
- * component. */
-const SCORE_MOOD: Record<string, string> = {
-  stress: "text-mood-energy",
-  recovery: "text-mood-recovery",
-  sleep: "text-mood-sleep",
-  energy: "text-mood-energy",
-  focus: "text-mood-focus",
-};
-
+/** Home page — ported from the Superdesign project's Dashboard draft
+ * (project 4f734257-…). Same fetches the classic /dashboard used, just
+ * restyled: the hero card shows the real overall wellness score and a
+ * real "vs recent average" delta (see lib/homeInsights.ts's phrasing
+ * convention) instead of the draft's fabricated "+15% from yesterday";
+ * the week bars use real per-day recovery scores instead of an
+ * invented "mood" series; the activity feed is the same real automation
+ * history RecentActivity.tsx renders on the classic dashboard. */
 export default async function DashboardHomePage() {
-  const [
-    meResult,
-    wellnessResult,
-    insightsResult,
-    latestResult,
-    historyResult,
-    connectionsResult,
-    rulesResult,
-    recommendationsResult,
-    automationHistoryResult,
-    pauseResult,
-  ] = await Promise.all([
-    backendFetch<MeResponse>("/api/me"),
-    backendFetch<WellnessResponse>("/api/wellness"),
-    backendFetch<InsightsResponse>("/api/insights?days=14"),
-    backendFetch<{ reading: NormalizedBiometricReading | null }>("/api/biometrics/latest"),
-    backendFetch<{ readings: NormalizedBiometricReading[] }>("/api/biometrics/history?days=7"),
-    backendFetch<ConnectionsResponse>("/api/connections"),
-    backendFetch<{ rules: AutomationRuleDefinition[] }>("/api/automation-rules"),
-    backendFetch<{ recommendations: RecommendationEntry[] }>("/api/recommendations"),
-    backendFetch<{ entries: AutomationHistoryEntry[] }>("/api/automation-history?limit=10"),
-    backendFetch<{ pausedUntil: string | null; isPaused: boolean }>("/api/preferences/automation-pause"),
-  ]);
+  const [wellnessResult, insightsResult, historyResult, connectionsResult, rulesResult, recommendationsResult, automationHistoryResult, pauseResult] =
+    await Promise.all([
+      backendFetch<WellnessResponse>("/api/wellness"),
+      backendFetch<InsightsResponse>("/api/insights?days=14"),
+      backendFetch<{ readings: NormalizedBiometricReading[] }>("/api/biometrics/history?days=7"),
+      backendFetch<ConnectionsResponse>("/api/connections"),
+      backendFetch<{ rules: AutomationRuleDefinition[] }>("/api/automation-rules"),
+      backendFetch<{ recommendations: RecommendationEntry[] }>("/api/recommendations"),
+      backendFetch<{ entries: AutomationHistoryEntry[] }>("/api/automation-history?limit=10"),
+      backendFetch<{ pausedUntil: string | null; isPaused: boolean }>("/api/preferences/automation-pause"),
+    ]);
 
-  const name = (meResult.ok ? meResult.data.displayName : null) ?? (meResult.ok ? meResult.data.email.split("@")[0] : "there");
   const scores = wellnessResult.ok ? wellnessResult.data.scores : null;
   const wellnessTrends = insightsResult.ok ? insightsResult.data.wellnessTrends : [];
-  const insights = buildHomeInsights(wellnessTrends);
-  const latestReading = latestResult.ok ? latestResult.data.reading : null;
+  const overallTrend = wellnessTrends.find((t) => t.metric === "overall");
   const history = historyResult.ok ? historyResult.data.readings : [];
   const connections: ConnectionsResponse = connectionsResult.ok ? connectionsResult.data : { wearables: [], smartHome: [] };
-  const allDevices = connections.smartHome.flatMap((c) => c.devices);
-  const deviceCount = allDevices.length;
+  const deviceCount = connections.smartHome.flatMap((c) => c.devices).length;
   const rules = rulesResult.ok ? rulesResult.data.rules : [];
   const activeRuleCount = rules.filter((r) => r.enabled).length;
   const topRecommendation = recommendationsResult.ok
     ? recommendationsResult.data.recommendations.find((r) => r.status === "PENDING")
     : undefined;
   const automationHistory = automationHistoryResult.ok ? automationHistoryResult.data.entries : [];
+  const recentActivity = automationHistory.filter((h) => h.outcome === "EXECUTED" || h.outcome === "QUEUED_FOR_DEVICE").slice(0, 5);
   const isPaused = pauseResult.ok ? pauseResult.data.isPaused : false;
 
   return (
-    <div className="flex flex-col gap-8">
-      <SearchBar rules={rules} devices={allDevices} />
-
-      <WelcomeBanner name={name ?? "there"} insights={insights} />
-
-      <QuickActions isPaused={isPaused} />
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Today</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <MetricTile label="Overall wellness" value={scores?.overall.value ?? null} />
-          <MetricTile label="Recovery" value={scores?.recovery.value ?? null} moodClassName={SCORE_MOOD.recovery} />
-          <MetricTile label="Stress" value={scores?.stress.value ?? null} moodClassName={SCORE_MOOD.stress} />
-          <MetricTile label="Sleep" value={scores?.sleep.value ?? null} moodClassName={SCORE_MOOD.sleep} />
-          <MetricTile label="Energy" value={scores?.energy.value ?? null} moodClassName={SCORE_MOOD.energy} />
-          <MetricTile label="Focus" value={scores?.focus.value ?? null} moodClassName={SCORE_MOOD.focus} />
-          <MetricTile label="Heart rate" value={latestReading?.heartRate ?? null} unit="bpm" />
-          <MetricTile
-            label="HRV"
-            value={latestReading?.heartRateVariability ? Math.round(latestReading.heartRateVariability) : null}
-            unit="ms"
-          />
+    <div className="flex flex-col gap-5">
+      {/* Wellness Hero Card */}
+      <section
+        className="lux-stagger-1 relative overflow-hidden rounded-[26px] p-6"
+        style={{
+          background: "linear-gradient(160deg, #241a2c 0%, #1d1622 55%, #171220 100%)",
+          border: "1px solid var(--lux-hairline-gold)",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+        }}
+      >
+        <div className="relative mb-5 flex items-center justify-between">
+          <span className="text-[12px] tracking-wide" style={{ color: "var(--lux-muted)" }}>
+            Overall wellness
+          </span>
+          {overallTrend && overallTrend.direction !== "flat" && (
+            <span
+              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium"
+              style={{
+                background: overallTrend.direction === "up" ? "rgba(95,184,120,0.15)" : "rgba(217,168,200,0.15)",
+                color: overallTrend.direction === "up" ? "var(--lux-sage)" : "var(--lux-rose)",
+              }}
+            >
+              {overallTrend.direction === "up" ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+              {Math.round(Math.abs(overallTrend.delta))} pts vs. recent average
+            </span>
+          )}
         </div>
-        <Link href="/dashboard/wellness" className="text-xs text-ink-secondary underline-offset-2 hover:underline">
-          See every score and how it&apos;s calculated →
-        </Link>
+        <div className="relative flex items-end justify-between pt-1">
+          <div className="flex items-baseline gap-1">
+            <span className="font-luxury-display tabular text-[42px] font-semibold" style={{ color: "var(--lux-ink)" }}>
+              {scores?.overall.value ?? "—"}
+            </span>
+            <span className="tabular text-[16px]" style={{ color: "var(--lux-muted)" }}>
+              /100
+            </span>
+          </div>
+          <Link
+            href="/dashboard/wellness"
+            className="text-[12px] font-medium"
+            style={{ color: "var(--lux-sage)" }}
+          >
+            See breakdown →
+          </Link>
+        </div>
       </section>
 
-      {latestReading?.heartRate !== undefined && <HeartRatePulse latest={latestReading} />}
+      <div className="lux-stagger-2">
+        <QuickActions isPaused={isPaused} luxury />
+      </div>
 
-      <RecentActivity history={automationHistory} />
+      {/* Wellness Pattern */}
+      <section
+        className="lux-stagger-3 rounded-[24px] p-5"
+        style={{ background: "var(--lux-bg-card)", border: "1px solid var(--lux-hairline)" }}
+      >
+        <h2 className="font-luxury-display text-[16px] font-semibold" style={{ color: "var(--lux-ink)" }}>
+          Recovery Pattern
+        </h2>
+        <p className="mb-4 text-[12px]" style={{ color: "var(--lux-muted)" }}>
+          Last 7 days
+        </p>
+        <LuxuryWeekBars history={history} />
+      </section>
 
-      <WellnessTimeline history={history} />
+      {recentActivity.length > 0 && (
+        <section className="lux-stagger-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="font-luxury-display text-[16px] font-semibold" style={{ color: "var(--lux-ink)" }}>
+              Recent Activity
+            </h2>
+            <Link href="/dashboard/automation" className="text-[13px] font-medium" style={{ color: "var(--lux-sage)" }}>
+              See all
+            </Link>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {recentActivity.map((entry) => (
+              <LuxuryActivityRow key={entry.id} entry={entry} icon={iconForRuleName(entry.rule.name)} />
+            ))}
+          </div>
+        </section>
+      )}
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Link href="/dashboard/automation">
-          <Card className="flex h-full items-center gap-3 py-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-raised text-brand">
-              <Zap size={16} aria-hidden="true" />
-            </span>
-            <div>
-              <p className="text-lg font-semibold tabular-nums">{activeRuleCount}</p>
-              <p className="text-xs text-ink-secondary">Active automation{activeRuleCount === 1 ? "" : "s"}</p>
-            </div>
-          </Card>
+      <section className="lux-stagger-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Link
+          href="/dashboard/automation"
+          className="flex items-center gap-3 rounded-[20px] p-4"
+          style={{ background: "var(--lux-bg-card)", border: "1px solid var(--lux-hairline)" }}
+        >
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+            style={{ background: "var(--lux-bg-card-2)", color: "var(--lux-sage)" }}
+          >
+            <Zap size={16} aria-hidden="true" />
+          </span>
+          <div>
+            <p className="tabular text-[18px] font-semibold" style={{ color: "var(--lux-ink)" }}>
+              {activeRuleCount}
+            </p>
+            <p className="text-[12px]" style={{ color: "var(--lux-muted)" }}>
+              Active automation{activeRuleCount === 1 ? "" : "s"}
+            </p>
+          </div>
         </Link>
-        <Link href="/dashboard/devices">
-          <Card className="flex h-full items-center gap-3 py-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-raised text-brand">
-              <Cpu size={16} aria-hidden="true" />
-            </span>
-            <div>
-              <p className="text-lg font-semibold tabular-nums">{deviceCount}</p>
-              <p className="text-xs text-ink-secondary">Connected device{deviceCount === 1 ? "" : "s"}</p>
-            </div>
-          </Card>
+        <Link
+          href="/dashboard/devices"
+          className="flex items-center gap-3 rounded-[20px] p-4"
+          style={{ background: "var(--lux-bg-card)", border: "1px solid var(--lux-hairline)" }}
+        >
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+            style={{ background: "var(--lux-bg-card-2)", color: "var(--lux-sage)" }}
+          >
+            <Cpu size={16} aria-hidden="true" />
+          </span>
+          <div>
+            <p className="tabular text-[18px] font-semibold" style={{ color: "var(--lux-ink)" }}>
+              {deviceCount}
+            </p>
+            <p className="text-[12px]" style={{ color: "var(--lux-muted)" }}>
+              Connected device{deviceCount === 1 ? "" : "s"}
+            </p>
+          </div>
         </Link>
-        <Link href="/dashboard/recommendations">
-          <Card className="flex h-full items-start gap-3 py-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-raised text-brand">
-              <Wand2 size={16} aria-hidden="true" />
-            </span>
-            <div>
-              {topRecommendation ? (
-                <>
-                  <p className="text-sm font-medium">{topRecommendation.title}</p>
-                  <p className="mt-0.5 line-clamp-2 text-xs text-ink-secondary">{topRecommendation.description}</p>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm font-medium">No recommendations right now</p>
-                  <Badge variant="neutral" className="mt-1">
-                    Check back later
-                  </Badge>
-                </>
-              )}
-            </div>
-          </Card>
+        <Link
+          href="/dashboard/recommendations"
+          className="flex items-start gap-3 rounded-[20px] p-4"
+          style={{ background: "var(--lux-bg-card)", border: "1px solid var(--lux-hairline)" }}
+        >
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+            style={{ background: "var(--lux-bg-card-2)", color: "var(--lux-gold)" }}
+          >
+            <Wand2 size={16} aria-hidden="true" />
+          </span>
+          <div>
+            {topRecommendation ? (
+              <>
+                <p className="text-[14px] font-medium" style={{ color: "var(--lux-ink)" }}>
+                  {topRecommendation.title}
+                </p>
+                <p className="mt-0.5 line-clamp-2 text-[12px]" style={{ color: "var(--lux-muted)" }}>
+                  {topRecommendation.description}
+                </p>
+              </>
+            ) : (
+              <p className="text-[14px] font-medium" style={{ color: "var(--lux-ink)" }}>
+                No recommendations right now
+              </p>
+            )}
+          </div>
         </Link>
       </section>
     </div>

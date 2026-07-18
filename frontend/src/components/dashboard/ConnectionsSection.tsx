@@ -1,40 +1,12 @@
 import type { ReactNode } from "react";
-import { HeartPulse, Apple, Watch, Lightbulb, Music, Mic } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { DisconnectButton } from "./DisconnectButton";
 import { SyncButton } from "./SyncButton";
 import { ConnectionStatusBadge, needsReconnect } from "./ConnectionStatusBadge";
 import { ALEXA_VOICE_COMMANDS } from "@/lib/alexaCommands";
+import { WEARABLE_LABELS, SMART_HOME_LABELS, PROVIDER_ICONS } from "@/lib/providerDisplay";
 import type { ConnectionsResponse, WearableConnectionSummary, SmartHomeConnectionSummary } from "@/lib/types";
-
-const WEARABLE_LABELS: Record<string, string> = {
-  WHOOP: "WHOOP",
-  GOOGLE_HEALTH: "Fitbit",
-  GARMIN: "Garmin",
-  APPLE_HEALTH: "Apple Health",
-  AMAZFIT: "Amazfit",
-};
-const SMART_HOME_LABELS: Record<string, string> = {
-  HUE: "Philips Hue",
-  SPOTIFY: "Spotify",
-  ECOBEE: "Ecobee",
-  ALEXA: "Amazon Alexa",
-};
-
-/** Neutral category pictograms, not brand marks — lucide has no literal
- * WHOOP/Fitbit/Hue/etc. logos, so these represent the provider's
- * category (wearable, smart light, music, voice) alongside the existing
- * text label, never replacing it. */
-const PROVIDER_ICONS: Record<string, typeof HeartPulse> = {
-  WHOOP: HeartPulse,
-  GOOGLE_HEALTH: HeartPulse,
-  APPLE_HEALTH: Apple,
-  AMAZFIT: Watch,
-  HUE: Lightbulb,
-  SPOTIFY: Music,
-  ALEXA: Mic,
-};
 
 function ProviderIcon({ provider }: { provider: string }) {
   const Icon = PROVIDER_ICONS[provider];

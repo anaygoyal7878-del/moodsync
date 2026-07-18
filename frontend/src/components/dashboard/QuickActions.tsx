@@ -30,19 +30,33 @@ function CircleButton({
   onClick,
   href,
   disabled,
+  luxury,
 }: {
   icon: typeof Wind;
   label: string;
   onClick?: () => void;
   href?: string;
   disabled?: boolean;
+  luxury?: boolean;
 }) {
   const inner = (
     <>
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-raised text-brand transition-transform active:scale-90">
+      <span
+        className={
+          luxury
+            ? "flex h-14 w-14 items-center justify-center rounded-full transition-transform active:scale-90"
+            : "flex h-14 w-14 items-center justify-center rounded-full bg-surface-raised text-brand transition-transform active:scale-90"
+        }
+        style={luxury ? { background: "var(--lux-bg-card-2)", color: "var(--lux-sage)" } : undefined}
+      >
         <Icon size={22} aria-hidden="true" />
       </span>
-      <span className="text-xs font-medium text-ink-secondary">{label}</span>
+      <span
+        className={luxury ? "text-xs font-medium" : "text-xs font-medium text-ink-secondary"}
+        style={luxury ? { color: "var(--lux-ink)" } : undefined}
+      >
+        {label}
+      </span>
     </>
   );
 
@@ -62,7 +76,7 @@ function CircleButton({
   );
 }
 
-export function QuickActions({ isPaused }: { isPaused: boolean }) {
+export function QuickActions({ isPaused, luxury }: { isPaused: boolean; luxury?: boolean }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
@@ -79,7 +93,12 @@ export function QuickActions({ isPaused }: { isPaused: boolean }) {
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Quick actions</h2>
+      <h2
+        className={luxury ? "font-luxury-display text-[16px] font-semibold" : "text-sm font-semibold uppercase tracking-wide text-ink-muted"}
+        style={luxury ? { color: "var(--lux-ink)" } : undefined}
+      >
+        Quick actions
+      </h2>
       <div className="flex gap-5 overflow-x-auto pb-1">
         {TEMPLATE_ACTIONS.map((action) => (
           <CircleButton
@@ -87,15 +106,17 @@ export function QuickActions({ isPaused }: { isPaused: boolean }) {
             icon={action.icon}
             label={action.label}
             href={`/dashboard/automation?template=${action.templateId}`}
+            luxury={luxury}
           />
         ))}
-        <CircleButton icon={Cpu} label="Devices" href="/dashboard/devices" />
-        <CircleButton icon={Plus} label="New rule" href="/dashboard/automation" />
+        <CircleButton icon={Cpu} label="Devices" href="/dashboard/devices" luxury={luxury} />
+        <CircleButton icon={Plus} label="New rule" href="/dashboard/automation" luxury={luxury} />
         <CircleButton
           icon={OctagonPause}
           label={isPaused ? "Resume" : "Emergency Stop"}
           onClick={toggleEmergencyStop}
           disabled={pending}
+          luxury={luxury}
         />
       </div>
     </section>

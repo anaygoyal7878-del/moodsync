@@ -279,3 +279,71 @@ body {
     animation: ambient-drift 18s ease-in-out infinite;
   }
 }
+
+/* Ported from the MoodSync Superdesign project (project 4f734257-…).
+ * Scoped under .ms-luxury rather than merged into :root — only the
+ * mobile-app-style Home/Insights/Profile pages use this palette; every
+ * other route keeps the earthy --brand/--surface system above. Values
+ * are copied verbatim from the design draft's :root block. */
+.ms-luxury {
+  --lux-bg-ground: #141018;
+  --lux-bg-card: #211b28;
+  --lux-bg-card-2: #2a2332;
+  --lux-hairline: rgba(255, 255, 255, 0.07);
+  --lux-hairline-gold: rgba(212, 175, 120, 0.18);
+  --lux-sage: #5fb878;
+  --lux-gold: #d4af78;
+  --lux-rose: #d9a8c8;
+  --lux-ink: #f6f3f8;
+  --lux-muted: #9d94a8;
+  background: var(--lux-bg-ground);
+  color: var(--lux-ink);
+  font-family: var(--font-inter), sans-serif;
+}
+
+.ms-luxury .font-luxury-display {
+  font-family: var(--font-space-grotesk), sans-serif;
+}
+
+
+.ms-luxury .tabular {
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes lux-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ms-luxury .lux-stagger-1 {
+  animation: lux-fade-up 0.5s ease 0.05s both;
+}
+.ms-luxury .lux-stagger-2 {
+  animation: lux-fade-up 0.5s ease 0.12s both;
+}
+.ms-luxury .lux-stagger-3 {
+  animation: lux-fade-up 0.5s ease 0.19s both;
+}
+.ms-luxury .lux-stagger-4 {
+  animation: lux-fade-up 0.5s ease 0.26s both;
+}
+.ms-luxury .lux-stagger-5 {
+  animation: lux-fade-up 0.5s ease 0.33s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-luxury .lux-stagger-1,
+  .ms-luxury .lux-stagger-2,
+  .ms-luxury .lux-stagger-3,
+  .ms-luxury .lux-stagger-4,
+  .ms-luxury .lux-stagger-5 {
+    animation: none;
+  }
+}
