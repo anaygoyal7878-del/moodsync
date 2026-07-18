@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 function timeOfDayGreeting(hour: number): string {
   if (hour < 5) return "Good night";
   if (hour < 12) return "Good morning";
@@ -17,23 +15,21 @@ function timeOfDayGreeting(hour: number): string {
  * looking at right now rather than the server's or a stored timezone's
  * clock. */
 export function WelcomeBanner({ name, insights }: { name: string; insights: string[] }) {
-  // Lazy initializer (not an effect) — this only needs to compute once
-  // per mount, not subscribe to ongoing changes, so there's no reason to
-  // pay for a second render just to set it. `typeof window` gates the
-  // server-render pass (which has no real "now" to read) the same way
-  // usePrefersReducedMotion.ts does for its own client-only value.
-  const [greeting] = useState<string | null>(() =>
-    typeof window !== "undefined" ? timeOfDayGreeting(new Date().getHours()) : null,
-  );
+  // Computed fresh every render rather than cached in state: the server
+  // render and the client's first render read the clock at slightly
+  // different instants, which can disagree right at an hour boundary —
+  // suppressHydrationWarning tells React that's expected for this one
+  // text node instead of discarding the whole SSR-ed tree over it.
+  const greeting = timeOfDayGreeting(new Date().getHours());
 
   return (
     <div className="animate-fade-in-up flex flex-col gap-1.5">
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
         Welcome back, {name} <span aria-hidden="true">👋</span>
       </h1>
-      {/* Reserves the line's height even before the client-only greeting
-       * resolves, so nothing shifts layout on hydration. */}
-      <p className="min-h-[1.5em] text-ink-secondary">{greeting ?? " "}</p>
+      <p className="min-h-[1.5em] text-ink-secondary" suppressHydrationWarning>
+        {greeting}
+      </p>
       {insights.length > 0 && (
         <ul className="mt-2 flex flex-col gap-1 text-sm text-ink-secondary">
           {insights.map((line) => (

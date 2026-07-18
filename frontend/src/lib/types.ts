@@ -47,6 +47,7 @@ export type AutomationOutcome =
   | "SKIPPED_CONFLICT"
   | "SKIPPED_MANUAL_PAUSE"
   | "SKIPPED_SAFETY_RATE_LIMIT"
+  | "QUEUED_FOR_DEVICE"
   | "FAILED";
 
 export interface AutomationHistoryEntry {

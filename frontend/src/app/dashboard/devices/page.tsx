@@ -7,7 +7,6 @@ export default async function DevicesPage() {
   const connections: ConnectionsResponse = connectionsResult.ok
     ? connectionsResult.data
     : { wearables: [], smartHome: [] };
-  const devices = connections.smartHome.flatMap((c) => c.devices);
 
-  return <DevicesSection devices={devices} />;
+  return <DevicesSection smartHome={connections.smartHome} />;
 }

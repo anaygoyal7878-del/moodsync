@@ -3,6 +3,7 @@ import { BACKEND_API_URL } from "@/lib/env";
 import { getAccessToken } from "@/lib/session";
 import { TimezoneSync } from "@/components/dashboard/TimezoneSync";
 import { Sidebar } from "@/components/dashboard/Sidebar";
+import { BottomTabBar } from "@/components/dashboard/BottomTabBar";
 
 interface MeResponse {
   id: string;
@@ -25,9 +26,11 @@ async function fetchCurrentUser(): Promise<MeResponse | null> {
 }
 
 /** Shared across every /dashboard/* route: auth gate + the persistent
- * app shell (a fixed left sidebar on desktop, a horizontal strip on
- * narrow viewports — see Sidebar.tsx) — each page below only fetches and
- * renders its own feature's data. */
+ * app shell. Two navigation components, each hidden by CSS on the
+ * viewport it doesn't own — Sidebar.tsx (`hidden sm:flex`, a fixed left
+ * rail) on desktop, BottomTabBar.tsx (`sm:hidden`, a fixed iOS-style tab
+ * bar) on mobile — rather than one component trying to be both shapes.
+ * Each page below only fetches and renders its own feature's data. */
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await fetchCurrentUser();
   if (!user) redirect("/login");
@@ -36,9 +39,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="flex min-h-screen flex-1 flex-col sm:flex-row">
       <TimezoneSync serverTimezone={user.timezone} />
       <Sidebar email={user.email} />
-      <main className="flex-1 overflow-x-hidden px-4 py-8 sm:px-8 sm:py-10">
+      <main className="flex-1 overflow-x-hidden px-4 py-8 pb-24 sm:px-8 sm:py-10 sm:pb-10">
         <div className="mx-auto flex max-w-5xl flex-col gap-8">{children}</div>
       </main>
+      <BottomTabBar />
     </div>
   );
 }

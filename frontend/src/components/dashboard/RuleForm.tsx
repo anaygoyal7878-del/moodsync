@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Switch } from "@/components/ui/Switch";
+import { ACTION_TYPES, TEMPLATES, type ActionType } from "@/lib/ruleTemplates";
 import type { DeviceSummary } from "@/lib/types";
 
 const BIOMETRIC_FIELDS = [
@@ -64,141 +65,6 @@ const OPERATORS = [
   { value: "eq", label: "equals" },
 ] as const;
 
-// notification.* is modeled in the schema (Milestone 4) but has no
-// dedicated executor — every dispatch outcome now generates a real
-// notification automatically instead (see ai/src/dispatch.ts /
-// ai/src/notificationExecutor.ts), so surfacing a notification-only
-// action type still isn't useful here.
-const ACTION_TYPES = [
-  { value: "hue.set_scene", label: "Activate a Hue scene", provider: "hue" },
-  { value: "hue.set_brightness", label: "Set a light's brightness", provider: "hue" },
-  { value: "hue.set_color_temperature", label: "Set a light's color temperature", provider: "hue" },
-  { value: "spotify.play_playlist", label: "Play a Spotify playlist", provider: "spotify" },
-  // No OAuth "connection" exists for this the way Hue/Spotify have one —
-  // HomeKit is device-side only (see docs/HOMEKIT_ARCHITECTURE.md), so
-  // this always queues for the iOS companion app rather than needing a
-  // connect step first.
-  { value: "homekit.activate_scene", label: "Activate a HomeKit scene (via iOS app)", provider: "homekit" },
-] as const;
-
-type ActionType = (typeof ACTION_TYPES)[number]["value"];
-
-/** Seven of the eight Decision Engine automation scenarios (see
- * docs/DECISION_ENGINE_ARCHITECTURE.md) as selectable starting points —
- * still fully user-editable after applying, not hardcoded system rules.
- * Only Travel/away-mode is absent: no location integration exists in
- * this codebase (see docs/DECISION_ENGINE_ROADMAP.md). Sleep Detection
- * is here as a HomeKit scene activation — it can't automatically confirm
- * lock/security state (see docs/HOMEKIT_ARCHITECTURE.md and the real
- * CheckSecurityIntent voice command for why), but activating a
- * user-configured "MoodSync Sleep" scene (which can itself include
- * locking a HomeKit-compatible lock, if the user built the scene that
- * way) plus the automatic notification every dispatch outcome already
- * generates is the real, honest version of this scenario.
- *
- * Each template uses a single condition to fit this form's current
- * single-condition builder, even where the underlying rule shape
- * (`RuleCondition[]`) supports ANDing several — a real simplification,
- * not a claim that e.g. "Elevated Stress" checks HRV too. */
-const TEMPLATES = [
-  {
-    id: "elevated-stress",
-    label: "Elevated Stress — dim & calm when heart rate spikes",
-    name: "Elevated Stress",
-    field: "heartRate" as const,
-    operator: "gt" as const,
-    value: "95",
-    actionType: "hue.set_color_temperature" as ActionType,
-    mirek: "450",
-    cooldownMinutes: "30",
-    priority: "70",
-    timeWindow: null as { start: string; end: string } | null,
-  },
-  {
-    id: "focus-mode",
-    label: "Focus Mode — bright & cool during work hours",
-    name: "Focus Mode",
-    field: "heartRate" as const,
-    operator: "gt" as const,
-    value: "0",
-    actionType: "hue.set_color_temperature" as ActionType,
-    mirek: "250",
-    cooldownMinutes: "60",
-    priority: "50",
-    timeWindow: { start: "09:00", end: "17:00" },
-  },
-  {
-    id: "sleep-preparation",
-    label: "Sleep Preparation — dim & warm before bed",
-    name: "Sleep Preparation",
-    field: "heartRate" as const,
-    operator: "gt" as const,
-    value: "0",
-    actionType: "hue.set_color_temperature" as ActionType,
-    mirek: "454",
-    cooldownMinutes: "1440",
-    priority: "80",
-    timeWindow: { start: "21:30", end: "22:30" },
-  },
-  {
-    id: "wake-up",
-    label: "Wake Up — gentle brightness ramp in the morning",
-    name: "Wake Up",
-    field: "heartRate" as const,
-    operator: "gt" as const,
-    value: "0",
-    actionType: "hue.set_brightness" as ActionType,
-    brightness: "20",
-    cooldownMinutes: "1440",
-    priority: "60",
-    timeWindow: { start: "06:00", end: "08:00" },
-  },
-  {
-    id: "workout",
-    label: "Workout — energizing scene when heart rate is high",
-    name: "Workout",
-    field: "heartRate" as const,
-    operator: "gt" as const,
-    value: "120",
-    actionType: "hue.set_brightness" as ActionType,
-    brightness: "100",
-    cooldownMinutes: "20",
-    priority: "70",
-    timeWindow: null,
-  },
-  {
-    id: "recovery",
-    label: "Recovery — lower-intensity scene after activity",
-    name: "Recovery",
-    field: "activityLevel" as const,
-    operator: "gte" as const,
-    value: "60",
-    actionType: "hue.set_brightness" as ActionType,
-    brightness: "35",
-    cooldownMinutes: "60",
-    priority: "60",
-    timeWindow: null,
-  },
-  {
-    id: "sleep-detected",
-    label: "Sleep Detected — activate your bedtime HomeKit scene",
-    name: "Sleep Detected",
-    // A new sleepScore only appears once a sleep session has completed
-    // and synced — the closest real proxy this schema has for "the user
-    // fell asleep" (there's no live "currently asleep" boolean from any
-    // provider). See docs/HOMEKIT_ARCHITECTURE.md/docs/DECISION_ENGINE_ROADMAP.md
-    // for why this can't also auto-confirm locks — that's CheckSecurityIntent's job.
-    field: "sleepScore" as const,
-    operator: "gte" as const,
-    value: "0",
-    actionType: "homekit.activate_scene" as ActionType,
-    sceneName: "MoodSync Sleep",
-    cooldownMinutes: "480",
-    priority: "80",
-    timeWindow: null,
-  },
-] as const;
-
 export function RuleForm({
   devices,
   spotifyConnected,
@@ -209,22 +75,41 @@ export function RuleForm({
   onCreated?: () => void;
 }) {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [field, setField] = useState<(typeof BIOMETRIC_FIELDS)[number] | (typeof WELLNESS_FIELDS)[number]>("recoveryScore");
-  const [operator, setOperator] = useState<(typeof OPERATORS)[number]["value"]>("lt");
-  const [value, setValue] = useState("50");
-  const [actionType, setActionType] = useState<ActionType>("hue.set_brightness");
+  const searchParams = useSearchParams();
+  // Lets QuickActions.tsx (the dashboard home's one-tap shortcuts) deep-link
+  // straight into a pre-filled form via `?template=<id>` instead of
+  // guessing at a device and submitting blind — see ruleTemplates.ts's
+  // doc comment for why a silent submit isn't honest here (Hue actions
+  // need a real deviceId this page doesn't know without the user picking
+  // one). Read once, directly in render (not an effect calling setState,
+  // which would trigger an avoidable extra render) — every field below
+  // seeds its own initial state from this same lookup.
+  const deepLinkedTemplate = TEMPLATES.find((t) => t.id === searchParams.get("template"));
+
+  const [name, setName] = useState<string>(deepLinkedTemplate?.name ?? "");
+  const [field, setField] = useState<(typeof BIOMETRIC_FIELDS)[number] | (typeof WELLNESS_FIELDS)[number]>(
+    deepLinkedTemplate?.field ?? "recoveryScore",
+  );
+  const [operator, setOperator] = useState<(typeof OPERATORS)[number]["value"]>(deepLinkedTemplate?.operator ?? "lt");
+  const [value, setValue] = useState<string>(deepLinkedTemplate?.value ?? "50");
+  const [actionType, setActionType] = useState<ActionType>(deepLinkedTemplate?.actionType ?? "hue.set_brightness");
   const [deviceId, setDeviceId] = useState(devices[0]?.externalDeviceId ?? "");
   const [sceneId, setSceneId] = useState("");
-  const [brightness, setBrightness] = useState("40");
-  const [mirek, setMirek] = useState("370");
+  const [brightness, setBrightness] = useState<string>(
+    deepLinkedTemplate && "brightness" in deepLinkedTemplate ? deepLinkedTemplate.brightness : "40",
+  );
+  const [mirek, setMirek] = useState<string>(
+    deepLinkedTemplate && "mirek" in deepLinkedTemplate ? deepLinkedTemplate.mirek : "370",
+  );
   const [playlistUri, setPlaylistUri] = useState("");
-  const [sceneName, setSceneName] = useState("");
-  const [cooldownMinutes, setCooldownMinutes] = useState("30");
-  const [priority, setPriority] = useState("50");
-  const [timeWindowEnabled, setTimeWindowEnabled] = useState(false);
-  const [windowStart, setWindowStart] = useState("09:00");
-  const [windowEnd, setWindowEnd] = useState("17:00");
+  const [sceneName, setSceneName] = useState<string>(
+    deepLinkedTemplate && "sceneName" in deepLinkedTemplate ? deepLinkedTemplate.sceneName : "",
+  );
+  const [cooldownMinutes, setCooldownMinutes] = useState<string>(deepLinkedTemplate?.cooldownMinutes ?? "30");
+  const [priority, setPriority] = useState<string>(deepLinkedTemplate?.priority ?? "50");
+  const [timeWindowEnabled, setTimeWindowEnabled] = useState(deepLinkedTemplate ? deepLinkedTemplate.timeWindow !== null : false);
+  const [windowStart, setWindowStart] = useState<string>(deepLinkedTemplate?.timeWindow?.start ?? "09:00");
+  const [windowEnd, setWindowEnd] = useState<string>(deepLinkedTemplate?.timeWindow?.end ?? "17:00");
   // "Arrival"/"Departure" trigger — see docs/GEOFENCING_ARCHITECTURE.md.
   // Requires the iOS companion app's location access; the rule still
   // fires from the dashboard's perspective the same way any other rule
@@ -237,7 +122,7 @@ export function RuleForm({
   // Preparation, "when I get home") has no biometric condition at all,
   // matching the backend's "conditions.length > 0 OR timeWindow set OR
   // locationTrigger set" rule (see backend/src/api/routes/automationRules.ts).
-  const [conditionEnabled, setConditionEnabled] = useState(true);
+  const [conditionEnabled, setConditionEnabled] = useState(deepLinkedTemplate ? deepLinkedTemplate.timeWindow === null : true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

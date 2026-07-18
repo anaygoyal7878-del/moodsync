@@ -10,6 +10,7 @@ const OUTCOME_LABELS: Record<AutomationHistoryEntry["outcome"], string> = {
   SKIPPED_CONFLICT: "Skipped (conflict)",
   SKIPPED_MANUAL_PAUSE: "Skipped (paused)",
   SKIPPED_SAFETY_RATE_LIMIT: "Skipped (safety limit)",
+  QUEUED_FOR_DEVICE: "Queued for device",
   FAILED: "Failed",
 };
 

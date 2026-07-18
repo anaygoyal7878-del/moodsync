@@ -2,6 +2,9 @@ import Link from "next/link";
 import { backendFetch } from "@/lib/api";
 import { buildHomeInsights } from "@/lib/homeInsights";
 import { WelcomeBanner } from "@/components/dashboard/WelcomeBanner";
+import { SearchBar } from "@/components/dashboard/SearchBar";
+import { QuickActions } from "@/components/dashboard/QuickActions";
+import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { MetricTile } from "@/components/dashboard/MetricTile";
 import { HeartRatePulse } from "@/components/dashboard/HeartRatePulse";
 import { WellnessTimeline } from "@/components/dashboard/WellnessTimeline";
@@ -13,6 +16,7 @@ import type {
   InsightsResponse,
   ConnectionsResponse,
   AutomationRuleDefinition,
+  AutomationHistoryEntry,
   RecommendationEntry,
 } from "@/lib/types";
 import type { NormalizedBiometricReading } from "@moodsync/shared";
@@ -35,17 +39,29 @@ const SCORE_MOOD: Record<string, string> = {
 };
 
 export default async function DashboardHomePage() {
-  const [meResult, wellnessResult, insightsResult, latestResult, historyResult, connectionsResult, rulesResult, recommendationsResult] =
-    await Promise.all([
-      backendFetch<MeResponse>("/api/me"),
-      backendFetch<WellnessResponse>("/api/wellness"),
-      backendFetch<InsightsResponse>("/api/insights?days=14"),
-      backendFetch<{ reading: NormalizedBiometricReading | null }>("/api/biometrics/latest"),
-      backendFetch<{ readings: NormalizedBiometricReading[] }>("/api/biometrics/history?days=7"),
-      backendFetch<ConnectionsResponse>("/api/connections"),
-      backendFetch<{ rules: AutomationRuleDefinition[] }>("/api/automation-rules"),
-      backendFetch<{ recommendations: RecommendationEntry[] }>("/api/recommendations"),
-    ]);
+  const [
+    meResult,
+    wellnessResult,
+    insightsResult,
+    latestResult,
+    historyResult,
+    connectionsResult,
+    rulesResult,
+    recommendationsResult,
+    automationHistoryResult,
+    pauseResult,
+  ] = await Promise.all([
+    backendFetch<MeResponse>("/api/me"),
+    backendFetch<WellnessResponse>("/api/wellness"),
+    backendFetch<InsightsResponse>("/api/insights?days=14"),
+    backendFetch<{ reading: NormalizedBiometricReading | null }>("/api/biometrics/latest"),
+    backendFetch<{ readings: NormalizedBiometricReading[] }>("/api/biometrics/history?days=7"),
+    backendFetch<ConnectionsResponse>("/api/connections"),
+    backendFetch<{ rules: AutomationRuleDefinition[] }>("/api/automation-rules"),
+    backendFetch<{ recommendations: RecommendationEntry[] }>("/api/recommendations"),
+    backendFetch<{ entries: AutomationHistoryEntry[] }>("/api/automation-history?limit=10"),
+    backendFetch<{ pausedUntil: string | null; isPaused: boolean }>("/api/preferences/automation-pause"),
+  ]);
 
   const name = (meResult.ok ? meResult.data.displayName : null) ?? (meResult.ok ? meResult.data.email.split("@")[0] : "there");
   const scores = wellnessResult.ok ? wellnessResult.data.scores : null;
@@ -54,16 +70,23 @@ export default async function DashboardHomePage() {
   const latestReading = latestResult.ok ? latestResult.data.reading : null;
   const history = historyResult.ok ? historyResult.data.readings : [];
   const connections: ConnectionsResponse = connectionsResult.ok ? connectionsResult.data : { wearables: [], smartHome: [] };
-  const deviceCount = connections.smartHome.flatMap((c) => c.devices).length;
+  const allDevices = connections.smartHome.flatMap((c) => c.devices);
+  const deviceCount = allDevices.length;
   const rules = rulesResult.ok ? rulesResult.data.rules : [];
   const activeRuleCount = rules.filter((r) => r.enabled).length;
   const topRecommendation = recommendationsResult.ok
     ? recommendationsResult.data.recommendations.find((r) => r.status === "PENDING")
     : undefined;
+  const automationHistory = automationHistoryResult.ok ? automationHistoryResult.data.entries : [];
+  const isPaused = pauseResult.ok ? pauseResult.data.isPaused : false;
 
   return (
     <div className="flex flex-col gap-8">
+      <SearchBar rules={rules} devices={allDevices} />
+
       <WelcomeBanner name={name ?? "there"} insights={insights} />
+
+      <QuickActions isPaused={isPaused} />
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Today</h2>
@@ -87,6 +110,8 @@ export default async function DashboardHomePage() {
       </section>
 
       {latestReading?.heartRate !== undefined && <HeartRatePulse latest={latestReading} />}
+
+      <RecentActivity history={automationHistory} />
 
       <WellnessTimeline history={history} />
 

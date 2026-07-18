@@ -5,6 +5,7 @@ import { LinkButton } from "@/components/ui/LinkButton";
 import { DisconnectButton } from "./DisconnectButton";
 import { SyncButton } from "./SyncButton";
 import { ConnectionStatusBadge, needsReconnect } from "./ConnectionStatusBadge";
+import { ALEXA_VOICE_COMMANDS } from "@/lib/alexaCommands";
 import type { ConnectionsResponse, WearableConnectionSummary, SmartHomeConnectionSummary } from "@/lib/types";
 
 const WEARABLE_LABELS: Record<string, string> = {
@@ -344,21 +345,6 @@ function SpotifyCard({ connection }: { connection: SmartHomeConnectionSummary | 
     </Card>
   );
 }
-
-/** Every voice command this skill supports — see
- * docs/ALEXA_ARCHITECTURE.md §9 for the full intent -> implementation
- * mapping. Shown as "available," not "granted": unlike account linking,
- * there's no per-command permission to have been denied — once linked,
- * every command works immediately. */
-const ALEXA_VOICE_COMMANDS = [
-  "how I'm doing today",
-  "my sleep summary",
-  "to sync my devices",
-  "to start a relaxation session",
-  "to improve my focus",
-  "to activate my evening routine",
-  "if my house is secure",
-];
 
 function AlexaCard({ connection }: { connection: SmartHomeConnectionSummary | undefined }) {
   const isActive = connection?.status === "ACTIVE";
