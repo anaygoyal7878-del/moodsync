@@ -99,7 +99,7 @@ export function normalizeGoogleHealthData(params: {
   }
 
   for (const point of stepsRollups) {
-    if (point.steps) getOrCreate(point.civilStartTime.date).steps = point.steps.countSum;
+    if (point.steps) getOrCreate(point.civilStartTime.date).steps = Number(point.steps.countSum);
   }
   for (const point of heartRateRollups) {
     if (point.heartRate) getOrCreate(point.civilStartTime.date).heartRate = point.heartRate.beatsPerMinuteAvg;

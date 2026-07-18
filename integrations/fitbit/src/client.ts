@@ -50,7 +50,13 @@ function toCivilDateTime(date: Date): CivilDateTime {
 export interface RollupDataPoint {
   civilStartTime: CivilDateTime;
   civilEndTime: CivilDateTime;
-  steps?: { countSum: number };
+  /** `countSum` is an int64 field, which Google Health's REST API
+   * serializes as a JSON string (standard protobuf-JSON behavior for
+   * int64, to avoid precision loss) — confirmed by a real sync hitting
+   * a live account and getting `"2094"` here, not `2094`. `kcalSum`
+   * below is a float64 and comes through as a real JSON number, so it
+   * doesn't need the same treatment. */
+  steps?: { countSum: number | string };
   /** Field names confirmed against `HeartRateRollupValue` in the live REST
    * reference — the API returns the full `beatsPerMinute{Min,Max,Avg}`
    * names, not the shorter `bpm*` guessed in an earlier pass. */
