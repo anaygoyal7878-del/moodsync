@@ -20,7 +20,7 @@ export function SyncButton({ provider }: { provider: "whoop" | "google-health" }
       <Button variant="secondary" onClick={handleSync} disabled={state === "loading"}>
         {state === "loading" ? "Syncing…" : "Sync now"}
       </Button>
-      {state === "error" && <span className="text-xs text-red-400">Sync failed</span>}
+      {state === "error" && <span className="text-xs text-danger">Sync failed</span>}
     </div>
   );
 }

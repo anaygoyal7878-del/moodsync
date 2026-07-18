@@ -63,7 +63,7 @@ export function AutomationSection({
                       entry.outcome === "EXECUTED"
                         ? "text-brand"
                         : entry.outcome === "FAILED"
-                          ? "text-red-400"
+                          ? "text-danger"
                           : "text-ink-muted"
                     }
                   >

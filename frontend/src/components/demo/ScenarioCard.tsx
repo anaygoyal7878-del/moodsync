@@ -2,11 +2,32 @@ import { Card } from "@/components/ui/Card";
 import { AutomationDemo } from "./AutomationDemo";
 import type { DemoScenario } from "./AutomationDemo";
 
+/** Maps each scenario to the wellness-state accent (see the --mood-*
+ * tokens in globals.css) it's actually about, so the "dynamic color
+ * system" from the brand brief shows up somewhere a visitor actually
+ * feels it — the whole scenario page's accent (buttons, matched-rule
+ * highlight, active chips) shifts to match instead of every scenario
+ * using the same default green. A direct content mapping, not a guess:
+ * each key names the real thing the scenario demonstrates. */
+const SCENARIO_MOOD: Record<string, string> = {
+  "wind-down": "sleep",
+  "sleep-prep": "sleep",
+  "sleep-security": "sleep",
+  "stress-relief": "calm",
+  "focus-mode": "focus",
+  "recovery-intelligence": "recovery",
+  "arrival-intelligence": "morning",
+  "weather-wellness": "calm",
+  "calendar-prep": "focus",
+};
+
 /** Header (emoji/title/concept badge/description) + the interactive
  * walkthrough itself — the full content of a single scenario's own page. */
 export function ScenarioCard({ scenario }: { scenario: DemoScenario }) {
+  const mood = SCENARIO_MOOD[scenario.id];
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mood-transition flex flex-col gap-6" data-mood={mood}>
       <div className="text-center">
         <p className="text-2xl" aria-hidden="true">
           {scenario.emoji}
@@ -26,7 +47,7 @@ export function ScenarioCard({ scenario }: { scenario: DemoScenario }) {
           </p>
         )}
       </div>
-      <Card raised className="p-6 sm:p-8">
+      <Card variant="glass" className="p-6 sm:p-8">
         <AutomationDemo scenario={scenario} />
       </Card>
     </div>

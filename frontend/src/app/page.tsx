@@ -34,17 +34,25 @@ export default function Home() {
 
       <main className="flex-1">
         <section className="relative overflow-hidden">
+          {/* Ambient light glows, not a literal scene — evokes morning
+           * light through a forest canopy without a clichéd leaf/nature
+           * photo or (the previous hero) a robot/AI-generated-human
+           * video, which is exactly the generic-AI-startup look this
+           * product's visual identity is meant to stand apart from. */}
           <div className="pointer-events-none absolute inset-0 z-0 bg-canvas" aria-hidden="true">
-            <video
-              className="h-full w-full object-cover opacity-60"
-              src="/video/metal-human.mp4"
-              poster="/video/metal-human.jpg"
-              autoPlay
-              loop
-              muted
-              playsInline
+            <div
+              className="animate-ambient-drift absolute -top-32 -left-24 h-[32rem] w-[32rem] rounded-full opacity-[0.16] blur-[110px]"
+              style={{ background: "radial-gradient(circle, var(--brand), transparent 70%)" }}
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-canvas/40 via-canvas/70 to-canvas" />
+            <div
+              className="animate-ambient-drift absolute top-1/3 -right-32 h-[28rem] w-[28rem] rounded-full opacity-[0.14] blur-[110px]"
+              style={{ background: "radial-gradient(circle, var(--gold), transparent 70%)", animationDelay: "-6s" }}
+            />
+            <div
+              className="animate-ambient-drift absolute -bottom-40 left-1/4 h-[26rem] w-[26rem] rounded-full opacity-[0.12] blur-[110px]"
+              style={{ background: "radial-gradient(circle, var(--terracotta), transparent 70%)", animationDelay: "-11s" }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-canvas/10 via-canvas/60 to-canvas" />
           </div>
 
           <div className="relative z-10 mx-auto max-w-4xl px-6 pt-24 pb-20 text-center sm:pt-32">
@@ -88,7 +96,11 @@ export default function Home() {
         <section id="features" className="mx-auto max-w-6xl px-6 py-20">
           <div className="grid gap-4 sm:grid-cols-3">
             {features.map((feature) => (
-              <Card key={feature.title} raised className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+              <Card
+                key={feature.title}
+                variant="glass"
+                className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-lg)]"
+              >
                 <h3 className="text-lg font-semibold tracking-tight">{feature.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-ink-secondary">{feature.body}</p>
               </Card>

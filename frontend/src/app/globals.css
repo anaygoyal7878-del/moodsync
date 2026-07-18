@@ -5,46 +5,141 @@
  * consumed below, rather than an @import here. */
 
 /*
- * Design system: dark-mode-first, one signature accent color, generous
- * whitespace — the same visual language as MoodSync's other surfaces
- * (see web/tailwind.config.js), carried forward for brand consistency.
+ * Design system: a premium, wellness-inspired identity built to read as
+ * a nature/materials brand first and a "tech dashboard" second —
+ * deliberately not the blue/purple/neon-gradient palette most AI/SaaS
+ * products default to. Warm charcoal + ivory neutrals (not cold
+ * near-black/near-white), a deep forest green as the primary accent
+ * (not primary blue), and soft gold/terracotta reserved for genuine
+ * highlights rather than spread across every button. Dark-mode-first,
+ * one signature accent, generous whitespace — the same structural
+ * approach as before, recolored and re-materialed from the ground up.
  * Tailwind v4's CSS-first config: tokens live here, not in a JS config
  * file — see AGENTS.md's warning that this Next.js version's conventions
  * differ from older training data.
  */
 :root {
-  --canvas: #0c0a11;
-  --surface: #16131e;
-  --surface-raised: #1e1a29;
-  --surface-hover: #262032;
-  --line: rgba(255, 255, 255, 0.07);
-  --line-strong: rgba(255, 255, 255, 0.14);
-  --ink: #f5f1ec;
-  --ink-secondary: #aa9fb5;
-  --ink-muted: #726a80;
-  --brand: #ff7a59;
-  --brand-hover: #ff9075;
+  /* Neutrals — warm charcoal canvas, ivory ink. Every neutral here has a
+   * slight warm (brown/gold) bias rather than true gray, which is what
+   * separates "premium wellness" from "cold corporate dashboard" even
+   * before any accent color is applied. */
+  --canvas: #191510;
+  --surface: #211c16;
+  --surface-raised: #2a231c;
+  --surface-hover: #332b22;
+  --line: rgba(240, 231, 214, 0.08);
+  --line-strong: rgba(240, 231, 214, 0.16);
+  --ink: #f1e9db;
+  --ink-secondary: #b7a996;
+  --ink-muted: #83765f;
 
-  /* Status colors — used by Badge and anywhere a state needs semantic
-   * (not brand) color: connection health, rule enabled/disabled,
-   * notification severity. --brand itself covers "active/primary"
-   * status, so there's no separate 5th color for that. */
-  --success: #34d399;
-  --success-bg: rgba(52, 211, 153, 0.12);
-  --warning: #fbbf24;
-  --warning-bg: rgba(251, 191, 36, 0.12);
-  --danger: #f87171;
-  --danger-bg: rgba(248, 113, 113, 0.12);
-  --info: #60a5fa;
-  --info-bg: rgba(96, 165, 250, 0.12);
+  /* Brand — Deep Forest Green by default. This is also the one CSS
+   * custom property the "dynamic mood" system (below) overrides per
+   * subtree via [data-mood], so every bg-brand/text-brand/border-brand
+   * usage across the app automatically follows the current wellness
+   * state without each component needing its own color logic. */
+  --brand: #35543f;
+  --brand-hover: #416a4c;
 
-  /* Radius scale — Card/Button/Input each hardcoded a different radius
-   * (2xl/full/xl) before this existed. New primitives should reference
-   * these names instead of picking another arbitrary value. */
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
+  /* Reserved highlight accents — used sparingly (a premium badge, a
+   * recommendation callout, a scoring gauge), never as the default
+   * button/link color. This is what keeps gold/terracotta feeling like
+   * genuine accents instead of a second brand color. */
+  --gold: #c9a15a;
+  --gold-bg: rgba(201, 161, 90, 0.14);
+  --terracotta: #b5674a;
+  --terracotta-bg: rgba(181, 103, 74, 0.14);
+
+  /* Status colors — semantic (not brand) color for real states:
+   * connection health, rule enabled/disabled, notification severity.
+   * Recolored off the generic green/amber/red/blue set to the same
+   * earthy family as everything else — "info" in particular moves from
+   * primary blue to a muted teal, since blue was the one hue this
+   * palette explicitly avoids. */
+  --success: #7f9c73;
+  --success-bg: rgba(127, 156, 115, 0.14);
+  --warning: #c98a4b;
+  --warning-bg: rgba(201, 138, 75, 0.14);
+  --danger: #a8493f;
+  --danger-bg: rgba(168, 73, 63, 0.14);
+  --info: #4f8a82;
+  --info-bg: rgba(79, 138, 130, 0.14);
+
+  /* Wellness-state accents — the "dynamic color system." Each names a
+   * mood MoodSync itself recognizes (WellnessScores keys / rule
+   * templates), not a generic chart palette. A subtree that sets
+   * [data-mood="…"] repoints --brand (see below) to one of these, so any
+   * primitive already using bg-brand/text-brand shifts its accent to
+   * match without new component-level logic — used today by
+   * WellnessScoreCard (per-metric) and the demo scenario pages
+   * (per-scenario). Sleep intentionally uses a muted midnight navy, not
+   * primary blue — a deliberately desaturated exception, not the
+   * palette's default hue. */
+  --mood-calm: #8ba888;
+  --mood-calm-hover: #9cbb98;
+  --mood-focus: #235e46;
+  --mood-focus-hover: #2c7356;
+  --mood-energy: #d99a3d;
+  --mood-energy-hover: #e6ac53;
+  --mood-recovery: #4f8a82;
+  --mood-recovery-hover: #649e96;
+  --mood-sleep: #29314e;
+  --mood-sleep-hover: #384165;
+  --mood-morning: #dfa863;
+  --mood-morning-hover: #ecbd7d;
+
+  /* Radius — organic, slightly more generous than a typical dashboard's
+   * tight corners, on the theory that "premium wellness" reads softer
+   * than "enterprise tool." */
+  --radius-sm: 0.625rem;
+  --radius-md: 0.875rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.75rem;
   --radius-full: 9999px;
+
+  /* Elevation — warm-tinted (not pure black) shadows, so depth reads as
+   * soft ambient light rather than a hard drop-shadow. */
+  --shadow-sm: 0 1px 2px rgba(15, 12, 8, 0.4);
+  --shadow-md: 0 12px 28px -10px rgba(15, 12, 8, 0.5);
+  --shadow-lg: 0 28px 56px -20px rgba(15, 12, 8, 0.6);
+}
+
+/* Dynamic wellness-state accent — see --mood-* above. Setting this
+ * attribute on any wrapper element re-themes every bg-brand/text-brand/
+ * border-brand descendant to that mood's color, with no per-component
+ * color logic required. Transitions are handled by `.mood-transition`
+ * (opt-in, since not every mood-scoped element wants an animated
+ * color-shift). */
+[data-mood="calm"] {
+  --brand: var(--mood-calm);
+  --brand-hover: var(--mood-calm-hover);
+}
+[data-mood="focus"] {
+  --brand: var(--mood-focus);
+  --brand-hover: var(--mood-focus-hover);
+}
+[data-mood="energy"] {
+  --brand: var(--mood-energy);
+  --brand-hover: var(--mood-energy-hover);
+}
+[data-mood="recovery"] {
+  --brand: var(--mood-recovery);
+  --brand-hover: var(--mood-recovery-hover);
+}
+[data-mood="sleep"] {
+  --brand: var(--mood-sleep);
+  --brand-hover: var(--mood-sleep-hover);
+}
+[data-mood="morning"] {
+  --brand: var(--mood-morning);
+  --brand-hover: var(--mood-morning-hover);
+}
+
+.mood-transition {
+  transition:
+    background-color 0.6s ease,
+    border-color 0.6s ease,
+    color 0.6s ease;
 }
 
 @theme inline {
@@ -59,6 +154,10 @@
   --color-ink-muted: var(--ink-muted);
   --color-brand: var(--brand);
   --color-brand-hover: var(--brand-hover);
+  --color-gold: var(--gold);
+  --color-gold-bg: var(--gold-bg);
+  --color-terracotta: var(--terracotta);
+  --color-terracotta-bg: var(--terracotta-bg);
   --color-success: var(--success);
   --color-success-bg: var(--success-bg);
   --color-warning: var(--warning);
@@ -67,9 +166,16 @@
   --color-danger-bg: var(--danger-bg);
   --color-info: var(--info);
   --color-info-bg: var(--info-bg);
+  --color-mood-calm: var(--mood-calm);
+  --color-mood-focus: var(--mood-focus);
+  --color-mood-energy: var(--mood-energy);
+  --color-mood-recovery: var(--mood-recovery);
+  --color-mood-sleep: var(--mood-sleep);
+  --color-mood-morning: var(--mood-morning);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
   --radius-full: var(--radius-full);
   --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -88,7 +194,7 @@ body {
 }
 
 ::selection {
-  background: rgba(255, 122, 89, 0.3);
+  background: rgba(201, 161, 90, 0.3);
 }
 
 :focus-visible {
@@ -111,6 +217,20 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--ink-muted);
+}
+
+/* Frosted-glass material — layered translucent surface + soft warm
+ * shadow + thin ivory-tinted border, used by Card's `variant="glass"`
+ * and the landing hero panel. Falls back gracefully (no blur, just the
+ * surface color) wherever backdrop-filter isn't supported. */
+.glass-panel {
+  background:
+    linear-gradient(165deg, rgba(241, 233, 219, 0.06), rgba(241, 233, 219, 0.015)),
+    var(--surface);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-md);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -140,5 +260,22 @@ body {
     40% {
       transform: scale(1);
     }
+  }
+
+  /* Slow, ambient drift for the landing hero's light glows — evokes
+   * morning light moving through a canopy rather than a static gradient
+   * blob, while staying subtle enough not to compete with the copy. */
+  @keyframes ambient-drift {
+    0%,
+    100% {
+      transform: translate(0, 0) scale(1);
+    }
+    50% {
+      transform: translate(2%, -3%) scale(1.05);
+    }
+  }
+
+  .animate-ambient-drift {
+    animation: ambient-drift 18s ease-in-out infinite;
   }
 }

@@ -43,7 +43,7 @@ export function AlexaConsentForm({ clientId, redirectUri, scope, amazonState }: 
 
   return (
     <div className="mt-6 flex flex-col gap-3">
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       <Button variant="primary" onClick={handleApprove} disabled={status === "loading"}>
         {status === "loading" ? "Linking…" : "Allow"}
       </Button>

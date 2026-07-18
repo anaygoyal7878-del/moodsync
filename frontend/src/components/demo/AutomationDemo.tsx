@@ -75,14 +75,14 @@ export function AutomationDemo({ scenario }: { scenario: DemoScenario }) {
           <p className="text-xs uppercase tracking-wide text-ink-muted">{metricLabel}</p>
           <p
             className="mt-2 text-4xl font-semibold tabular-nums transition-colors duration-700"
-            style={{ color: step.alert ? "#ff9075" : "#f5f1ec" }}
+            style={{ color: step.alert ? "var(--brand-hover)" : "var(--ink)" }}
           >
             {step.metricValue}%
           </p>
           <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-raised">
             <div
               className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${step.metricValue}%`, backgroundColor: step.alert ? "#ff7a59" : "#726a80" }}
+              style={{ width: `${step.metricValue}%`, backgroundColor: step.alert ? "var(--brand)" : "var(--ink-muted)" }}
             />
           </div>
           <p
@@ -103,10 +103,14 @@ export function AutomationDemo({ scenario }: { scenario: DemoScenario }) {
               <div
                 className="h-12 w-12 shrink-0 rounded-full transition-all duration-700"
                 style={{
-                  backgroundColor: step.light.warm ? "#ffb37a" : "#f5f1ec",
+                  backgroundColor: step.light.warm ? "var(--mood-energy)" : "var(--ink)",
                   opacity: step.light.brightness / 100,
                   boxShadow: step.light.on
-                    ? `0 0 ${step.light.brightness / 2.5}px ${step.light.brightness / 6}px ${step.light.warm ? "#ffb37a55" : "#f5f1ec55"}`
+                    ? `0 0 ${step.light.brightness / 2.5}px ${step.light.brightness / 6}px ${
+                        step.light.warm
+                          ? "color-mix(in srgb, var(--mood-energy) 35%, transparent)"
+                          : "color-mix(in srgb, var(--ink) 35%, transparent)"
+                      }`
                     : "none",
                 }}
                 aria-hidden="true"

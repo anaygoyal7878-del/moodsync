@@ -14,8 +14,8 @@ export default function DemoPage() {
 
       <main className="flex-1">
         <section className="mx-auto max-w-3xl px-6 pt-16 pb-8 text-center sm:pt-24">
-          <p className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-medium text-amber-200">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" aria-hidden="true" />
+          <p className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold-bg px-3 py-1 text-xs font-medium text-gold">
+            <span className="h-1.5 w-1.5 rounded-full bg-gold" aria-hidden="true" />
             Simulated data — no wearable or account required
           </p>
           <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-5xl">
