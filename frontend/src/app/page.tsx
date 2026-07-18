@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Nav } from "@/components/marketing/Nav";
+import MagicBento from "@/components/marketing/MagicBento";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 
@@ -10,21 +11,6 @@ const integrations = [
   { name: "Spotify", status: "Limited beta" },
   { name: "Garmin", status: "Blocked upstream" },
   { name: "Ecobee", status: "Blocked upstream" },
-];
-
-const features = [
-  {
-    title: "Reads your recovery",
-    body: "MoodSync watches your recovery score, sleep, and strain — not just a single number — so its recommendations reflect how your whole day is actually going.",
-  },
-  {
-    title: "Acts on your behalf",
-    body: "When your recovery drops, MoodSync can dim your lights, shift your color temperature, or trigger a scene automatically, without you touching an app.",
-  },
-  {
-    title: "Transparent by default",
-    body: "Every automation is logged: what fired, why, and when. No black box — your automation history is always one click away.",
-  },
 ];
 
 export default function Home() {
@@ -94,18 +80,23 @@ export default function Home() {
         </section>
 
         <section id="features" className="mx-auto max-w-6xl px-6 py-20">
-          <div className="grid gap-4 sm:grid-cols-3">
-            {features.map((feature) => (
-              <Card
-                key={feature.title}
-                variant="glass"
-                className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-lg)]"
-              >
-                <h3 className="text-lg font-semibold tracking-tight">{feature.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-secondary">{feature.body}</p>
-              </Card>
-            ))}
+          <div className="mb-10 text-center">
+            <h2 className="text-3xl font-semibold tracking-tight">What MoodSync actually does</h2>
+            <p className="mx-auto mt-3 max-w-2xl text-ink-secondary">
+              Six real, already-shipped capabilities — hover a card to see it react.
+            </p>
           </div>
+          <MagicBento
+            textAutoHide
+            enableStars
+            enableSpotlight
+            enableBorderGlow
+            enableTilt
+            enableMagnetism
+            clickEffect
+            spotlightRadius={300}
+            particleCount={10}
+          />
         </section>
 
         <section id="integrations" className="mx-auto max-w-6xl px-6 py-20">
