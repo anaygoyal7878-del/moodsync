@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeGoogleHealthData } from './normalize.js';
-import type { RollupDataPoint, DailyRestingHeartRatePoint, SleepDataPoint, HeartRateSamplePoint } from './client.js';
+import type {
+  RollupDataPoint,
+  DailyRestingHeartRatePoint,
+  SleepDataPoint,
+  HeartRateSamplePoint,
+  SleepStageSummaryEntry,
+} from './client.js';
 
 function civil(year: number, month: number, day: number) {
   return { date: { year, month, day }, time: { hours: 0, minutes: 0, seconds: 0 } };
@@ -43,7 +49,9 @@ function makeRestingHeartRate(overrides: Partial<DailyRestingHeartRatePoint['dat
   };
 }
 
-function makeSleep(summary: { minutesAsleep: string; minutesInSleepPeriod: string }): SleepDataPoint {
+function makeSleep(
+  summary: { minutesAsleep: string; minutesInSleepPeriod: string; stagesSummary?: SleepStageSummaryEntry[] },
+): SleepDataPoint {
   return {
     name: 'users/me/dataTypes/sleep/dataPoints/1',
     data: {
@@ -125,6 +133,47 @@ describe('normalizeGoogleHealthData', () => {
     });
     // 419 / 465 * 100 ≈ 90.1 -> rounds to 90
     expect(result[0]?.sleepScore).toBe(90);
+  });
+
+  it('sums stagesSummary minutes by type into deep/REM/light sleep fields', () => {
+    const result = normalizeGoogleHealthData({
+      userId: 'user-1',
+      stepsRollups: [makeStepsRollup()],
+      heartRateRollups: [],
+      caloriesRollups: [],
+      restingHeartRates: [],
+      sleeps: [
+        makeSleep({
+          minutesAsleep: '419',
+          minutesInSleepPeriod: '465',
+          stagesSummary: [
+            { type: 'LIGHT', minutes: '210' },
+            { type: 'DEEP', minutes: '90' },
+            { type: 'REM', minutes: '100' },
+            { type: 'AWAKE', minutes: '19' },
+            // A second LIGHT entry (multiple light-sleep cycles) should sum, not overwrite.
+            { type: 'LIGHT', minutes: '15' },
+          ],
+        }),
+      ],
+    });
+    expect(result[0]?.deepSleepMinutes).toBe(90);
+    expect(result[0]?.remSleepMinutes).toBe(100);
+    expect(result[0]?.lightSleepMinutes).toBe(225);
+  });
+
+  it('leaves sleep-stage minutes unset when stagesSummary is absent', () => {
+    const result = normalizeGoogleHealthData({
+      userId: 'user-1',
+      stepsRollups: [makeStepsRollup()],
+      heartRateRollups: [],
+      caloriesRollups: [],
+      restingHeartRates: [],
+      sleeps: [makeSleep({ minutesAsleep: '419', minutesInSleepPeriod: '465' })],
+    });
+    expect(result[0]?.deepSleepMinutes).toBeUndefined();
+    expect(result[0]?.remSleepMinutes).toBeUndefined();
+    expect(result[0]?.lightSleepMinutes).toBeUndefined();
   });
 
   it('leaves sleepScore unset when no sleep data is available', () => {

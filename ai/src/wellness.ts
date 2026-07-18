@@ -129,17 +129,47 @@ export function computeRecoveryScore(
   return { value, basis: 'evidence-informed-heuristic' };
 }
 
+/** 8 hours — the midpoint of the CDC/National Sleep Foundation's
+ * recommended 7-9 hour range for adults (sleepfoundation.org/how-sleep-works/how-much-sleep-do-we-really-need),
+ * used as the "100%" anchor for the total-sleep-time component below. */
+const RECOMMENDED_SLEEP_MINUTES = 8 * 60;
+
+/** Deep sleep is normally 10-20% of total sleep time for adults
+ * (sleepfoundation.org/stages-of-sleep/deep-sleep) — the low end of that
+ * range is the "fully scored" floor; nothing in that source suggests a
+ * ceiling penalty for more than 20%, so this only ramps up to 100, never
+ * back down. */
+const NORMAL_DEEP_SLEEP_PCT_FLOOR = 10;
+
 /**
- * Sleep (0-100) — passes through the provider's own native `sleepScore`
- * directly (Apple Health/Google Health already compute this on-device or
- * server-side). No new formula is invented here: `NormalizedBiometricReading`
- * carries no deep/REM stage breakdown to compute a stage-weighted score
- * from (see docs/DECISION_ENGINE_ROADMAP.md) — inventing one against data
- * this product doesn't collect would violate the research-first rule.
+ * Sleep (0-100). When stage-level data exists (WHOOP/Google Health
+ * today — see `NormalizedBiometricReading.deepSleepMinutes` et al.),
+ * uses a stage-weighted formula cited in docs/WELLNESS_SCORING.md: 40%
+ * total sleep time (against the CDC/NSF-recommended 7-9hr range), 40%
+ * deep sleep (against the Sleep Foundation's 10-20%-of-total normal
+ * range), 20% the provider's own efficiency/quality score. Falls back to
+ * a plain passthrough of the provider's native `sleepScore` when stage
+ * data is absent (Apple Health/Amazfit readings, or a provider night
+ * with no stage breakdown) — same behavior as before this formula
+ * existed, so no regression for those providers.
  */
 export function computeSleepScore(reading: NormalizedBiometricReading): WellnessScore {
-  if (reading.sleepScore === undefined) return { value: null, basis: 'heuristic' };
-  return { value: Math.round(clamp(reading.sleepScore, 0, 100)), basis: 'provider-native' };
+  const { deepSleepMinutes, remSleepMinutes, lightSleepMinutes, sleepScore } = reading;
+
+  if (deepSleepMinutes !== undefined && remSleepMinutes !== undefined && lightSleepMinutes !== undefined) {
+    const totalSleepMinutes = deepSleepMinutes + remSleepMinutes + lightSleepMinutes;
+    if (totalSleepMinutes > 0) {
+      const totalTimeScore = clamp((totalSleepMinutes / RECOMMENDED_SLEEP_MINUTES) * 100, 0, 100);
+      const deepPct = (deepSleepMinutes / totalSleepMinutes) * 100;
+      const deepScore = clamp((deepPct / NORMAL_DEEP_SLEEP_PCT_FLOOR) * 100, 0, 100);
+      const efficiencyScore = sleepScore !== undefined ? clamp(sleepScore, 0, 100) : totalTimeScore;
+      const value = Math.round(totalTimeScore * 0.4 + deepScore * 0.4 + efficiencyScore * 0.2);
+      return { value: clamp(value, 0, 100), basis: 'evidence-informed-heuristic' };
+    }
+  }
+
+  if (sleepScore === undefined) return { value: null, basis: 'heuristic' };
+  return { value: Math.round(clamp(sleepScore, 0, 100)), basis: 'provider-native' };
 }
 
 /**

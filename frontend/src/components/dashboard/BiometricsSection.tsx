@@ -8,6 +8,9 @@ import type { NormalizedBiometricReading } from "@moodsync/shared";
 const METRIC_ORDER: Array<keyof NormalizedBiometricReading> = [
   "recoveryScore",
   "sleepScore",
+  "deepSleepMinutes",
+  "remSleepMinutes",
+  "lightSleepMinutes",
   "heartRate",
   "restingHeartRate",
   "stressLevel",

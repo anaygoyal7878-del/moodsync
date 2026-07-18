@@ -201,6 +201,13 @@ model BiometricReading {
   /// 0-100 percentage (SpO2). Apple Health-only today.
   bloodOxygen          Float?
   sleepScore           Float?
+  /// Minutes of deep/slow-wave sleep. WHOOP + Google Health/Fitbit only —
+  /// see NormalizedBiometricReading in shared/src/wearables.ts.
+  deepSleepMinutes     Float?
+  /// Minutes of REM sleep. Same provenance as deepSleepMinutes.
+  remSleepMinutes      Float?
+  /// Minutes of light sleep. Same provenance as deepSleepMinutes.
+  lightSleepMinutes    Float?
   recoveryScore        Float?
   stressLevel          Float?
   activityLevel        Float?

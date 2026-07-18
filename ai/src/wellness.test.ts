@@ -69,6 +69,37 @@ describe('computeSleepScore / computeEnergyScore', () => {
     expect(computeSleepScore(reading()).value).toBeNull();
   });
 
+  it('uses the stage-weighted formula when deep/REM/light minutes are all present', () => {
+    // 480 total minutes (= RECOMMENDED_SLEEP_MINUTES, so total-time component = 100),
+    // 96 deep minutes = 20% of total (>= the 10% floor, so deep component = 100),
+    // sleepScore (efficiency) = 90.
+    const result = computeSleepScore(
+      reading({ deepSleepMinutes: 96, remSleepMinutes: 144, lightSleepMinutes: 240, sleepScore: 90 }),
+    );
+    // 100*0.4 + 100*0.4 + 90*0.2 = 98
+    expect(result).toEqual({ value: 98, basis: 'evidence-informed-heuristic' });
+  });
+
+  it('scores deep sleep proportionally below the 10%-of-total floor', () => {
+    // 480 total minutes, only 24 deep minutes = 5% of total -> deep component = 50.
+    const result = computeSleepScore(
+      reading({ deepSleepMinutes: 24, remSleepMinutes: 156, lightSleepMinutes: 300, sleepScore: 90 }),
+    );
+    // 100*0.4 + 50*0.4 + 90*0.2 = 78
+    expect(result).toEqual({ value: 78, basis: 'evidence-informed-heuristic' });
+  });
+
+  it('falls back to total-sleep-time for the efficiency component when sleepScore is absent', () => {
+    const result = computeSleepScore(reading({ deepSleepMinutes: 96, remSleepMinutes: 144, lightSleepMinutes: 240 }));
+    // total-time component = 100, deep component = 100, efficiency falls back to total-time (100) -> 100
+    expect(result).toEqual({ value: 100, basis: 'evidence-informed-heuristic' });
+  });
+
+  it('falls back to plain passthrough when stage minutes are only partially present', () => {
+    const result = computeSleepScore(reading({ deepSleepMinutes: 90, sleepScore: 82 }));
+    expect(result).toEqual({ value: 82, basis: 'provider-native' });
+  });
+
   it('energy passes through activityLevel', () => {
     expect(computeEnergyScore(reading({ activityLevel: 63 }))).toEqual({ value: 63, basis: 'provider-native' });
   });

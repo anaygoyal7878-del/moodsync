@@ -67,9 +67,25 @@ describe('normalizeWhoopData', () => {
       recoveryScore: 65,
       restingHeartRate: 52,
       sleepScore: 82,
+      // 5,400,000ms / 60,000 = 90; 6,000,000ms / 60,000 = 100; 9,000,000ms / 60,000 = 150
+      deepSleepMinutes: 90,
+      remSleepMinutes: 100,
+      lightSleepMinutes: 150,
     });
     expect(result[0]?.heartRate).toBeUndefined();
     expect(result[0]?.steps).toBeUndefined();
+  });
+
+  it('leaves sleep-stage minutes unset when no matching sleep record exists', () => {
+    const result = normalizeWhoopData({
+      userId: 'user-1',
+      recoveries: [makeRecovery({ sleep_id: 'missing-sleep' })],
+      sleeps: [makeSleep()],
+      workouts: [],
+    });
+    expect(result[0]?.deepSleepMinutes).toBeUndefined();
+    expect(result[0]?.remSleepMinutes).toBeUndefined();
+    expect(result[0]?.lightSleepMinutes).toBeUndefined();
   });
 
   it('skips recovery records that are not yet scored', () => {

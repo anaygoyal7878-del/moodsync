@@ -32,6 +32,8 @@ export function normalizeWhoopData(params: {
         .filter((w) => sameCalendarDay(w.end, recovery.updated_at) && w.score_state === 'SCORED' && w.score)
         .sort((a, b) => new Date(b.end).getTime() - new Date(a.end).getTime())[0];
 
+      const stages = sleep?.score?.stage_summary;
+
       const reading: NormalizedBiometricReading = {
         provider: 'whoop',
         userId,
@@ -39,6 +41,9 @@ export function normalizeWhoopData(params: {
         restingHeartRate: recovery.score?.resting_heart_rate,
         recoveryScore: recovery.score?.recovery_score,
         sleepScore: sleep?.score?.sleep_performance_percentage,
+        deepSleepMinutes: stages ? Math.round(stages.total_slow_wave_sleep_time_milli / 60_000) : undefined,
+        remSleepMinutes: stages ? Math.round(stages.total_rem_sleep_time_milli / 60_000) : undefined,
+        lightSleepMinutes: stages ? Math.round(stages.total_light_sleep_time_milli / 60_000) : undefined,
       };
 
       if (matchingWorkout?.score) {

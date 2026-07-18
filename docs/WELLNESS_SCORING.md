@@ -68,26 +68,50 @@ relationship without exact percentages). MoodSync's implementation
 weight 0.1 — chosen to match the qualitative relationship described
 publicly, not to replicate a formula that isn't public.
 
-## Sleep — `provider-native` only
+## Sleep — stage-weighted when available, `provider-native` otherwise
 
-Passes through the provider's own `sleepScore` directly (Apple
-Health/Google Health compute this on-device or server-side already — see
-`docs/APPLE_HEALTH_ARCHITECTURE.md`/`docs/INTEGRATIONS_RESEARCH.md`).
+`NormalizedBiometricReading` now carries `deepSleepMinutes`/
+`remSleepMinutes`/`lightSleepMinutes` (WHOOP's `stage_summary`, Google
+Health/Fitbit's `stagesSummary` — both parse raw stage data their APIs
+already return; see `integrations/whoop/src/normalize.ts` and
+`integrations/fitbit/src/normalize.ts`). When present,
+`computeSleepScore` uses the previously-cited stage-weighted formula (40%
+total sleep time, 40% deep sleep, 20% efficiency), with each component
+grounded in a real source rather than an invented threshold:
 
-**No new formula is invented here.** `NormalizedBiometricReading` has no
-deep/REM sleep-stage breakdown fields — only a single `sleepScore`.
-Formulas exist in the wild for stage-weighted sleep scoring (e.g. one
-cited implementation: 40% total sleep time, 40% deep sleep, 20%
-efficiency), but building one against data this product doesn't collect
-would mean inventing inputs, which the project's research-first rule
-prohibits. Adding stage-level fields to the schema is a documented
-roadmap item.
+- **Total sleep time (40%)**: scored against 8 hours (480 minutes) — the
+  midpoint of the CDC/National Sleep Foundation's recommended 7-9 hour
+  range for adults
+  ([sleepfoundation.org/how-sleep-works/how-much-sleep-do-we-really-need](https://www.sleepfoundation.org/how-sleep-works/how-much-sleep-do-we-really-need)).
+  `min(total minutes / 480, 1) × 100`.
+- **Deep sleep (40%)**: deep sleep is normally 10-20% of total sleep time
+  for adults
+  ([sleepfoundation.org/stages-of-sleep/deep-sleep](https://www.sleepfoundation.org/stages-of-sleep/deep-sleep)).
+  Scored as `min(deep% / 10, 1) × 100` — full marks once the low end of
+  the normal range is reached; the source doesn't describe a downside to
+  exceeding 20%, so there's no penalty for scoring above it (inventing a
+  decay curve past a range the citation doesn't characterize as bad would
+  be exactly the kind of unsupported threshold this project's
+  research-first rule prohibits).
+- **Efficiency (20%)**: the provider's own native `sleepScore` (WHOOP's
+  `sleep_performance_percentage`, Google Health/Fitbit's
+  `minutesAsleep`/`minutesInSleepPeriod` ratio) when present, otherwise
+  falls back to the total-sleep-time component.
 
-Sleep efficiency itself, for reference (not currently computed by
-MoodSync, since no raw time-in-bed/time-asleep fields are collected):
-`(hours slept / hours in bed) × 100%`, with 85%+ considered good — a
-widely-cited, simple, real formula, noted here for when stage-level data
-is added.
+**Falls back to plain passthrough** (unchanged from before this formula
+existed) when stage data is absent — Apple Health and Amazfit readings,
+or any night without a stage breakdown — passing `sleepScore` directly
+through, `basis: 'provider-native'`.
+
+Sleep efficiency itself, for reference: `(hours slept / hours in bed) ×
+100%`, with 85%+ considered good — a widely-cited, simple, real formula.
+Still not computed from raw time-in-bed/time-asleep independently, since
+the provider's own pre-computed ratio (used above) is preferred over
+hand-deriving it — see the doc comment on `sleepEfficiencyScore` in
+`integrations/fitbit/src/normalize.ts` for why summing stage minutes was
+abandoned for *this specific* calculation in favor of Google Health's
+pre-computed fields (stage minutes themselves are still used for the
+deep-sleep component above, which has no pre-computed equivalent).
 
 ## Energy — `provider-native` only
 

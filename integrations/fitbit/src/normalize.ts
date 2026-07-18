@@ -4,7 +4,28 @@ import type {
   DailyRestingHeartRatePoint,
   SleepDataPoint,
   HeartRateSamplePoint,
+  SleepStageSummaryEntry,
 } from './client.js';
+
+/** Sums `stagesSummary` entries (int64-as-string `minutes`, see
+ * `SleepStageSummaryEntry`'s doc comment for the confirmed real shape) by
+ * stage type into MoodSync's deep/REM/light fields. Distinct from
+ * `sleepEfficiencyScore` below, which deliberately prefers Google
+ * Health's pre-computed `minutesAsleep`/`minutesInSleepPeriod` instead of
+ * hand-summing this same array — that choice was about which fields are
+ * more reliable for an *efficiency ratio*, not a finding that
+ * `stagesSummary` itself is wrong; per-stage minutes have no
+ * pre-computed equivalent, so this is the only source for them. */
+function stageMinutes(
+  entries: SleepStageSummaryEntry[] | undefined,
+  type: SleepStageSummaryEntry['type'],
+): number | undefined {
+  if (!entries) return undefined;
+  const total = entries
+    .filter((e) => e.type === type)
+    .reduce((sum, e) => sum + Number(e.minutes), 0);
+  return Number.isFinite(total) && total > 0 ? total : undefined;
+}
 
 function dayKey(c: { year: number; month: number; day: number }): string {
   return `${c.year}-${String(c.month).padStart(2, '0')}-${String(c.day).padStart(2, '0')}`;
@@ -100,8 +121,14 @@ export function normalizeGoogleHealthData(params: {
   const mostRecentSleep = sleeps[0];
   const mostRecentDay = [...byDay.keys()].sort().at(-1);
   if (mostRecentSleep && mostRecentDay) {
+    const target = byDay.get(mostRecentDay)!;
     const score = sleepEfficiencyScore(mostRecentSleep.data.sleep.summary);
-    if (score !== undefined) byDay.get(mostRecentDay)!.sleepScore = score;
+    if (score !== undefined) target.sleepScore = score;
+
+    const stages = mostRecentSleep.data.sleep.summary?.stagesSummary;
+    target.deepSleepMinutes = stageMinutes(stages, 'DEEP');
+    target.remSleepMinutes = stageMinutes(stages, 'REM');
+    target.lightSleepMinutes = stageMinutes(stages, 'LIGHT');
   }
 
   const sampleReadings: NormalizedBiometricReading[] = [];

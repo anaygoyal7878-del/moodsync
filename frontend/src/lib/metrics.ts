@@ -4,6 +4,9 @@
 export const METRIC_LABELS: Record<string, string> = {
   recoveryScore: "Recovery",
   sleepScore: "Sleep",
+  deepSleepMinutes: "Deep sleep",
+  remSleepMinutes: "REM sleep",
+  lightSleepMinutes: "Light sleep",
   heartRate: "Heart rate",
   restingHeartRate: "Resting HR",
   stressLevel: "Stress",
@@ -26,6 +29,9 @@ export const METRIC_UNITS: Record<string, string> = {
   heartRate: "bpm",
   restingHeartRate: "bpm",
   calories: "kcal",
+  deepSleepMinutes: "min",
+  remSleepMinutes: "min",
+  lightSleepMinutes: "min",
 };
 
 export function metricLabel(metric: string): string {

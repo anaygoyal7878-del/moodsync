@@ -24,6 +24,20 @@ export interface NormalizedBiometricReading {
   bloodOxygen?: number | undefined;
   /** 0-100, provider-normalized */
   sleepScore?: number | undefined;
+  /** Minutes of deep/slow-wave sleep in the most recent sleep session.
+   * WHOOP (`stage_summary.total_slow_wave_sleep_time_milli`) and Google
+   * Health/Fitbit (`stagesSummary[type=DEEP].minutes`) both expose this in
+   * their raw API responses — see integrations/whoop/src/normalize.ts and
+   * integrations/fitbit/src/normalize.ts. Feeds the stage-weighted sleep
+   * score in ai/src/wellness.ts (docs/WELLNESS_SCORING.md); absent for
+   * providers that don't report stage-level detail. */
+  deepSleepMinutes?: number | undefined;
+  /** Minutes of REM sleep in the most recent sleep session. Same
+   * WHOOP/Google Health provenance as `deepSleepMinutes`. */
+  remSleepMinutes?: number | undefined;
+  /** Minutes of light sleep in the most recent sleep session. Same
+   * WHOOP/Google Health provenance as `deepSleepMinutes`. */
+  lightSleepMinutes?: number | undefined;
   /** 0-100. WHOOP-native ("Recovery"); no Google Health equivalent today. */
   recoveryScore?: number | undefined;
   /** 0-100. No confirmed WHOOP or Google Health equivalent today — only
