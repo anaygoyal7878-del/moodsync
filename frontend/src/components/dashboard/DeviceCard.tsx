@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lightbulb, Thermometer, Speaker, Lock, Cpu } from "lucide-react";
+import { Lightbulb, Thermometer, Speaker, Lock, Cpu, Sun } from "lucide-react";
 import type { DeviceSummary } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import ElasticSlider from "@/components/ui/ElasticSlider";
 
 /** Only `deviceType: 'light'` is populated today (Hue is the only
  * device-syncing provider — see backend/src/services/hueService.ts) but
@@ -74,6 +75,24 @@ export function DeviceCard({ device }: { device: DeviceSummary }) {
           Off
         </Button>
       </div>
+      {device.deviceType === "light" && (
+        <div className={pending ? "pointer-events-none opacity-50" : undefined}>
+          {/* Sets brightness on release, not on every drag frame — this
+           * isn't a live readout of the bulb's current brightness (Hue's
+           * sync only stores on/off + room here), just a "set it to X"
+           * control, same as the On/Off buttons above. */}
+          <ElasticSlider
+            startingValue={1}
+            maxValue={100}
+            defaultValue={80}
+            isStepped
+            stepSize={5}
+            leftIcon={<Sun size={12} aria-hidden="true" />}
+            rightIcon={<Sun size={16} aria-hidden="true" />}
+            onChangeCommitted={(brightness) => setLightState({ on: true, brightness: Math.round(brightness) })}
+          />
+        </div>
+      )}
       {error && (
         <p role="alert" className="text-xs text-danger">
           {error}
