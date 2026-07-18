@@ -23,8 +23,11 @@ targets:
         UILaunchScreen: {}
         NSHealthShareUsageDescription: "MoodSync reads your heart rate, sleep, and activity data to automate your smart home based on how you're feeling."
         NSHomeKitUsageDescription: "MoodSync activates HomeKit scenes you've configured (like \"Relax\" or \"Focus\") based on your biometrics."
+        NSLocationWhenInUseUsageDescription: "MoodSync uses your location to detect when you arrive at or leave the home region you set, so it can trigger arrival/departure automations."
+        NSLocationAlwaysAndWhenInUseUsageDescription: "MoodSync monitors your home region in the background so arrival/departure automations still fire when the app isn't open."
         UIBackgroundModes:
           - fetch
+          - location
     settings:
       base:
         # Placeholder — replace with your own explicit bundle ID once

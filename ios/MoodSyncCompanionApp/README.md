@@ -13,7 +13,26 @@ including real `XCTest` runs — this repo's sandbox previously only had
 Xcode Command Line Tools, which can't run `XCTest` at all; real Xcode is
 now installed), and this wrapper project itself builds and code-signs
 successfully for the iOS Simulator (`xcodebuild ... build`), including
-the HealthKit and HomeKit entitlements.
+the HealthKit, HomeKit, and (added for geofencing —
+`LocationController.swift`) location entitlements/usage-description
+keys.
+
+**A real CLI-invocation gotcha, not a project problem**: `xcodebuild
+-project MoodSyncCompanionApp.xcodeproj -target MoodSyncCompanionApp
+build` alone fails with "no such module 'MoodSyncCompanionUI'" — the
+local `MoodSyncCompanion` package (a separate pseudo-"project" in
+xcodebuild's eyes) builds its products into its own directory, and
+without a shared build output location the app target's search paths
+never see them. This is a CLI-only issue: opening
+`MoodSyncCompanionApp.xcodeproj` in the actual Xcode app and building
+normally does not hit this, since Xcode's own derived-data handling
+shares build products across local package dependencies automatically.
+To reproduce the successful CLI build used for this verification, pass
+an explicit shared `SYMROOT`:
+`xcodebuild -project MoodSyncCompanionApp.xcodeproj -target
+MoodSyncCompanionApp -sdk iphonesimulator -destination 'platform=iOS
+Simulator,name=iPhone 17' ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
+SYMROOT="$(pwd)/SharedBuild" build`.
 
 ## Regenerating the project
 
