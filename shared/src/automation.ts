@@ -112,4 +112,17 @@ export interface AutomationRuleDefinition {
    * rule (and the underlying AutomationExecutionLog audit trail) is
    * unaffected. */
   notificationsEnabled?: boolean;
+  /** Optional geofence trigger — see docs/GEOFENCING_ARCHITECTURE.md and
+   * ai/src/dispatch.ts's `dispatchForLocationEvent`. A rule can combine
+   * this with `conditions`/`timeWindow` (e.g. "on arrival, only if
+   * stress is elevated") or use it alone (`conditions: []`, no
+   * `timeWindow` — a pure "when I get home" rule, valid the same way a
+   * schedule-only rule is). */
+  locationTrigger?: LocationEventType;
 }
+
+/** ARRIVED/DEPARTED a user's one geofenced "home" region — see
+ * docs/GEOFENCING_ARCHITECTURE.md. No coordinate or region metadata is
+ * modeled here; that lives device-side in the iOS companion app
+ * (ios/MoodSyncCompanion/Sources/MoodSyncCompanion/LocationController.swift). */
+export type LocationEventType = 'ARRIVED' | 'DEPARTED';

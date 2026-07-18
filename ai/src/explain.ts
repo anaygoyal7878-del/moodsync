@@ -1,4 +1,11 @@
-import type { AutomationRuleDefinition, BiometricField, NormalizedBiometricReading, RuleCondition, WellnessField } from '@moodsync/shared';
+import type {
+  AutomationRuleDefinition,
+  BiometricField,
+  LocationEventType,
+  NormalizedBiometricReading,
+  RuleCondition,
+  WellnessField,
+} from '@moodsync/shared';
 import type { WellnessScores } from './wellness.js';
 
 const BIOMETRIC_FIELD_LABELS: Record<BiometricField, string> = {
@@ -82,6 +89,20 @@ export function explainTrigger(rule: AutomationRuleDefinition, reading: Normaliz
  * `resourceKeyFor`/conflict resolution in ai/src/dispatch.ts. */
 export function explainConflict(losingRule: AutomationRuleDefinition, winningRule: AutomationRuleDefinition, resourceKey: string): string {
   return `"${winningRule.name}" (priority ${winningRule.priority}) took precedence over "${losingRule.name}" (priority ${losingRule.priority}) for ${resourceKey}.`;
+}
+
+/** The trigger explanation for a location-triggered rule
+ * (`AutomationRuleDefinition.locationTrigger`) — parallel to
+ * `explainTrigger`'s biometric-condition text, since there's no reading
+ * value to cite for a geofence event. Takes just the event type, not
+ * the rule, since the location event itself is the only thing being
+ * described here (a rule that also combines biometric conditions still
+ * only cites the location trigger in this text — see
+ * ai/src/ruleEngine.ts's `evaluateLocationRule` for how those
+ * conditions gate matching without being echoed back in the reason). */
+export function explainLocationTrigger(type: LocationEventType): string {
+  const event = type === 'ARRIVED' ? 'you arrived home' : 'you left home';
+  return `Triggered because ${event}.`;
 }
 
 export function explainManualPause(untilIso: string): string {

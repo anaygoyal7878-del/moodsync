@@ -47,23 +47,27 @@ const actionSchema = z.object({
 
 const timeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Must be "HH:mm" 24-hour time');
 const timeWindowSchema = z.object({ start: timeSchema, end: timeSchema });
+const locationTriggerSchema = z.enum(['ARRIVED', 'DEPARTED']);
 
 const createRuleSchema = z
   .object({
     name: z.string().min(1).max(200),
     enabled: z.boolean().default(true),
-    // A schedule-only rule (Focus Mode, Sleep Preparation) has no
-    // biometric condition at all — only requires .min(1) when timeWindow
-    // isn't set, enforced by the refine below rather than here.
+    // A schedule-only rule (Focus Mode, Sleep Preparation) or a pure
+    // geofence rule (locationTrigger set) has no biometric condition at
+    // all — only requires .min(1) when neither timeWindow nor
+    // locationTrigger is set, enforced by the refine below rather than
+    // here.
     conditions: z.array(conditionSchema),
     actions: z.array(actionSchema).min(1, 'A rule needs at least one action'),
     cooldownMinutes: z.number().int().min(0).max(1440).default(30),
     priority: z.number().int().min(0).max(100).default(50),
     timeWindow: timeWindowSchema.optional(),
     notificationsEnabled: z.boolean().default(true),
+    locationTrigger: locationTriggerSchema.optional(),
   })
-  .refine((data) => data.conditions.length > 0 || data.timeWindow !== undefined, {
-    message: 'A rule needs at least one condition, or a scheduled time window',
+  .refine((data) => data.conditions.length > 0 || data.timeWindow !== undefined || data.locationTrigger !== undefined, {
+    message: 'A rule needs at least one condition, a scheduled time window, or an arrival/departure trigger',
     path: ['conditions'],
   });
 
@@ -76,6 +80,7 @@ const updateRuleSchema = z.object({
   priority: z.number().int().min(0).max(100).optional(),
   timeWindow: timeWindowSchema.nullable().optional(),
   notificationsEnabled: z.boolean().optional(),
+  locationTrigger: locationTriggerSchema.nullable().optional(),
 });
 
 export default async function automationRuleRoutes(app: FastifyInstance) {
@@ -88,11 +93,12 @@ export default async function automationRuleRoutes(app: FastifyInstance) {
     const parsed = createRuleSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
-    const { timeWindow, ...rest } = parsed.data;
+    const { timeWindow, locationTrigger, ...rest } = parsed.data;
     const rule = await automationRuleRepository.create({
       userId: request.userId!,
       ...rest,
       ...(timeWindow !== undefined ? { timeWindow } : {}),
+      ...(locationTrigger !== undefined ? { locationTrigger } : {}),
     });
     return reply.code(201).send({ rule });
   });

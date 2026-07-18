@@ -225,10 +225,18 @@ export function RuleForm({
   const [timeWindowEnabled, setTimeWindowEnabled] = useState(false);
   const [windowStart, setWindowStart] = useState("09:00");
   const [windowEnd, setWindowEnd] = useState("17:00");
-  // Only meaningful once timeWindowEnabled is true — a schedule-only rule
-  // (Focus Mode, Sleep Preparation) has no biometric condition at all,
-  // matching the backend's "conditions.length > 0 OR timeWindow set" rule
-  // (see backend/src/api/routes/automationRules.ts).
+  // "Arrival"/"Departure" trigger — see docs/GEOFENCING_ARCHITECTURE.md.
+  // Requires the iOS companion app's location access; the rule still
+  // fires from the dashboard's perspective the same way any other rule
+  // does, just triggered by a POST /api/location-events push instead of
+  // a biometric reading.
+  const [locationTriggerEnabled, setLocationTriggerEnabled] = useState(false);
+  const [locationTrigger, setLocationTrigger] = useState<"ARRIVED" | "DEPARTED">("ARRIVED");
+  // Only meaningful once timeWindowEnabled or locationTriggerEnabled is
+  // true — a schedule-only or geofence-only rule (Focus Mode, Sleep
+  // Preparation, "when I get home") has no biometric condition at all,
+  // matching the backend's "conditions.length > 0 OR timeWindow set OR
+  // locationTrigger set" rule (see backend/src/api/routes/automationRules.ts).
   const [conditionEnabled, setConditionEnabled] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -290,6 +298,7 @@ export function RuleForm({
         cooldownMinutes: Number(cooldownMinutes),
         priority: Number(priority),
         ...(timeWindowEnabled ? { timeWindow: { start: windowStart, end: windowEnd } } : {}),
+        ...(locationTriggerEnabled ? { locationTrigger } : {}),
         notificationsEnabled,
       }),
     });
@@ -350,6 +359,12 @@ export function RuleForm({
         />
 
         <Switch
+          checked={locationTriggerEnabled}
+          onCheckedChange={setLocationTriggerEnabled}
+          label="Trigger on arrival or departure (requires the iOS companion app's location access)"
+        />
+
+        <Switch
           checked={notificationsEnabled}
           onCheckedChange={setNotificationsEnabled}
           label="Notify me when this rule fires"
@@ -360,13 +375,32 @@ export function RuleForm({
             <Input type="time" className="w-auto" value={windowStart} onChange={(e) => setWindowStart(e.target.value)} />
             <span>and</span>
             <Input type="time" className="w-auto" value={windowEnd} onChange={(e) => setWindowEnd(e.target.value)} />
-            <Switch
-              checked={conditionEnabled}
-              onCheckedChange={setConditionEnabled}
-              label="Also require a biometric condition"
-              className="ml-4"
-            />
           </div>
+        )}
+
+        {locationTriggerEnabled && (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-ink-secondary">
+            <span>When you</span>
+            <Select
+              className="w-auto"
+              value={locationTrigger}
+              onChange={(e) => setLocationTrigger(e.target.value as "ARRIVED" | "DEPARTED")}
+            >
+              <option value="ARRIVED">arrive home</option>
+              <option value="DEPARTED">leave home</option>
+            </Select>
+            <span className="text-xs text-ink-muted">
+              set once in the MoodSync companion iOS app — see the geofencing developer guide.
+            </span>
+          </div>
+        )}
+
+        {(timeWindowEnabled || locationTriggerEnabled) && (
+          <Switch
+            checked={conditionEnabled}
+            onCheckedChange={setConditionEnabled}
+            label="Also require a biometric condition"
+          />
         )}
 
         {conditionEnabled && (

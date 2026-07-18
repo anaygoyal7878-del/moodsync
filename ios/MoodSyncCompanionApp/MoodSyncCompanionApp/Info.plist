@@ -22,9 +22,14 @@
 	<string>MoodSync reads your heart rate, sleep, and activity data to automate your smart home based on how you're feeling.</string>
 	<key>NSHomeKitUsageDescription</key>
 	<string>MoodSync activates HomeKit scenes you've configured (like "Relax" or "Focus") based on your biometrics.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>MoodSync uses your location to detect when you arrive at or leave the home region you set, so it can trigger arrival/departure automations.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>MoodSync monitors your home region in the background so arrival/departure automations still fire when the app isn't open.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
+		<string>location</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict/>

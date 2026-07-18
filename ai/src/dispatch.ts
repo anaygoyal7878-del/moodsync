@@ -6,11 +6,18 @@ import {
   biometricReadingRepository,
   userTimezoneRepository,
 } from '@moodsync/database';
-import type { AutomationRuleDefinition, NormalizedBiometricReading } from '@moodsync/shared';
-import { evaluateRules } from './ruleEngine.js';
+import type { AutomationRuleDefinition, NormalizedBiometricReading, LocationEventType } from '@moodsync/shared';
+import { evaluateRules, evaluateLocationRules } from './ruleEngine.js';
 import { isWithinCooldown } from './cooldown.js';
 import { executeAction } from './actionExecutors.js';
-import { explainTrigger, explainConflict, explainManualPause, explainRateLimit, explainResourcePause } from './explain.js';
+import {
+  explainTrigger,
+  explainLocationTrigger,
+  explainConflict,
+  explainManualPause,
+  explainRateLimit,
+  explainResourcePause,
+} from './explain.js';
 import { deliverNotification } from './notificationExecutor.js';
 import { computeWellnessScores } from './wellness.js';
 
@@ -123,41 +130,23 @@ async function recordAndNotify(params: {
 }
 
 /**
- * The core product loop: given one new biometric reading (or, for a
- * schedule-only rule, a tick with no fresh biometric data — see
- * workers/src/scheduledDispatch.ts), find every enabled rule it matches,
- * apply manual-pause / conflict-resolution / cooldown / safety-rate-limit
- * checks in that order, execute what's left, and record every outcome
- * (including skips and failures, never just successes) with a
- * human-readable explanation to both `AutomationExecutionLog` and a
- * persisted `Notification` — see docs/DECISION_ENGINE_ARCHITECTURE.md.
- * Called from the backend's manual "sync now" endpoint, every wearable
- * sync worker, and the scheduled-tick worker.
+ * Shared by both dispatch entry points (a matched biometric reading, or a
+ * matched location event) — manual-pause / conflict-resolution / cooldown /
+ * safety-rate-limit / per-resource-pause checks, action execution, and
+ * outcome recording, all identical regardless of what triggered the
+ * match. `readingId` is `undefined` for a location-triggered dispatch —
+ * there's no biometric reading tied to it. `reasonFor` builds the
+ * human-readable trigger explanation per rule, since that text differs
+ * (a biometric condition's value vs. "you arrived home").
  */
-export async function dispatchForReading(
-  reading: NormalizedBiometricReading,
-  readingId?: string,
-  now: Date = new Date(),
+async function dispatchMatchedRules(
+  userId: string,
+  matched: AutomationRuleDefinition[],
+  readingId: string | undefined,
+  reasonFor: (rule: AutomationRuleDefinition) => string,
+  now: Date,
 ): Promise<DispatchResult[]> {
-  const userId = reading.userId;
   const results: DispatchResult[] = [];
-
-  const rules = await automationRuleRepository.listEnabledForUser(userId);
-
-  // Only fetch history and compute wellness scores when some enabled
-  // rule actually references one — the common case (biometric-only
-  // rules) skips this extra DB round-trip entirely.
-  const needsWellnessScores = rules.some((rule) => rule.conditions.some((c) => c.field.startsWith('wellness.')));
-  const wellnessScores = needsWellnessScores
-    ? computeWellnessScores(reading, (await biometricReadingRepository.listRecentNormalized(userId, WELLNESS_HISTORY_DAYS)).filter((r) => r.timestamp !== reading.timestamp))
-    : undefined;
-
-  // Only fetch the user's timezone when some enabled rule actually has a
-  // timeWindow — biometric-only rules (the common case) never consult it.
-  const needsTimezone = rules.some((rule) => rule.timeWindow != null);
-  const timezone = needsTimezone ? await userTimezoneRepository.getTimezone(userId) : 'UTC';
-
-  const matched = evaluateRules(rules, reading, now, wellnessScores, timezone);
   if (matched.length === 0) return results;
 
   const pausedUntil = await userPreferencesRepository.getAutomationsPausedUntil(userId);
@@ -209,7 +198,7 @@ export async function dispatchForReading(
       continue;
     }
 
-    const reason = explainTrigger(rule, reading, wellnessScores);
+    const reason = reasonFor(rule);
     try {
       let anyQueued = false;
       let anyExecuted = false;
@@ -262,4 +251,81 @@ export async function dispatchForReading(
   }
 
   return results;
+}
+
+/**
+ * The core product loop: given one new biometric reading (or, for a
+ * schedule-only rule, a tick with no fresh biometric data — see
+ * workers/src/scheduledDispatch.ts), find every enabled rule it matches,
+ * apply manual-pause / conflict-resolution / cooldown / safety-rate-limit
+ * checks in that order, execute what's left, and record every outcome
+ * (including skips and failures, never just successes) with a
+ * human-readable explanation to both `AutomationExecutionLog` and a
+ * persisted `Notification` — see docs/DECISION_ENGINE_ARCHITECTURE.md.
+ * Called from the backend's manual "sync now" endpoint, every wearable
+ * sync worker, and the scheduled-tick worker.
+ */
+export async function dispatchForReading(
+  reading: NormalizedBiometricReading,
+  readingId?: string,
+  now: Date = new Date(),
+): Promise<DispatchResult[]> {
+  const userId = reading.userId;
+
+  const rules = await automationRuleRepository.listEnabledForUser(userId);
+
+  // Only fetch history and compute wellness scores when some enabled
+  // rule actually references one — the common case (biometric-only
+  // rules) skips this extra DB round-trip entirely.
+  const needsWellnessScores = rules.some((rule) => rule.conditions.some((c) => c.field.startsWith('wellness.')));
+  const wellnessScores = needsWellnessScores
+    ? computeWellnessScores(reading, (await biometricReadingRepository.listRecentNormalized(userId, WELLNESS_HISTORY_DAYS)).filter((r) => r.timestamp !== reading.timestamp))
+    : undefined;
+
+  // Only fetch the user's timezone when some enabled rule actually has a
+  // timeWindow — biometric-only rules (the common case) never consult it.
+  const needsTimezone = rules.some((rule) => rule.timeWindow != null);
+  const timezone = needsTimezone ? await userTimezoneRepository.getTimezone(userId) : 'UTC';
+
+  const matched = evaluateRules(rules, reading, now, wellnessScores, timezone);
+  return dispatchMatchedRules(userId, matched, readingId, (rule) => explainTrigger(rule, reading, wellnessScores), now);
+}
+
+/**
+ * A location-triggered dispatch pass, parallel to `dispatchForReading` —
+ * see docs/GEOFENCING_ARCHITECTURE.md for why this needs its own entry
+ * point rather than a synthetic fake reading: an ARRIVED/DEPARTED event
+ * isn't a biometric reading, and a rule that reacts to it (via
+ * `AutomationRuleDefinition.locationTrigger`) may optionally also require
+ * biometric conditions, evaluated against the user's most recent stored
+ * reading (there's no reading accompanying a location event itself).
+ * Called by the backend's `POST /api/location-events` route after
+ * persisting the `LocationEvent` row.
+ */
+export async function dispatchForLocationEvent(
+  userId: string,
+  type: LocationEventType,
+  now: Date = new Date(),
+): Promise<DispatchResult[]> {
+  const rules = await automationRuleRepository.listEnabledForUser(userId);
+  const candidateRules = rules.filter((rule) => rule.locationTrigger === type);
+  if (candidateRules.length === 0) return [];
+
+  // Only fetch a reading/wellness-scores/timezone when some candidate
+  // rule actually needs them — a pure location-only rule (no
+  // conditions, no timeWindow) needs none of this.
+  const needsReading = candidateRules.some((rule) => rule.conditions.length > 0);
+  const latestReading = needsReading ? (await biometricReadingRepository.findLatestNormalized(userId))?.reading : undefined;
+
+  const needsWellnessScores = candidateRules.some((rule) => rule.conditions.some((c) => c.field.startsWith('wellness.')));
+  const wellnessScores =
+    needsWellnessScores && latestReading
+      ? computeWellnessScores(latestReading, (await biometricReadingRepository.listRecentNormalized(userId, WELLNESS_HISTORY_DAYS)).filter((r) => r.timestamp !== latestReading.timestamp))
+      : undefined;
+
+  const needsTimezone = candidateRules.some((rule) => rule.timeWindow != null);
+  const timezone = needsTimezone ? await userTimezoneRepository.getTimezone(userId) : 'UTC';
+
+  const matched = evaluateLocationRules(candidateRules, type, now, latestReading, wellnessScores, timezone);
+  return dispatchMatchedRules(userId, matched, undefined, () => explainLocationTrigger(type), now);
 }

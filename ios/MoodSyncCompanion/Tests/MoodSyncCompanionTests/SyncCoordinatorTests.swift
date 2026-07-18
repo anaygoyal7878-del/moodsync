@@ -45,6 +45,8 @@ private final class FakeAPIClient: MoodSyncAPIClientProtocol, @unchecked Sendabl
     func completePendingDeviceCommand(id: String, status: PendingDeviceCommandOutcome, accessToken: String) async throws {
         completedCommandIDs.append((id, status))
     }
+
+    func postLocationEvent(type: LocationEventType, occurredAt: Date, accessToken: String) async throws {}
 }
 
 final class SyncCoordinatorTests: XCTestCase {

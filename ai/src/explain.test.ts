@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AutomationRuleDefinition, NormalizedBiometricReading } from '@moodsync/shared';
-import { explainTrigger, explainConflict, explainManualPause, explainRateLimit } from './explain.js';
+import { explainTrigger, explainConflict, explainManualPause, explainRateLimit, explainLocationTrigger } from './explain.js';
 
 function rule(overrides: Partial<AutomationRuleDefinition> = {}): AutomationRuleDefinition {
   return {
@@ -92,5 +92,15 @@ describe('explainConflict / explainManualPause / explainRateLimit', () => {
 
   it('formats a rate-limit explanation', () => {
     expect(explainRateLimit(rule(), 10)).toContain('10');
+  });
+});
+
+describe('explainLocationTrigger', () => {
+  it('describes an arrival', () => {
+    expect(explainLocationTrigger('ARRIVED')).toContain('arrived home');
+  });
+
+  it('describes a departure', () => {
+    expect(explainLocationTrigger('DEPARTED')).toContain('left home');
   });
 });

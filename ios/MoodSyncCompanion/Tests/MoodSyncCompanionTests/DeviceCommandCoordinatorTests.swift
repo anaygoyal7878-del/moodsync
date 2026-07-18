@@ -35,6 +35,8 @@ private final class FakeDeviceCommandAPIClient: MoodSyncAPIClientProtocol, @unch
     func completePendingDeviceCommand(id: String, status: PendingDeviceCommandOutcome, accessToken: String) async throws {
         completions.append((id, status))
     }
+
+    func postLocationEvent(type: LocationEventType, occurredAt: Date, accessToken: String) async throws {}
 }
 
 private func makeCommand(id: String = "cmd-1", sceneName: String = "MoodSync Relax") -> PendingDeviceCommand {

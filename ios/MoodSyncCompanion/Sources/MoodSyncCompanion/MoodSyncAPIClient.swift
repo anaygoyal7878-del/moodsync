@@ -19,6 +19,19 @@ public protocol MoodSyncAPIClientProtocol: Sendable {
     func ingest(readings: [NormalizedReading], deviceName: String?, accessToken: String) async throws -> Int
     func fetchPendingDeviceCommands(accessToken: String) async throws -> [PendingDeviceCommand]
     func completePendingDeviceCommand(id: String, status: PendingDeviceCommandOutcome, accessToken: String) async throws
+    /// Pushed by `LocationController` on a `CLCircularRegion` enter/exit
+    /// callback — see docs/GEOFENCING_ARCHITECTURE.md. Matches
+    /// `backend/src/api/routes/locationEvents.ts`'s
+    /// `{ type, occurredAt }` request body exactly.
+    func postLocationEvent(type: LocationEventType, occurredAt: Date, accessToken: String) async throws
+}
+
+/// ARRIVED/DEPARTED — mirrors `LocationEventType` in
+/// shared/src/automation.ts exactly (same two string values), kept as
+/// its own Swift enum rather than importing anything cross-language.
+public enum LocationEventType: String, Sendable, Codable {
+    case arrived = "ARRIVED"
+    case departed = "DEPARTED"
 }
 
 public enum PendingDeviceCommandOutcome: Sendable, Equatable {
@@ -99,6 +112,18 @@ public actor MoodSyncAPIClient: MoodSyncAPIClientProtocol {
         let _: EmptyResponse? = try await postAllowingEmptyResponse(
             path: "/api/devices/pending-commands/\(id)/complete",
             body: body,
+            accessToken: accessToken
+        )
+    }
+
+    public func postLocationEvent(type: LocationEventType, occurredAt: Date, accessToken: String) async throws {
+        struct LocationEventRequest: Encodable { let type: String; let occurredAt: Date }
+        struct Response: Decodable { let dispatched: [DispatchedRuleSummary] }
+        struct DispatchedRuleSummary: Decodable {}
+
+        let _: Response = try await post(
+            path: "/api/location-events",
+            body: LocationEventRequest(type: type.rawValue, occurredAt: occurredAt),
             accessToken: accessToken
         )
     }

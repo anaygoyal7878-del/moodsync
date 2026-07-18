@@ -1,4 +1,12 @@
-import type { AutomationRuleDefinition, BiometricField, NormalizedBiometricReading, RuleCondition, TimeWindow, WellnessField } from '@moodsync/shared';
+import type {
+  AutomationRuleDefinition,
+  BiometricField,
+  LocationEventType,
+  NormalizedBiometricReading,
+  RuleCondition,
+  TimeWindow,
+  WellnessField,
+} from '@moodsync/shared';
 import type { WellnessScores } from './wellness.js';
 
 function compare(actual: number, operator: RuleCondition['operator'], expected: number): boolean {
@@ -140,4 +148,43 @@ export function evaluateRules(
   timezone: string = 'UTC',
 ): AutomationRuleDefinition[] {
   return rules.filter((rule) => evaluateRule(rule, reading, now, wellnessScores, timezone));
+}
+
+/**
+ * A location-triggered rule (`AutomationRuleDefinition.locationTrigger`)
+ * matches an ARRIVED/DEPARTED event of the same type, still respecting
+ * `timeWindow` if set. Unlike a biometric-triggered rule, `conditions`
+ * are optional here even when non-empty — a pure location rule
+ * (`conditions: []`, no `timeWindow`) is valid by design (the location
+ * event itself is the whole trigger), and a rule that also sets
+ * biometric conditions requires a `latestReading` to check them against
+ * (there's no reading tied to the location event itself — see
+ * ai/src/dispatch.ts's `dispatchForLocationEvent`) — never matches
+ * without one rather than guessing.
+ */
+export function evaluateLocationRule(
+  rule: AutomationRuleDefinition,
+  type: LocationEventType,
+  now: Date = new Date(),
+  latestReading?: NormalizedBiometricReading,
+  wellnessScores?: WellnessScores,
+  timezone: string = 'UTC',
+): boolean {
+  if (!rule.enabled) return false;
+  if (rule.locationTrigger !== type) return false;
+  if (rule.timeWindow && !withinTimeWindow(rule.timeWindow, now, timezone)) return false;
+  if (rule.conditions.length === 0) return true;
+  if (!latestReading) return false;
+  return rule.conditions.every((condition) => conditionMatches(condition, latestReading, wellnessScores));
+}
+
+export function evaluateLocationRules(
+  rules: AutomationRuleDefinition[],
+  type: LocationEventType,
+  now: Date = new Date(),
+  latestReading?: NormalizedBiometricReading,
+  wellnessScores?: WellnessScores,
+  timezone: string = 'UTC',
+): AutomationRuleDefinition[] {
+  return rules.filter((rule) => evaluateLocationRule(rule, type, now, latestReading, wellnessScores, timezone));
 }

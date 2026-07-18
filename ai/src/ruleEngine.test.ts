@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AutomationRuleDefinition, NormalizedBiometricReading } from '@moodsync/shared';
-import { evaluateRule, evaluateRules, withinTimeWindow } from './ruleEngine.js';
+import { evaluateRule, evaluateRules, evaluateLocationRule, evaluateLocationRules, withinTimeWindow } from './ruleEngine.js';
 import type { WellnessScores } from './wellness.js';
 
 function makeReading(overrides: Partial<NormalizedBiometricReading> = {}): NormalizedBiometricReading {
@@ -143,6 +143,56 @@ describe('withinTimeWindow', () => {
     expect(withinTimeWindow(window, summerAfternoonUtc, 'America/Chicago')).toBe(true);
     expect(withinTimeWindow(window, summerAfternoonUtc, 'UTC')).toBe(true);
     expect(withinTimeWindow(window, summerAfternoonUtc, 'Asia/Tokyo')).toBe(false); // 23:30 JST
+  });
+});
+
+describe('evaluateLocationRule', () => {
+  it('matches a pure location rule (no conditions) of the same event type', () => {
+    const rule = makeRule({ conditions: [], locationTrigger: 'ARRIVED' });
+    expect(evaluateLocationRule(rule, 'ARRIVED')).toBe(true);
+  });
+
+  it('does not match a different event type', () => {
+    const rule = makeRule({ conditions: [], locationTrigger: 'ARRIVED' });
+    expect(evaluateLocationRule(rule, 'DEPARTED')).toBe(false);
+  });
+
+  it('does not match a rule with no locationTrigger at all', () => {
+    const rule = makeRule({ conditions: [] });
+    expect(evaluateLocationRule(rule, 'ARRIVED')).toBe(false);
+  });
+
+  it('never matches a disabled rule', () => {
+    const rule = makeRule({ conditions: [], locationTrigger: 'ARRIVED', enabled: false });
+    expect(evaluateLocationRule(rule, 'ARRIVED')).toBe(false);
+  });
+
+  it('respects an additional timeWindow', () => {
+    const rule = makeRule({ conditions: [], locationTrigger: 'ARRIVED', timeWindow: { start: '09:00', end: '17:00' } });
+    const noon = new Date();
+    noon.setUTCHours(12, 0, 0, 0);
+    const midnight = new Date();
+    midnight.setUTCHours(0, 0, 0, 0);
+    expect(evaluateLocationRule(rule, 'ARRIVED', noon)).toBe(true);
+    expect(evaluateLocationRule(rule, 'ARRIVED', midnight)).toBe(false);
+  });
+
+  it('requires a latestReading to check an additional biometric condition, never matching without one', () => {
+    const rule = makeRule({
+      conditions: [{ field: 'recoveryScore', operator: 'lt', value: 40 }],
+      locationTrigger: 'ARRIVED',
+    });
+    expect(evaluateLocationRule(rule, 'ARRIVED')).toBe(false);
+    expect(evaluateLocationRule(rule, 'ARRIVED', new Date(), makeReading({ recoveryScore: 32 }))).toBe(true);
+    expect(evaluateLocationRule(rule, 'ARRIVED', new Date(), makeReading({ recoveryScore: 90 }))).toBe(false);
+  });
+});
+
+describe('evaluateLocationRules', () => {
+  it('returns only the rules matching the given event type', () => {
+    const arrival = makeRule({ id: 'a', conditions: [], locationTrigger: 'ARRIVED' });
+    const departure = makeRule({ id: 'b', conditions: [], locationTrigger: 'DEPARTED' });
+    expect(evaluateLocationRules([arrival, departure], 'ARRIVED')).toEqual([arrival]);
   });
 });
 

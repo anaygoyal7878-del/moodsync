@@ -1,6 +1,6 @@
 import { prisma } from '../prismaClient.js';
 import { Prisma } from '@prisma/client';
-import type { AutomationRuleDefinition, RuleCondition, AutomationAction, TimeWindow } from '@moodsync/shared';
+import type { AutomationRuleDefinition, RuleCondition, AutomationAction, TimeWindow, LocationEventType } from '@moodsync/shared';
 
 /** RuleCondition[]/AutomationAction[] are plain JSON-shaped interfaces
  * (strings/numbers/Record<string,unknown>), so this cast is a type-system
@@ -21,6 +21,7 @@ function toDomain(row: {
   priority: number;
   timeWindow: unknown;
   notificationsEnabled: boolean;
+  locationTrigger: LocationEventType | null;
 }): AutomationRuleDefinition {
   return {
     id: row.id,
@@ -33,6 +34,7 @@ function toDomain(row: {
     priority: row.priority,
     ...(row.timeWindow ? { timeWindow: row.timeWindow as TimeWindow } : {}),
     notificationsEnabled: row.notificationsEnabled,
+    ...(row.locationTrigger ? { locationTrigger: row.locationTrigger } : {}),
   };
 }
 
@@ -54,6 +56,7 @@ export interface AutomationRuleUpdateInput {
   priority?: number | undefined;
   timeWindow?: TimeWindow | null | undefined;
   notificationsEnabled?: boolean | undefined;
+  locationTrigger?: LocationEventType | null | undefined;
 }
 
 export const automationRuleRepository = {
@@ -93,6 +96,7 @@ export const automationRuleRepository = {
         priority: input.priority,
         ...(input.timeWindow ? { timeWindow: toJson(input.timeWindow) } : {}),
         ...(input.notificationsEnabled !== undefined ? { notificationsEnabled: input.notificationsEnabled } : {}),
+        ...(input.locationTrigger ? { locationTrigger: input.locationTrigger } : {}),
       },
     });
     return toDomain(row);
@@ -115,6 +119,7 @@ export const automationRuleRepository = {
           ? { timeWindow: input.timeWindow ? toJson(input.timeWindow) : Prisma.JsonNull }
           : {}),
         ...(input.notificationsEnabled !== undefined ? { notificationsEnabled: input.notificationsEnabled } : {}),
+        ...(input.locationTrigger !== undefined ? { locationTrigger: input.locationTrigger } : {}),
       },
     });
     if (result.count === 0) return null;

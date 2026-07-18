@@ -39,6 +39,7 @@ model User {
   pendingDeviceCommands PendingDeviceCommand[]
   resourcePauses       ResourcePause[]
   musicPlayLogs        MusicPlayLog[]
+  locationEvents       LocationEvent[]
   preferences          UserPreferences?
 
   @@map("users")
@@ -253,6 +254,10 @@ model AutomationRule {
   /// (account-wide); this silences just this rule's notifications while
   /// its AutomationExecutionLog audit trail keeps recording regardless.
   notificationsEnabled Boolean @default(true)
+  /// Optional geofence trigger — see docs/GEOFENCING_ARCHITECTURE.md and
+  /// ai/src/dispatch.ts's dispatchForLocationEvent. Null for every
+  /// existing (biometric/schedule-triggered) rule.
+  locationTrigger LocationEventType?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -490,4 +495,26 @@ model PendingNotificationDigestEntry {
 
   @@index([userId, createdAt])
   @@map("pending_notification_digest_entries")
+}
+
+enum LocationEventType {
+  ARRIVED
+  DEPARTED
+}
+
+/// ARRIVED/DEPARTED a user's one geofenced "home" region, pushed by
+/// LocationController.swift in the iOS companion app — see
+/// docs/GEOFENCING_ARCHITECTURE.md. No coordinate is ever stored, only
+/// the boolean crossing event, consumed by
+/// ai/src/dispatch.ts's dispatchForLocationEvent.
+model LocationEvent {
+  id         String            @id @default(uuid())
+  userId     String
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       LocationEventType
+  occurredAt DateTime
+  createdAt  DateTime          @default(now())
+
+  @@index([userId, occurredAt])
+  @@map("location_events")
 }
