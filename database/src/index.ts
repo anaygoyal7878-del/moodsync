@@ -10,6 +10,10 @@ export { biometricReadingRepository } from './repositories/biometricReadingRepos
 export { automationRuleRepository, type AutomationRuleUpdateInput } from './repositories/automationRuleRepository.js';
 export { automationExecutionLogRepository } from './repositories/automationExecutionLogRepository.js';
 export { notificationRepository } from './repositories/notificationRepository.js';
+export {
+  pendingNotificationDigestRepository,
+  type QueueDigestEntryInput,
+} from './repositories/pendingNotificationDigestRepository.js';
 export { userPreferencesRepository } from './repositories/userPreferencesRepository.js';
 export { pendingDeviceCommandRepository } from './repositories/pendingDeviceCommandRepository.js';
 export { userTimezoneRepository } from './repositories/userTimezoneRepository.js';

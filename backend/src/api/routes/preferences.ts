@@ -16,6 +16,7 @@ const notificationPreferencesSchema = z
     notificationsEnabled: z.boolean().optional(),
     quietHoursStart: timeSchema.nullable().optional(),
     quietHoursEnd: timeSchema.nullable().optional(),
+    notificationDigestMode: z.enum(['IMMEDIATE', 'HOURLY']).optional(),
   })
   .refine((data) => (data.quietHoursStart == null) === (data.quietHoursEnd == null), {
     message: 'quietHoursStart and quietHoursEnd must both be set or both be null',

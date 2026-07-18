@@ -10,6 +10,7 @@
     "start:sync-all": "node dist/syncAll.js",
     "start:scheduled-dispatch": "node dist/scheduledDispatch.js",
     "start:weekly-report": "node dist/weeklyReportWorker.js",
+    "start:notification-digest": "node dist/notificationDigestWorker.js",
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {

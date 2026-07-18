@@ -35,6 +35,7 @@ model User {
   recommendations      Recommendation[]
   automationLogs       AutomationExecutionLog[]
   notifications        Notification[]
+  pendingNotificationDigestEntries PendingNotificationDigestEntry[]
   pendingDeviceCommands PendingDeviceCommand[]
   preferences          UserPreferences?
 
@@ -245,6 +246,11 @@ model AutomationRule {
   /// templates (Focus Mode, Sleep Preparation) rely on this alongside an
   /// empty `conditions` array — see docs/DECISION_ENGINE_ARCHITECTURE.md.
   timeWindow      Json?
+  /// Per-rule notification opt-off — see AutomationRuleDefinition in
+  /// shared/src/automation.ts. Distinct from UserPreferences.notificationsEnabled
+  /// (account-wide); this silences just this rule's notifications while
+  /// its AutomationExecutionLog audit trail keeps recording regardless.
+  notificationsEnabled Boolean @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -412,7 +418,36 @@ model UserPreferences {
   /// self-expiring override — see docs/DECISION_ENGINE_ARCHITECTURE.md.
   automationsPausedUntil DateTime?
   preferredUnits         String    @default("imperial")
+  /// IMMEDIATE (default, unchanged prior behavior): every dispatch
+  /// outcome that passes shouldNotify writes a Notification row right
+  /// away. HOURLY: outcomes queue into PendingNotificationDigestEntry
+  /// instead, and workers/src/notificationDigestWorker.ts batches each
+  /// user's queued entries into one combined Notification per run.
+  notificationDigestMode NotificationDigestMode @default(IMMEDIATE)
   updatedAt              DateTime  @updatedAt
 
   @@map("user_preferences")
+}
+
+enum NotificationDigestMode {
+  IMMEDIATE
+  HOURLY
+}
+
+/// Queued notification content awaiting the next
+/// workers/src/notificationDigestWorker.ts run — only written to when a
+/// user's notificationDigestMode is HOURLY (see ai/src/notificationExecutor.ts's
+/// deliverNotification). Consumed and deleted once batched into a real
+/// Notification row.
+model PendingNotificationDigestEntry {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  ruleId    String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("pending_notification_digest_entries")
 }

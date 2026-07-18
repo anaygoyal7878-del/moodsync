@@ -13,7 +13,7 @@ export default async function NotificationsPage() {
   const isAutomationPaused = pauseResult.ok ? pauseResult.data.isPaused : false;
   const notificationPreferences: NotificationPreferences = notificationPreferencesResult.ok
     ? notificationPreferencesResult.data
-    : { notificationsEnabled: true, quietHoursStart: null, quietHoursEnd: null };
+    : { notificationsEnabled: true, quietHoursStart: null, quietHoursEnd: null, notificationDigestMode: "IMMEDIATE" };
 
   return (
     <NotificationHistorySection

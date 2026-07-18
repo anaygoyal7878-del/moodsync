@@ -60,6 +60,7 @@ const createRuleSchema = z
     cooldownMinutes: z.number().int().min(0).max(1440).default(30),
     priority: z.number().int().min(0).max(100).default(50),
     timeWindow: timeWindowSchema.optional(),
+    notificationsEnabled: z.boolean().default(true),
   })
   .refine((data) => data.conditions.length > 0 || data.timeWindow !== undefined, {
     message: 'A rule needs at least one condition, or a scheduled time window',
@@ -74,6 +75,7 @@ const updateRuleSchema = z.object({
   cooldownMinutes: z.number().int().min(0).max(1440).optional(),
   priority: z.number().int().min(0).max(100).optional(),
   timeWindow: timeWindowSchema.nullable().optional(),
+  notificationsEnabled: z.boolean().optional(),
 });
 
 export default async function automationRuleRoutes(app: FastifyInstance) {

@@ -20,6 +20,7 @@ function toDomain(row: {
   cooldownMinutes: number;
   priority: number;
   timeWindow: unknown;
+  notificationsEnabled: boolean;
 }): AutomationRuleDefinition {
   return {
     id: row.id,
@@ -31,6 +32,7 @@ function toDomain(row: {
     cooldownMinutes: row.cooldownMinutes,
     priority: row.priority,
     ...(row.timeWindow ? { timeWindow: row.timeWindow as TimeWindow } : {}),
+    notificationsEnabled: row.notificationsEnabled,
   };
 }
 
@@ -51,6 +53,7 @@ export interface AutomationRuleUpdateInput {
   cooldownMinutes?: number | undefined;
   priority?: number | undefined;
   timeWindow?: TimeWindow | null | undefined;
+  notificationsEnabled?: boolean | undefined;
 }
 
 export const automationRuleRepository = {
@@ -89,6 +92,7 @@ export const automationRuleRepository = {
         cooldownMinutes: input.cooldownMinutes,
         priority: input.priority,
         ...(input.timeWindow ? { timeWindow: toJson(input.timeWindow) } : {}),
+        ...(input.notificationsEnabled !== undefined ? { notificationsEnabled: input.notificationsEnabled } : {}),
       },
     });
     return toDomain(row);
@@ -110,6 +114,7 @@ export const automationRuleRepository = {
         ...(input.timeWindow !== undefined
           ? { timeWindow: input.timeWindow ? toJson(input.timeWindow) : Prisma.JsonNull }
           : {}),
+        ...(input.notificationsEnabled !== undefined ? { notificationsEnabled: input.notificationsEnabled } : {}),
       },
     });
     if (result.count === 0) return null;

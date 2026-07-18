@@ -21,6 +21,7 @@ export function NotificationPreferencesForm({ preferences }: { preferences: Noti
   const [quietHoursOn, setQuietHoursOn] = useState(preferences.quietHoursStart !== null);
   const [quietHoursStart, setQuietHoursStart] = useState(preferences.quietHoursStart ?? "22:00");
   const [quietHoursEnd, setQuietHoursEnd] = useState(preferences.quietHoursEnd ?? "07:00");
+  const [digestOn, setDigestOn] = useState(preferences.notificationDigestMode === "HOURLY");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -34,6 +35,7 @@ export function NotificationPreferencesForm({ preferences }: { preferences: Noti
         notificationsEnabled,
         quietHoursStart: quietHoursOn ? quietHoursStart : null,
         quietHoursEnd: quietHoursOn ? quietHoursEnd : null,
+        notificationDigestMode: digestOn ? "HOURLY" : "IMMEDIATE",
       }),
     });
     router.refresh();
@@ -59,6 +61,12 @@ export function NotificationPreferencesForm({ preferences }: { preferences: Noti
           <Input type="time" className="w-auto" value={quietHoursEnd} onChange={(e) => setQuietHoursEnd(e.target.value)} />
         </div>
       )}
+
+      <Switch
+        checked={digestOn}
+        onCheckedChange={setDigestOn}
+        label="Bundle notifications into an hourly digest instead of sending each one immediately"
+      />
 
       <div className="flex items-center gap-2">
         <Button variant="ghost" disabled={saving} onClick={save}>

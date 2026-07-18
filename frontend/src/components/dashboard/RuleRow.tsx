@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lightbulb, Music, Smartphone, Thermometer, Mic, Bell, Zap } from "lucide-react";
+import { Lightbulb, Music, Smartphone, Thermometer, Mic, Bell, BellOff, Zap } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -66,6 +66,11 @@ export function RuleRow({ rule }: { rule: AutomationRuleDefinition }) {
             <Badge variant={rule.enabled ? "success" : "neutral"} dot>
               {rule.enabled ? "Enabled" : "Disabled"}
             </Badge>
+            {rule.notificationsEnabled === false && (
+              <span title="Notifications muted for this rule" className="text-ink-muted">
+                <BellOff size={13} aria-hidden="true" />
+              </span>
+            )}
           </div>
           <p className="text-xs text-ink-muted">
             {rule.conditions.length > 0 ? rule.conditions.map(summarizeCondition).join(" and ") : "scheduled"}

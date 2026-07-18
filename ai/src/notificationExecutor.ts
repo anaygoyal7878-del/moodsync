@@ -1,4 +1,9 @@
-import { notificationRepository, userPreferencesRepository, userTimezoneRepository } from '@moodsync/database';
+import {
+  notificationRepository,
+  pendingNotificationDigestRepository,
+  userPreferencesRepository,
+  userTimezoneRepository,
+} from '@moodsync/database';
 import { withinTimeWindow } from './ruleEngine.js';
 
 export interface CreateNotificationInput {
@@ -57,4 +62,26 @@ export async function createNotification(input: CreateNotificationInput): Promis
     body: input.body,
     ruleId: input.ruleId,
   });
+}
+
+/**
+ * The single entry point dispatch.ts's `recordAndNotify` calls for every
+ * outcome that should notify — checks `shouldNotify` first (quiet
+ * hours/on-off, unchanged), then branches on the user's
+ * `notificationDigestMode`: `IMMEDIATE` (default) writes a real
+ * `Notification` right away via `createNotification`, same behavior as
+ * before this mode existed; `HOURLY` queues the content into
+ * `PendingNotificationDigestEntry` instead, for
+ * `workers/src/notificationDigestWorker.ts` to batch into one combined
+ * `Notification` per user on its next run.
+ */
+export async function deliverNotification(input: CreateNotificationInput, now: Date = new Date()): Promise<void> {
+  if (!(await shouldNotify(input.userId, now))) return;
+
+  const digestMode = await userPreferencesRepository.getNotificationDigestMode(input.userId);
+  if (digestMode === 'HOURLY') {
+    await pendingNotificationDigestRepository.create(input);
+    return;
+  }
+  await createNotification(input);
 }

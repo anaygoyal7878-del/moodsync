@@ -230,6 +230,7 @@ export function RuleForm({
   // matching the backend's "conditions.length > 0 OR timeWindow set" rule
   // (see backend/src/api/routes/automationRules.ts).
   const [conditionEnabled, setConditionEnabled] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -289,6 +290,7 @@ export function RuleForm({
         cooldownMinutes: Number(cooldownMinutes),
         priority: Number(priority),
         ...(timeWindowEnabled ? { timeWindow: { start: windowStart, end: windowEnd } } : {}),
+        notificationsEnabled,
       }),
     });
 
@@ -345,6 +347,12 @@ export function RuleForm({
           checked={timeWindowEnabled}
           onCheckedChange={setTimeWindowEnabled}
           label="Only during a scheduled time window"
+        />
+
+        <Switch
+          checked={notificationsEnabled}
+          onCheckedChange={setNotificationsEnabled}
+          label="Notify me when this rule fires"
         />
         {timeWindowEnabled && (
           <div className="flex flex-wrap items-center gap-2 text-sm text-ink-secondary">

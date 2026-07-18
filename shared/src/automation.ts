@@ -104,4 +104,12 @@ export interface AutomationRuleDefinition {
    * biometric condition at all) is the one case that's valid with an
    * empty `conditions` array, as long as `timeWindow` is set. */
   timeWindow?: TimeWindow;
+  /** Per-rule notification opt-off — defaults to true (undefined is
+   * treated as enabled everywhere this is read) so existing rules built
+   * before this field existed keep notifying exactly as before. Distinct
+   * from the account-wide `UserPreferences.notificationsEnabled` toggle:
+   * this silences one specific rule's notifications while every other
+   * rule (and the underlying AutomationExecutionLog audit trail) is
+   * unaffected. */
+  notificationsEnabled?: boolean;
 }

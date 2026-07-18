@@ -10,7 +10,7 @@ import { evaluateRules } from './ruleEngine.js';
 import { isWithinCooldown } from './cooldown.js';
 import { executeAction } from './actionExecutors.js';
 import { explainTrigger, explainConflict, explainManualPause, explainRateLimit } from './explain.js';
-import { createNotification, shouldNotify } from './notificationExecutor.js';
+import { deliverNotification } from './notificationExecutor.js';
 import { computeWellnessScores } from './wellness.js';
 
 /** Trailing window used to compute wellness scores' own-baseline
@@ -110,14 +110,14 @@ async function recordAndNotify(params: {
   });
   // The audit trail above is always written regardless of notification
   // preferences — only the interruptive notification is gated on
-  // quiet-hours/on-off (see ai/src/notificationExecutor.ts).
-  if (await shouldNotify(params.userId, params.now)) {
-    await createNotification({
-      userId: params.userId,
-      title: params.notifyTitle,
-      body: params.reason,
-      ruleId: params.rule.id,
-    });
+  // quiet-hours/on-off/digest-mode (deliverNotification) and this rule's
+  // own opt-off (rule.notificationsEnabled, undefined treated as enabled
+  // for rules created before this field existed).
+  if (params.rule.notificationsEnabled !== false) {
+    await deliverNotification(
+      { userId: params.userId, title: params.notifyTitle, body: params.reason, ruleId: params.rule.id },
+      params.now,
+    );
   }
 }
 

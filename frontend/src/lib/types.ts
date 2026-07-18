@@ -73,6 +73,7 @@ export interface NotificationPreferences {
   notificationsEnabled: boolean;
   quietHoursStart: string | null;
   quietHoursEnd: string | null;
+  notificationDigestMode: "IMMEDIATE" | "HOURLY";
 }
 
 export type ScoreBasis = "provider-native" | "evidence-informed-heuristic" | "heuristic";
