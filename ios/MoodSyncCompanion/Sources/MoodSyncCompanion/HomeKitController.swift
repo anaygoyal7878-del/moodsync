@@ -4,6 +4,18 @@ public enum HomeKitError: Error, Sendable {
     case noHomeConfigured
     case sceneNotFound(String)
     case activationFailed(String)
+    /// `HMHomeManagerAuthorizationStatus.restricted` — e.g. Screen Time
+    /// / parental controls blocking HomeKit access outright. Distinct
+    /// from `.noHomeConfigured` (which means "access is fine, the user
+    /// just hasn't set up a Home yet in Apple's Home app") since the
+    /// recovery action differs: a restriction can't be fixed by
+    /// configuring a Home, only by changing the device's restrictions.
+    case restricted
+    /// `waitUntilReady()` never received `homeManagerDidUpdateHomes` —
+    /// normally near-instant, but with no Apple-documented upper bound,
+    /// so this call times out defensively rather than hanging the UI
+    /// forever on an unresponsive real device.
+    case timedOut
 }
 
 /// Thin, testable seam over HomeKit — same protocol-seam rationale as
@@ -38,6 +50,11 @@ public protocol HomeKitControlling: Sendable {
     /// action's `params.sceneName` should match against.
     func listSceneNames() async throws -> [String]
     func activateScene(named sceneName: String) async throws
+    /// True if `HMHomeManagerAuthorizationStatus.restricted` is set right
+    /// now — checked synchronously, no `waitUntilReady()` needed, since
+    /// authorization state (unlike the homes list itself) is available
+    /// immediately.
+    func isRestricted() -> Bool
 }
 
 #if canImport(HomeKit)
@@ -65,10 +82,27 @@ public final class HomeKitController: NSObject, HomeKitControlling, HMHomeManage
         true
     }
 
-    private func waitUntilReady() async {
+    public func isRestricted() -> Bool {
+        manager.authorizationStatus.contains(.restricted)
+    }
+
+    /// Races `homeManagerDidUpdateHomes` against a fixed timeout — see
+    /// `HomeKitError.timedOut`'s doc comment for why this doesn't just
+    /// await the continuation unconditionally.
+    private func waitUntilReady() async throws {
         if isReady { return }
-        await withCheckedContinuation { continuation in
-            readyContinuations.append(continuation)
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                await withCheckedContinuation { continuation in
+                    self.readyContinuations.append(continuation)
+                }
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: 5_000_000_000)
+                throw HomeKitError.timedOut
+            }
+            try await group.next()
+            group.cancelAll()
         }
     }
 
@@ -82,7 +116,8 @@ public final class HomeKitController: NSObject, HomeKitControlling, HMHomeManage
     }
 
     public func listSceneNames() async throws -> [String] {
-        await waitUntilReady()
+        guard !isRestricted() else { throw HomeKitError.restricted }
+        try await waitUntilReady()
         guard let home = manager.primaryHome ?? manager.homes.first else {
             throw HomeKitError.noHomeConfigured
         }
@@ -90,7 +125,8 @@ public final class HomeKitController: NSObject, HomeKitControlling, HMHomeManage
     }
 
     public func activateScene(named sceneName: String) async throws {
-        await waitUntilReady()
+        guard !isRestricted() else { throw HomeKitError.restricted }
+        try await waitUntilReady()
         guard let home = manager.primaryHome ?? manager.homes.first else {
             throw HomeKitError.noHomeConfigured
         }

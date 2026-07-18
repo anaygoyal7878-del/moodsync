@@ -3,6 +3,38 @@ import Foundation
 public enum MoodSyncAPIError: Error, Sendable {
     case requestFailed(status: Int, body: String)
     case notAuthenticated
+    /// Distinguishes "the device can't reach the network at all" (no
+    /// internet, Wi-Fi/cellular off, airplane mode) and "reached the
+    /// network but not this specific server" (wrong IP/port, Mac's dev
+    /// server not running, or on a different Wi-Fi network) — both are
+    /// `URLError` at the `URLSession` layer, mapped here instead of
+    /// leaking a raw `URLError.localizedDescription` (e.g. "The Internet
+    /// connection appears to be offline.") up to the UI unexplained. See
+    /// `dataTask(for:)` below for the specific `URLError.Code` mapping.
+    case offline
+    case cannotReachServer(String)
+}
+
+extension MoodSyncAPIError: LocalizedError {
+    /// Single source of truth for user-facing text — both
+    /// `SyncCoordinator` and `DeviceCommandCoordinator` used to duplicate
+    /// this switch themselves; conforming to `LocalizedError` means
+    /// `error.localizedDescription` (what `MoodSyncCompanionView`'s login
+    /// screen already reads) gets the same real message instead of
+    /// Swift's generic "operation couldn't be completed" fallback for a
+    /// plain, non-conforming `Error` enum.
+    public var errorDescription: String? {
+        switch self {
+        case .notAuthenticated:
+            return "Your session expired — log in again."
+        case .requestFailed(let status, _):
+            return "MoodSync returned an error (status \(status))."
+        case .offline:
+            return "No internet connection — check Wi-Fi/cellular and airplane mode, then try again."
+        case .cannotReachServer:
+            return "Couldn't reach MoodSync — check the Server URL in Settings and that your Mac's backend is running on the same network."
+        }
+    }
 }
 
 public struct MoodSyncTokens: Sendable, Equatable {
@@ -128,12 +160,37 @@ public actor MoodSyncAPIClient: MoodSyncAPIClientProtocol {
         )
     }
 
+    /// Wraps `URLSession.data(for:)`, translating a `URLError` (the type
+    /// thrown for "never reached any server" failures — offline, DNS
+    /// failure, connection refused/timed out) into one of
+    /// `MoodSyncAPIError`'s two specific cases instead of letting the raw
+    /// `URLError` surface. `.offline`-eligible codes are Apple's own
+    /// documented set for "no network path exists at all" (airplane mode,
+    /// Wi-Fi/cellular off, or genuinely no internet) — everything else
+    /// that still fails to reach a server (wrong IP/port, dev server not
+    /// running, wrong Wi-Fi network) becomes `.cannotReachServer` with the
+    /// system's own description, since there's no single clean codepath
+    /// to explain "you're probably pointed at the wrong Server URL" more
+    /// specifically than that.
+    private func dataTask(for request: URLRequest) async throws -> (Data, URLResponse) {
+        do {
+            return try await session.data(for: request)
+        } catch let error as URLError {
+            switch error.code {
+            case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff:
+                throw MoodSyncAPIError.offline
+            default:
+                throw MoodSyncAPIError.cannotReachServer(error.localizedDescription)
+            }
+        }
+    }
+
     private func get<Response: Decodable>(path: String, accessToken: String) async throws -> Response {
         var request = URLRequest(url: baseURL.appendingPathComponent(path))
         request.httpMethod = "GET"
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
-        let (data, urlResponse) = try await session.data(for: request)
+        let (data, urlResponse) = try await dataTask(for: request)
         guard let httpResponse = urlResponse as? HTTPURLResponse else {
             throw MoodSyncAPIError.requestFailed(status: -1, body: "No HTTP response")
         }
@@ -164,7 +221,7 @@ public actor MoodSyncAPIClient: MoodSyncAPIClientProtocol {
         encoder.dateEncodingStrategy = .iso8601
         request.httpBody = try encoder.encode(body)
 
-        let (data, urlResponse) = try await session.data(for: request)
+        let (data, urlResponse) = try await dataTask(for: request)
         guard let httpResponse = urlResponse as? HTTPURLResponse else {
             throw MoodSyncAPIError.requestFailed(status: -1, body: "No HTTP response")
         }
@@ -195,7 +252,7 @@ public actor MoodSyncAPIClient: MoodSyncAPIClientProtocol {
         encoder.dateEncodingStrategy = .iso8601
         request.httpBody = try encoder.encode(body)
 
-        let (data, urlResponse) = try await session.data(for: request)
+        let (data, urlResponse) = try await dataTask(for: request)
         guard let httpResponse = urlResponse as? HTTPURLResponse else {
             throw MoodSyncAPIError.requestFailed(status: -1, body: "No HTTP response")
         }

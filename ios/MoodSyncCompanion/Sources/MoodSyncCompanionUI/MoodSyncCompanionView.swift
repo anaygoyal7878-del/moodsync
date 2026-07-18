@@ -161,6 +161,35 @@ public struct MoodSyncCompanionView: View {
             status = "Synced — \(count) reading\(count == 1 ? "" : "s") sent."
         case .failure(let message):
             status = message
+            return
+        }
+
+        // Checked right after a successful sync — this is "the next time
+        // you open the app" moment docs/HOMEKIT_ARCHITECTURE.md describes
+        // for homekit.* actions, since there's no other reliable wake
+        // point available to a third-party app without Apple's
+        // case-by-case background-execution entitlement.
+        await checkPendingDeviceCommands(accessToken: accessToken)
+    }
+
+    #if canImport(HomeKit)
+    private func checkPendingDeviceCommands(accessToken: String) async {
+        let coordinator = DeviceCommandCoordinator(
+            homeKit: HomeKitController(),
+            apiClient: MoodSyncAPIClient(baseURL: baseURL)
+        )
+        switch await coordinator.run(accessToken: accessToken) {
+        case .noCommandsPending:
+            break
+        case .completed(let executed, let failed):
+            if executed > 0 || failed > 0 {
+                status += " · HomeKit: \(executed) scene\(executed == 1 ? "" : "s") activated" + (failed > 0 ? ", \(failed) failed" : "")
+            }
+        case .failure(let message):
+            status += " · HomeKit check failed: \(message)"
         }
     }
+    #else
+    private func checkPendingDeviceCommands(accessToken: String) async {}
+    #endif
 }

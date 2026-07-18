@@ -1,5 +1,17 @@
 # Apple Health — Developer Preparation Guide
 
+> **Superseded for setup steps** — this doc was written before
+> `ios/MoodSyncCompanionApp/MoodSyncCompanionApp.xcodeproj` (a real Xcode
+> App project wrapping the Swift package) existed; §2–§3 below describe
+> *creating* that project, which is no longer necessary since it's
+> already committed. For the current, complete, start-to-finish device
+> setup (Apple Developer account → certificates → HomeKit/Location
+> capabilities → the new first-launch onboarding flow → your iPhone),
+> use **[docs/IOS_REAL_DEVICE_SETUP_GUIDE.md](./IOS_REAL_DEVICE_SETUP_GUIDE.md)**
+> instead. This doc's HealthKit-specific background (§5 usage-description
+> rationale, §9 App Store privacy requirements) is still accurate and
+> referenced from there.
+
 This is the step-by-step guide for everything **you** need to do before the
 Apple Health integration can run on a real iPhone. It assumes you have
 never configured HealthKit, an Apple Developer account, or an Xcode

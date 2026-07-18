@@ -28,6 +28,16 @@ targets:
         UIBackgroundModes:
           - fetch
           - location
+        # Dev-only exception, not a blanket ATS bypass: NSAllowsLocalNetworking
+        # (confirmed against Apple's own Info.plist key reference — see
+        # docs/IOS_REAL_DEVICE_SETUP_GUIDE.md's citations) allows plain HTTP
+        # only to hosts on the device's local network (RFC1918 addresses,
+        # .local hostnames) — exactly "your Mac's dev server on the same
+        # Wi-Fi," and nothing else. Remove this once the backend has a real
+        # HTTPS deployment; it should never ship to the App Store pointed at
+        # a plain-HTTP production URL.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
     settings:
       base:
         # Placeholder — replace with your own explicit bundle ID once

@@ -11,10 +11,12 @@ integrations (WHOOP, Fitbit, Hue, Spotify).
 See [docs/APPLE_HEALTH_ARCHITECTURE.md](../../docs/APPLE_HEALTH_ARCHITECTURE.md)
 for the full system design (auth flow, data flow, security model, sync
 strategy, privacy, and exactly which HealthKit metrics are/aren't
-available — verified against live `developer.apple.com` documentation)
-and [docs/APPLE_HEALTH_DEVELOPER_GUIDE.md](../../docs/APPLE_HEALTH_DEVELOPER_GUIDE.md)
+available — verified against live `developer.apple.com` documentation),
+[docs/GEOFENCING_ARCHITECTURE.md](../../docs/GEOFENCING_ARCHITECTURE.md)
+for the CoreLocation-based arrival/departure design, and
+[docs/IOS_REAL_DEVICE_SETUP_GUIDE.md](../../docs/IOS_REAL_DEVICE_SETUP_GUIDE.md)
 for the step-by-step Apple Developer account/Xcode/device setup required
-to actually run this on a phone.
+to actually run this on a physical iPhone from a completely cold start.
 
 ## Metrics read
 
@@ -30,17 +32,24 @@ reference — this is a permanent platform gap, not a bug.
 
 - `MoodSyncCompanion` (library target): HealthKit authorization/reading
   (`HealthKitReader`, including background delivery via `HKObserverQuery`
-  + `enableBackgroundDelivery`), the networking client
-  (`MoodSyncAPIClient`), and the pure orchestration logic
-  (`SyncCoordinator`) — all behind protocols (`HealthKitReading`,
-  `MoodSyncAPIClientProtocol`) so the coordinator is unit-testable
-  without HealthKit or the network.
-- `MoodSyncCompanionUI` (library target): the one-screen SwiftUI view
-  (login + sync). Deliberately minimal — this app's only job is getting
-  HealthKit data into the backend, not a second product surface.
+  + `enableBackgroundDelivery`), HomeKit scene activation
+  (`HomeKitController`), CoreLocation geofencing (`LocationController`),
+  the networking client (`MoodSyncAPIClient`), persisted server
+  configuration (`ServerConfiguration`), and the pure orchestration logic
+  (`SyncCoordinator`, `DeviceCommandCoordinator`) — all behind protocols
+  (`HealthKitReading`, `HomeKitControlling`, `LocationControlling`,
+  `MoodSyncAPIClientProtocol`) so the coordinators are unit-testable
+  without HealthKit, HomeKit, CoreLocation, or the network.
+- `MoodSyncCompanionUI` (library target): `OnboardingView` (first-launch
+  Server URL entry + Health/Location/HomeKit permission requests, each
+  explained before the system prompt appears) and `MoodSyncCompanionView`
+  (login + sync + "set home" for geofencing). Deliberately minimal beyond
+  that — this app's only job is getting HealthKit data into the backend
+  and pushing location/HomeKit events, not a second product surface.
 - `MoodSyncCompanionTests`: unit tests for the pure logic
-  (`SleepEfficiencyCalculator`, `ActivityLevel`, `SyncCoordinator` against
-  fakes of both dependencies).
+  (`SleepEfficiencyCalculator`, `ActivityLevel`, `ServerConfiguration`,
+  `SyncCoordinator`/`DeviceCommandCoordinator` against fakes of their
+  dependencies).
 
 Authentication reuses the same MoodSync account as the web app —
 `POST /api/auth/login` with the user's existing email/password — rather
@@ -51,54 +60,42 @@ route uses.
 
 ## What was verified in this environment, and what wasn't
 
-This repo's sandbox has the Swift compiler (`swift build`/`swift run`)
-but not full Xcode — confirmed via `xcodebuild -version` failing with
-"requires Xcode, but active developer directory is a command line tools
-instance." That draws a hard, honest line:
+Real Xcode (not just the Command Line Tools) is installed in this
+environment as of the real-device-readiness round — see
+`ios/MoodSyncCompanionApp/README.md` for the CLI-invocation gotcha
+encountered getting `xcodebuild` to succeed, and
+`docs/IOS_REAL_DEVICE_SETUP_GUIDE.md` for everything that still requires
+hardware/an Apple Developer account this environment doesn't have.
 
 **Verified for real:**
-- Every file in this package compiles, including real HealthKit API
-  usage (`HKHealthStore`, `HKSampleQuery`, `HKStatisticsQuery`,
-  `HKCategoryValueSleepAnalysis`) — targeting macOS 14 lets `swift build`
-  link against HealthKit without an iOS SDK. (A sibling package already
-  in this repo, `Packages/MoodSyncCore/Sources/MoodSyncHealthKit`, proved
-  this pattern compiles first; this package's HealthKit code mirrors its
-  verified query shapes rather than guessing at the API.)
-- The pure logic is correct, not just compiling: `XCTest` itself isn't
-  available here either (same "requires Xcode" limitation, confirmed by
-  running the *pre-existing* `MoodSyncCoreTests` target and hitting the
-  identical `no such module 'Testing'` error) — so before removing it,
-  a throwaway executable target ran the same assertions as the real
-  `Tests/MoodSyncCompanionTests/` files by hand and confirmed all of them
-  pass, including that a `NormalizedReading` round-trips through JSON
-  into exactly the field names/shape
-  `backend/src/api/routes/integrations/appleHealth.ts`'s Zod schema
-  expects.
-- The backend endpoint this app talks to was verified separately, for
+- `swift build`/`swift test` pass for the whole package, including real
+  HealthKit/HomeKit/CoreLocation API usage — 23 `XCTest` cases, all
+  genuinely executed (not stubbed).
+- The `MoodSyncCompanionApp.xcodeproj` wrapper (see
+  `ios/MoodSyncCompanionApp/`) builds a real, code-signed `.app` bundle
+  for the iOS Simulator via `xcodebuild`, with the HealthKit, HomeKit,
+  and location entitlements/`Info.plist` keys all processing correctly.
+- Every HealthKit/HomeKit entitlement key and the `NSAllowsLocalNetworking`
+  ATS exception were independently re-confirmed against live
+  `developer.apple.com` documentation during the real-device-readiness
+  round (not carried over from an earlier session) — see
+  `docs/IOS_REAL_DEVICE_SETUP_GUIDE.md`'s citations.
+- The backend endpoints this app talks to were verified separately, for
   real, against a live local Postgres — see `docs/MILESTONES.md`.
 
-**Not verifiable without Xcode + a real Apple Developer account:**
-- Compiling this into an actual `.app` bundle (SwiftPM library targets
-  aren't an installable app on their own — that needs an Xcode project
-  or `.iOSApplication` product wrapping these targets).
-- Running on a simulator or device, or the real HealthKit permission
-  dialog appearing.
-- The HealthKit capability/entitlement, which must be added in Xcode's
-  "Signing & Capabilities" and requires a paid Apple Developer account to
-  provision for a real device.
-- `Info.plist` usage-description strings (required by iOS at runtime,
-  not by the Swift compiler) — see below for the exact keys needed when
-  this is wrapped into a real Xcode project.
+**Not verifiable without a physical iPhone + a paid Apple Developer
+Program account** (this environment has neither):
+- The app actually launching, requesting permissions, and having a
+  human tap through the real system prompts.
+- Geofencing actually firing on a real region crossing — the Simulator
+  can simulate a location but not a genuine boundary-crossing event with
+  the ~20s debounce/~10s wake window `docs/GEOFENCING_ARCHITECTURE.md`
+  describes; only a physical device exercises that.
+- Background HealthKit delivery / geofence delivery after the app has
+  been backgrounded or the device rebooted — again, real hardware and
+  time, not something the Simulator reproduces faithfully.
+- Code signing with a real Team ID/provisioning profile — `DEVELOPMENT_TEAM`
+  is empty in `project.yml`, which only works for Simulator builds.
 
-## Required when wrapping this into an Xcode project
-
-- **Info.plist**: `NSHealthShareUsageDescription` (HealthKit refuses to
-  even show the permission prompt without this key set to a real
-  string).
-- **Entitlements**: the `com.apple.developer.healthkit` capability,
-  added via Xcode's Signing & Capabilities tab, which also requires an
-  Apple Developer Program account for device provisioning.
-- **Info.plist / config**: the backend's base URL (`MoodSyncAPIClient`'s
-  `baseURL` parameter) — points at `http://localhost:3000` for local
-  development against the same backend the web app's `.env.local` uses,
-  a real deployed URL for TestFlight/production.
+See `docs/IOS_REAL_DEVICE_SETUP_GUIDE.md` for exactly what to do about
+all of the above on your own Mac/iPhone.

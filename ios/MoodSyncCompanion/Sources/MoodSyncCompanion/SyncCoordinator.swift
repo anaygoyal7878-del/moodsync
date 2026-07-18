@@ -26,8 +26,6 @@ public final class SyncCoordinator {
             return .success(readingsInserted: inserted)
         } catch let error as HealthKitError {
             return .failure(describeHealthKitError(error))
-        } catch let error as MoodSyncAPIError {
-            return .failure(describeAPIError(error))
         } catch {
             return .failure(error.localizedDescription)
         }
@@ -39,15 +37,6 @@ public final class SyncCoordinator {
             return "Health data isn't available on this device."
         case .authorizationFailed(let message):
             return "Couldn't get permission to read Health data: \(message)"
-        }
-    }
-
-    private func describeAPIError(_ error: MoodSyncAPIError) -> String {
-        switch error {
-        case .notAuthenticated:
-            return "Your session expired — log in again."
-        case .requestFailed(let status, _):
-            return "Sync failed (server returned \(status))."
         }
     }
 }

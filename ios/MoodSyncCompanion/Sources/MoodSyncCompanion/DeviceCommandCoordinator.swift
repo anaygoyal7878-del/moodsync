@@ -40,8 +40,6 @@ public final class DeviceCommandCoordinator {
                 }
             }
             return .completed(executed: executed, failed: failed)
-        } catch let error as MoodSyncAPIError {
-            return .failure(describeAPIError(error))
         } catch {
             return .failure(error.localizedDescription)
         }
@@ -70,15 +68,10 @@ public final class DeviceCommandCoordinator {
             return "No HomeKit scene named \"\(name)\" was found — check the scene name in your automation rule."
         case .activationFailed(let message):
             return "Couldn't activate the scene: \(message)"
-        }
-    }
-
-    private func describeAPIError(_ error: MoodSyncAPIError) -> String {
-        switch error {
-        case .notAuthenticated:
-            return "Your session expired — log in again."
-        case .requestFailed(let status, _):
-            return "Couldn't reach MoodSync (server returned \(status))."
+        case .restricted:
+            return "HomeKit access is restricted on this device (check Screen Time / parental controls)."
+        case .timedOut:
+            return "Timed out waiting for HomeKit to respond — try again."
         }
     }
 }

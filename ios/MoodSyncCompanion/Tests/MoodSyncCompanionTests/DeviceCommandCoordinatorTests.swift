@@ -14,6 +14,8 @@ private final class FakeHomeKitController: HomeKitControlling, @unchecked Sendab
         if let activationError { throw activationError }
         activatedScenes.append(sceneName)
     }
+
+    func isRestricted() -> Bool { false }
 }
 
 private final class FakeDeviceCommandAPIClient: MoodSyncAPIClientProtocol, @unchecked Sendable {

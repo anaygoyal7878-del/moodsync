@@ -104,8 +104,14 @@ data.
   means this could grow later (e.g. "work," a specific gym), but that's
   new UI (a region picker/map) and new plumbing, not implied by this
   round.
-- No fallback for a user who denies "Always" location access — the rule
-  simply never fires for that user, same "absence, not failure" pattern
-  as every other optional capability in this product (e.g. a user who
-  never connects a wearable just sees empty biometric sections, not an
-  error).
+- No automated fallback for a user who denies "Always" location access —
+  the rule simply never fires for that user, same "absence, not failure"
+  pattern as every other optional capability in this product (e.g. a
+  user who never connects a wearable just sees empty biometric
+  sections, not an error). The real-device-readiness round (see
+  `docs/IOS_REAL_DEVICE_SETUP_GUIDE.md`) added user-facing *messaging*
+  for this state — `OnboardingView` and `LocationController
+  .authorizationState()` distinguish "denied," "restricted," "When In
+  Use only," and "Location Services off system-wide," each with its own
+  specific recovery instructions — but there's still no automatic retry
+  or alternate trigger; the user has to act on that guidance themselves.

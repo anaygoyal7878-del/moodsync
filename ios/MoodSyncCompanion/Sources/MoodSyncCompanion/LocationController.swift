@@ -3,6 +3,30 @@ import Foundation
 public enum LocationControllerError: Error, Sendable {
     case authorizationDenied
     case noHomeConfigured
+    /// The system-wide "Location Services" toggle (Settings > Privacy &
+    /// Security > Location Services) is off — distinct from this app's
+    /// own per-app authorization, which can still read as
+    /// `.notDetermined`/`.denied` either way. Checked via
+    /// `CLLocationManager.locationServicesEnabled()`, a separate,
+    /// device-wide switch from the per-app `authorizationStatus` below.
+    case locationServicesDisabled
+    /// The user granted "While Using the App" but not "Always" — real
+    /// arrival/departure detection needs Always (see the type doc below),
+    /// so this is surfaced distinctly from a flat denial: the UI's
+    /// recovery action differs ("open Settings and change While Using to
+    /// Always" vs. "grant Location access at all").
+    case whenInUseOnly
+}
+
+/// Mirrors `CLAuthorizationStatus` cases relevant to this app's decisions
+/// — kept as MoodSync's own enum (not a `CLAuthorizationStatus`
+/// re-export) so callers outside `#if canImport(CoreLocation)` can still
+/// reason about the state shape.
+public enum LocationAuthorizationState: Sendable, Equatable {
+    case notDetermined
+    case deniedOrRestricted
+    case whenInUseOnly
+    case authorizedAlways
 }
 
 /// Thin, testable seam over CoreLocation — same protocol-seam rationale as
@@ -33,6 +57,19 @@ public protocol LocationControlling: Sendable {
     /// callers should request authorization first via
     /// `requestAlwaysAuthorization()`.
     func setHomeToCurrentLocation() async throws
+    /// Current per-app authorization state — read this before deciding
+    /// which of `requestWhenInUseAuthorization()`/`requestAlwaysAuthorization()`
+    /// to call next, per Apple's documented two-step escalation pattern
+    /// (request When In Use first, explain why Always is needed, then
+    /// request Always — jumping straight to Always without that first
+    /// step still works but is more likely to be denied).
+    func authorizationState() -> LocationAuthorizationState
+    /// True only when the system-wide Location Services toggle is on —
+    /// see `LocationControllerError.locationServicesDisabled`. Runs off
+    /// the main thread since Apple's own documentation notes this call
+    /// can block.
+    func isLocationServicesEnabled() async -> Bool
+    func requestWhenInUseAuthorization()
     func requestAlwaysAuthorization()
     func stopMonitoring()
 }
@@ -70,12 +107,47 @@ public final class LocationController: NSObject, LocationControlling, CLLocation
             && manager.monitoredRegions.contains { $0.identifier == Self.homeRegionIdentifier }
     }
 
+    public func authorizationState() -> LocationAuthorizationState {
+        switch manager.authorizationStatus {
+        case .notDetermined:
+            return .notDetermined
+        case .denied, .restricted:
+            return .deniedOrRestricted
+        case .authorizedWhenInUse:
+            return .whenInUseOnly
+        case .authorizedAlways:
+            return .authorizedAlways
+        @unknown default:
+            return .deniedOrRestricted
+        }
+    }
+
+    public func isLocationServicesEnabled() async -> Bool {
+        // `CLLocationManager.locationServicesEnabled()` is a synchronous
+        // class method Apple's own documentation warns can block, so it's
+        // run off the main actor here rather than called directly from a
+        // SwiftUI view's task.
+        await Task.detached { CLLocationManager.locationServicesEnabled() }.value
+    }
+
+    public func requestWhenInUseAuthorization() {
+        manager.requestWhenInUseAuthorization()
+    }
+
     public func requestAlwaysAuthorization() {
         manager.requestAlwaysAuthorization()
     }
 
     public func setHomeToCurrentLocation() async throws {
-        guard manager.authorizationStatus == .authorizedAlways else {
+        guard await isLocationServicesEnabled() else {
+            throw LocationControllerError.locationServicesDisabled
+        }
+        switch authorizationState() {
+        case .authorizedAlways:
+            break
+        case .whenInUseOnly:
+            throw LocationControllerError.whenInUseOnly
+        case .notDetermined, .deniedOrRestricted:
             throw LocationControllerError.authorizationDenied
         }
         guard let location = manager.location else {
