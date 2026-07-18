@@ -11,6 +11,7 @@
     "start:scheduled-dispatch": "node dist/scheduledDispatch.js",
     "start:weekly-report": "node dist/weeklyReportWorker.js",
     "start:notification-digest": "node dist/notificationDigestWorker.js",
+    "start:spotify-playback-check": "node dist/spotifyPlaybackCheckWorker.js",
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
@@ -18,6 +19,7 @@
     "@moodsync/database": "*",
     "@moodsync/integration-fitbit": "*",
     "@moodsync/integration-hue": "*",
+    "@moodsync/integration-spotify": "*",
     "@moodsync/integration-whoop": "*",
     "@moodsync/shared": "*"
   },

@@ -16,6 +16,7 @@ export {
 } from './repositories/pendingNotificationDigestRepository.js';
 export { userPreferencesRepository } from './repositories/userPreferencesRepository.js';
 export { resourcePauseRepository } from './repositories/resourcePauseRepository.js';
+export { musicPlayLogRepository, type LogPlayInput } from './repositories/musicPlayLogRepository.js';
 export { pendingDeviceCommandRepository } from './repositories/pendingDeviceCommandRepository.js';
 export { userTimezoneRepository } from './repositories/userTimezoneRepository.js';
 export { insightRepository, type CreateInsightInput } from './repositories/insightRepository.js';

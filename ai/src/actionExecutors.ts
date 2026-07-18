@@ -36,8 +36,8 @@ const registry: Partial<Record<SmartHomeProviderId, ActionExecutor>> = {
     await executeHueAction(userId, action);
     return { queued: false };
   },
-  spotify: async (userId, action) => {
-    await executeSpotifyAction(userId, action);
+  spotify: async (userId, action, ruleId) => {
+    await executeSpotifyAction(userId, action, ruleId);
     return { queued: false };
   },
   homekit: async (userId, action, ruleId) => {

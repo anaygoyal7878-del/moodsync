@@ -1,10 +1,49 @@
 import type { FastifyInstance } from 'fastify';
-import { automationRuleRepository, biometricReadingRepository, recommendationRepository } from '@moodsync/database';
-import { computeWellnessTrends, generateRecommendations } from '@moodsync/ai';
+import {
+  automationRuleRepository,
+  biometricReadingRepository,
+  musicPlayLogRepository,
+  recommendationRepository,
+} from '@moodsync/database';
+import { computeWellnessTrends, generateRecommendations, type PlaylistSkipStat } from '@moodsync/ai';
 
 /** How far back to look for wellness trend data when deciding whether to
  * suggest a new rule — same window `/api/insights` defaults to. */
 const TREND_WINDOW_DAYS = 14;
+
+/** How many of a playlist's most recent checked plays the skip-rate
+ * heuristic looks at — matches `MIN_SKIP_SAMPLE_SIZE` in
+ * ai/src/recommendations.ts so the sample never falls short of what the
+ * heuristic itself requires. */
+const SKIP_STAT_SAMPLE_SIZE = 10;
+
+/** Builds one PlaylistSkipStat per (rule, playlist) pair the user has
+ * actually played via a spotify.play_playlist action — computed here
+ * (impure, DB-touching) so ai/src/recommendations.ts stays pure/DB-free,
+ * same split as computeWellnessTrends/computeAutomationEffectiveness. */
+async function computePlaylistSkipStats(userId: string, rules: Awaited<ReturnType<typeof automationRuleRepository.listForUser>>): Promise<PlaylistSkipStat[]> {
+  const playlistUris = await musicPlayLogRepository.listDistinctPlaylistsForUser(userId);
+  const stats: PlaylistSkipStat[] = [];
+
+  for (const playlistUri of playlistUris) {
+    const recentPlays = await musicPlayLogRepository.listRecentCheckedForPlaylist(userId, playlistUri, SKIP_STAT_SAMPLE_SIZE);
+    if (recentPlays.length === 0) continue;
+
+    const rule = rules.find((r) => r.id === recentPlays[0]!.ruleId);
+    if (!rule) continue; // rule was deleted since these plays happened
+
+    const skippedCount = recentPlays.filter((p) => p.likedSignal === false).length;
+    stats.push({
+      ruleId: rule.id,
+      ruleName: rule.name,
+      playlistUri,
+      skipRate: skippedCount / recentPlays.length,
+      sampleSize: recentPlays.length,
+    });
+  }
+
+  return stats;
+}
 
 export default async function recommendationRoutes(app: FastifyInstance) {
   /**
@@ -23,7 +62,8 @@ export default async function recommendationRoutes(app: FastifyInstance) {
       automationRuleRepository.listForUser(userId),
     ]);
     const wellnessTrends = computeWellnessTrends([...readings].reverse());
-    const candidates = generateRecommendations({ wellnessTrends, existingRules: rules });
+    const playlistSkipStats = await computePlaylistSkipStats(userId, rules);
+    const candidates = generateRecommendations({ wellnessTrends, existingRules: rules, playlistSkipStats });
 
     for (const candidate of candidates) {
       if (await recommendationRepository.hasBeenSuggested(userId, candidate.title)) continue;
@@ -31,7 +71,10 @@ export default async function recommendationRoutes(app: FastifyInstance) {
         userId,
         title: candidate.title,
         description: candidate.description,
-        suggestedActions: { templateId: candidate.templateId },
+        suggestedActions:
+          candidate.kind === 'edit-rule'
+            ? { kind: 'edit-rule', ruleId: candidate.ruleId }
+            : { kind: 'template', templateId: candidate.templateId },
       });
     }
 

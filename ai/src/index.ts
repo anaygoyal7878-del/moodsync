@@ -28,4 +28,4 @@ export {
 export { explainTrigger, explainConflict, explainManualPause, explainRateLimit } from './explain.js';
 export { createNotification, shouldNotify, type CreateNotificationInput } from './notificationExecutor.js';
 export { computeWeeklyInsights } from './weeklyReport.js';
-export { generateRecommendations, type RecommendationCandidate } from './recommendations.js';
+export { generateRecommendations, type RecommendationCandidate, type PlaylistSkipStat } from './recommendations.js';

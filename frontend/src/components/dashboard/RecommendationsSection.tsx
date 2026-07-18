@@ -26,7 +26,10 @@ function RecommendationCard({ recommendation, onResponded }: { recommendation: R
     onResponded();
   }
 
-  const templateName = TEMPLATE_NAMES[recommendation.suggestedActions.templateId] ?? recommendation.suggestedActions.templateId;
+  const actions = recommendation.suggestedActions;
+  const isEditRule = "kind" in actions && actions.kind === "edit-rule";
+  const templateId = "templateId" in actions ? actions.templateId : undefined;
+  const templateName = templateId ? (TEMPLATE_NAMES[templateId] ?? templateId) : undefined;
 
   return (
     <Card>
@@ -34,8 +37,17 @@ function RecommendationCard({ recommendation, onResponded }: { recommendation: R
         <p className="text-sm font-medium text-ink">{recommendation.title}</p>
         <p className="text-sm text-ink-secondary">{recommendation.description}</p>
         <p className="text-xs text-ink-muted">
-          To use it: open &ldquo;New rule&rdquo; below and pick the &ldquo;{templateName}&rdquo; template — this only
-          suggests it, MoodSync never creates a rule without you confirming which device it controls.
+          {isEditRule ? (
+            <>
+              To use it: open this rule below and change its playlist — this only suggests it, MoodSync never edits
+              a rule for you.
+            </>
+          ) : (
+            <>
+              To use it: open &ldquo;New rule&rdquo; below and pick the &ldquo;{templateName}&rdquo; template — this
+              only suggests it, MoodSync never creates a rule without you confirming which device it controls.
+            </>
+          )}
         </p>
         <div className="flex items-center gap-2">
           <Button variant="secondary" disabled={submitting !== null} onClick={() => respond("accept")}>

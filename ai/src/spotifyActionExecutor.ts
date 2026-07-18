@@ -1,4 +1,4 @@
-import { smartHomeConnectionRepository, oauthTokenRepository } from '@moodsync/database';
+import { smartHomeConnectionRepository, oauthTokenRepository, musicPlayLogRepository } from '@moodsync/database';
 import { SpotifyClient, refreshSpotifyToken, type SpotifyOAuthConfig } from '@moodsync/integration-spotify';
 import type { AutomationAction } from '@moodsync/shared';
 
@@ -43,8 +43,12 @@ async function getFreshSpotifyAccessToken(oauthTokenId: string, config: SpotifyO
 /** Executes one Spotify action. Only `spotify.play_playlist` exists today
  * — see shared/src/automation.ts's `ActionType` for the full set this
  * would need to grow into if playlist-only control turns out to be too
- * narrow. */
-export async function executeSpotifyAction(userId: string, action: AutomationAction): Promise<void> {
+ * narrow. `ruleId` is optional so existing direct callers (none besides
+ * dispatch.ts today) keep working without a rule context; when
+ * provided, a successful play logs a `MusicPlayLog` row for the
+ * skip-detection worker (workers/src/spotifyPlaybackCheckWorker.ts) to
+ * check later. */
+export async function executeSpotifyAction(userId: string, action: AutomationAction, ruleId?: string): Promise<void> {
   const connection = await smartHomeConnectionRepository.findByUserAndProvider(userId, 'SPOTIFY');
   if (!connection?.oauthTokenId) throw new Error('No Spotify connection for this user');
 
@@ -61,6 +65,7 @@ export async function executeSpotifyAction(userId: string, action: AutomationAct
         throw new Error('spotify.play_playlist params.deviceId, if provided, must be a string');
       }
       await client.playPlaylist({ playlistUri, deviceId });
+      if (ruleId) await musicPlayLogRepository.logPlay({ userId, ruleId, playlistUri });
       return;
     }
     default:

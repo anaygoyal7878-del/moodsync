@@ -1,7 +1,10 @@
 /**
  * Spotify Web API playback client. `/me/player/play` request/response
  * shape verified against developer.spotify.com's "Start/Resume Playback"
- * reference — see docs/INTEGRATIONS_RESEARCH.md.
+ * reference — see docs/INTEGRATIONS_RESEARCH.md. `/me/player/currently-playing`
+ * shape (`context.uri`, `is_playing`) and its 204-no-body-when-nothing-
+ * playing behavior both confirmed against developer.spotify.com's "Get
+ * Currently Playing Track" reference.
  */
 
 const BASE_URL = 'https://api.spotify.com/v1';
@@ -53,5 +56,26 @@ export class SpotifyClient {
       // enum wasn't independently confirmed.
       throw new SpotifyApiError(`Spotify playback request failed: ${res.status} ${await res.text()}`, res.status);
     }
+  }
+
+  /** `contextUri: null` covers both "nothing is playing" (a real 204,
+   * confirmed empty-body behavior — see class doc comment) and a
+   * currently-playing item with no `context` (e.g. a single track played
+   * outside any playlist/album context) — callers can't distinguish
+   * those two cases from this response alone, which is fine for the one
+   * use today (comparing against a specific playlist URI this app
+   * itself started). */
+  async getCurrentlyPlaying(): Promise<{ isPlaying: boolean; contextUri: string | null }> {
+    const res = await fetch(`${BASE_URL}/me/player/currently-playing`, {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+    });
+
+    if (res.status === 204) return { isPlaying: false, contextUri: null };
+    if (!res.ok) {
+      throw new SpotifyApiError(`Spotify currently-playing request failed: ${res.status} ${await res.text()}`, res.status);
+    }
+
+    const body = (await res.json()) as { is_playing?: boolean; context?: { uri?: string } | null };
+    return { isPlaying: body.is_playing ?? false, contextUri: body.context?.uri ?? null };
   }
 }

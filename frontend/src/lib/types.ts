@@ -129,7 +129,7 @@ export interface RecommendationEntry {
   title: string;
   description: string;
   status: "PENDING" | "ACCEPTED" | "DISMISSED" | "EXPIRED";
-  suggestedActions: { templateId: string };
+  suggestedActions: { kind: "template"; templateId: string } | { kind: "edit-rule"; ruleId: string } | { templateId: string };
   createdAt: string;
   respondedAt: string | null;
 }

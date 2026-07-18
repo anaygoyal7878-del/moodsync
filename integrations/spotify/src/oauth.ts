@@ -19,7 +19,22 @@
 const AUTHORIZE_URL = 'https://accounts.spotify.com/authorize';
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
 
-export const SPOTIFY_SCOPES = ['user-read-playback-state', 'user-modify-playback-state', 'playlist-read-private'] as const;
+/** `user-read-currently-playing` added for the skip-detection worker
+ * (workers/src/spotifyPlaybackCheckWorker.ts) — confirmed against
+ * developer.spotify.com's scopes reference that `/me/player/currently-playing`
+ * needs this scope specifically, NOT `user-read-playback-state` (which
+ * only covers the broader `/me/player` endpoint, already requested for
+ * a different reason and left in place). A user connected before this
+ * scope was added won't have granted it — their existing token can still
+ * play music (unaffected) but `getCurrentlyPlaying` calls will 403 until
+ * they reconnect and re-consent; the skip-detection worker treats that
+ * as "can't determine, leave likedSignal null" rather than throwing. */
+export const SPOTIFY_SCOPES = [
+  'user-read-playback-state',
+  'user-modify-playback-state',
+  'playlist-read-private',
+  'user-read-currently-playing',
+] as const;
 
 export interface SpotifyOAuthConfig {
   clientId: string;

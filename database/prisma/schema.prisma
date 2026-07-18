@@ -38,6 +38,7 @@ model User {
   pendingNotificationDigestEntries PendingNotificationDigestEntry[]
   pendingDeviceCommands PendingDeviceCommand[]
   resourcePauses       ResourcePause[]
+  musicPlayLogs        MusicPlayLog[]
   preferences          UserPreferences?
 
   @@map("users")
@@ -403,6 +404,27 @@ model Recommendation {
 
   @@index([userId, status])
   @@map("recommendations")
+}
+
+/// One row per real spotify.play_playlist action execution — see
+/// ai/src/spotifyActionExecutor.ts. likedSignal starts null and is set
+/// by workers/src/spotifyPlaybackCheckWorker.ts a few minutes later: a
+/// skip-detection *proxy* (still the same context playing = true, moved
+/// on = false), not a certain "did the user like this" signal — see the
+/// worker's doc comment. Feeds ai/src/recommendations.ts's third
+/// heuristic (suggest changing a playlist that gets skipped often).
+model MusicPlayLog {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ruleId       String
+  playlistUri  String
+  playedAt     DateTime @default(now())
+  likedSignal  Boolean?
+
+  @@index([userId, playlistUri])
+  @@index([likedSignal, playedAt])
+  @@map("music_play_logs")
 }
 
 model UserPreferences {

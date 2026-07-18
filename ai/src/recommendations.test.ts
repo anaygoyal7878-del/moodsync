@@ -71,4 +71,38 @@ describe('generateRecommendations', () => {
     const none = generateRecommendations({ wellnessTrends: [], existingRules: [] });
     expect(none).toHaveLength(0);
   });
+
+  it('flags a playlist with a high skip rate and enough samples', () => {
+    const candidates = generateRecommendations({
+      wellnessTrends: [],
+      existingRules: [],
+      playlistSkipStats: [
+        { ruleId: 'r1', ruleName: 'Wind Down', playlistUri: 'spotify:playlist:abc', skipRate: 0.8, sampleSize: 5 },
+      ],
+    });
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]).toMatchObject({ kind: 'edit-rule', ruleId: 'r1' });
+  });
+
+  it('does not flag a playlist below the sample-size floor even with a high skip rate', () => {
+    const candidates = generateRecommendations({
+      wellnessTrends: [],
+      existingRules: [],
+      playlistSkipStats: [
+        { ruleId: 'r1', ruleName: 'Wind Down', playlistUri: 'spotify:playlist:abc', skipRate: 1, sampleSize: 3 },
+      ],
+    });
+    expect(candidates).toHaveLength(0);
+  });
+
+  it('does not flag a playlist below the skip-rate threshold', () => {
+    const candidates = generateRecommendations({
+      wellnessTrends: [],
+      existingRules: [],
+      playlistSkipStats: [
+        { ruleId: 'r1', ruleName: 'Wind Down', playlistUri: 'spotify:playlist:abc', skipRate: 0.4, sampleSize: 10 },
+      ],
+    });
+    expect(candidates).toHaveLength(0);
+  });
 });
