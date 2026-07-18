@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { AutomationRuleDefinition, NormalizedBiometricReading } from '@moodsync/shared';
 import { computeTrends, computeAutomationEffectiveness } from './insights.js';
+import type { WellnessScores } from './wellness.js';
+
+function makeWellnessScores(overrides: Partial<Record<keyof WellnessScores, number | null>> = {}): WellnessScores {
+  const base = { value: null, basis: 'heuristic' as const };
+  const keys: (keyof WellnessScores)[] = ['stress', 'recovery', 'sleep', 'energy', 'fatigue', 'focus', 'relaxation', 'overall'];
+  const scores = {} as WellnessScores;
+  for (const key of keys) {
+    scores[key] = { ...base, value: overrides[key] ?? null };
+  }
+  return scores;
+}
 
 function makeReading(overrides: Partial<NormalizedBiometricReading> = {}): NormalizedBiometricReading {
   return { provider: 'whoop', userId: 'user-1', timestamp: new Date().toISOString(), ...overrides };
@@ -124,5 +135,37 @@ describe('computeAutomationEffectiveness', () => {
       readings: [],
     });
     expect(result).toHaveLength(0);
+  });
+
+  it('scores a wellness.* condition using the supplied score map', () => {
+    const rule = makeRule({ conditions: [{ field: 'wellness.stress', operator: 'gt', value: 60 }] });
+    const trigger = { id: 'r1', reading: makeReading({ timestamp: '2026-07-10T08:00:00Z' }) };
+    const next = { id: 'r2', reading: makeReading({ timestamp: '2026-07-10T20:00:00Z' }) };
+
+    const result = computeAutomationEffectiveness({
+      rules: [rule],
+      logs: [{ ruleId: rule.id, triggerReadingId: 'r1', outcome: 'EXECUTED' }],
+      readings: [trigger, next],
+      wellnessScoresByReadingId: new Map([
+        ['r1', makeWellnessScores({ stress: 85 })],
+        ['r2', makeWellnessScores({ stress: 40 })],
+      ]),
+    });
+
+    expect(result[0]).toMatchObject({ metric: 'wellness.stress', comparableCount: 1, improvedCount: 1, effectivenessRate: 100 });
+  });
+
+  it('reports a null rate for a wellness.* condition when no score map is supplied', () => {
+    const rule = makeRule({ conditions: [{ field: 'wellness.stress', operator: 'gt', value: 60 }] });
+    const trigger = { id: 'r1', reading: makeReading({ timestamp: '2026-07-10T08:00:00Z' }) };
+    const next = { id: 'r2', reading: makeReading({ timestamp: '2026-07-10T20:00:00Z' }) };
+
+    const result = computeAutomationEffectiveness({
+      rules: [rule],
+      logs: [{ ruleId: rule.id, triggerReadingId: 'r1', outcome: 'EXECUTED' }],
+      readings: [trigger, next],
+    });
+
+    expect(result[0]).toMatchObject({ metric: 'wellness.stress', comparableCount: 0, effectivenessRate: null });
   });
 });

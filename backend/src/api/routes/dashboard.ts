@@ -78,10 +78,19 @@ export default async function dashboardRoutes(app: FastifyInstance) {
     const readings = readingsWithId.map((r) => r.reading);
     const trends = computeTrends(readings);
     const wellnessTrends = computeWellnessTrends(readings);
+    // Same per-reading scoring computeWellnessTrends does internally, kept
+    // here as a map keyed by reading id so computeAutomationEffectiveness
+    // (which only ever sees trigger/next readings, not the full window
+    // context) can score a wellness.* rule condition without recomputing
+    // history itself.
+    const wellnessScoresByReadingId = new Map(
+      readingsWithId.map(({ id, reading }, i) => [id, computeWellnessScores(reading, readings.slice(0, i))]),
+    );
     const automationEffectiveness = computeAutomationEffectiveness({
       rules,
       logs: logs.map((l) => ({ ruleId: l.ruleId, triggerReadingId: l.triggerReadingId, outcome: l.outcome })),
       readings: readingsWithId,
+      wellnessScoresByReadingId,
     });
 
     return reply.send({ trends, wellnessTrends, automationEffectiveness });

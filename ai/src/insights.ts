@@ -183,8 +183,17 @@ export function computeAutomationEffectiveness(params: {
   logs: ExecutionLogLike[];
   /** Oldest first — from `biometricReadingRepository.listRecentNormalizedWithId`. */
   readings: Array<{ id: string; reading: NormalizedBiometricReading }>;
+  /** Computed wellness scores keyed by reading id, one entry per reading
+   * in `readings` — required to score a rule whose primary condition is a
+   * `wellness.*` field, since that value isn't stored on the raw reading
+   * (see `ai/src/wellness.ts`). Callers build this the same way
+   * `computeWellnessTrends` does: `computeWellnessScores(reading,
+   * priorReadings)` per reading. Omitting it degrades gracefully — a
+   * wellness-field rule just yields `comparableCount: 0` /
+   * `effectivenessRate: null` instead of throwing. */
+  wellnessScoresByReadingId?: Map<string, WellnessScores>;
 }): AutomationEffectivenessResult[] {
-  const { rules, logs, readings } = params;
+  const { rules, logs, readings, wellnessScoresByReadingId } = params;
   const ruleById = new Map(rules.map((r) => [r.id, r]));
   const readingById = new Map(readings.map((r) => [r.id, r.reading]));
 
@@ -201,14 +210,10 @@ export function computeAutomationEffectiveness(params: {
     const rule = ruleById.get(ruleId);
     const condition = rule?.conditions[0];
     if (!rule || !condition) continue;
-    // A wellness.* condition's "value" isn't stored on the raw reading
-    // (it's computed from a trailing history, see ai/src/wellness.ts) —
-    // scoring effectiveness against it would need to recompute wellness
-    // scores for both the trigger and next reading, which needs the same
-    // history-fetching this module deliberately doesn't do (kept
-    // DB-free/pure). Skipped rather than guessed at; see
-    // docs/DECISION_ENGINE_ROADMAP.md for wiring this up properly.
-    if (condition.field.startsWith('wellness.')) continue;
+    const isWellnessField = condition.field.startsWith('wellness.');
+    const wellnessKey = isWellnessField
+      ? (condition.field.slice('wellness.'.length) as (typeof WELLNESS_SCORE_KEYS)[number])
+      : null;
 
     let comparableCount = 0;
     let improvedCount = 0;
@@ -216,13 +221,24 @@ export function computeAutomationEffectiveness(params: {
     for (const log of executions) {
       if (!log.triggerReadingId) continue;
       const triggerReading = readingById.get(log.triggerReadingId);
-      const triggerValue = triggerReading?.[condition.field as BiometricField];
-      if (!triggerReading || triggerValue === undefined) continue;
+      if (!triggerReading) continue;
 
       const triggerTime = new Date(triggerReading.timestamp).getTime();
       const next = readings.find((r) => new Date(r.reading.timestamp).getTime() > triggerTime);
-      const nextValue = next?.reading[condition.field as BiometricField];
-      if (nextValue === undefined) continue;
+      if (!next) continue;
+
+      // A wellness.* condition's value isn't stored on the raw reading —
+      // it's computed from trailing history (see ai/src/wellness.ts) — so
+      // it comes from the caller-supplied score map instead of the
+      // reading object directly. Missing map/entry degrades to "not
+      // comparable" rather than throwing.
+      const triggerValue = wellnessKey
+        ? (wellnessScoresByReadingId?.get(log.triggerReadingId)?.[wellnessKey].value ?? undefined)
+        : triggerReading[condition.field as BiometricField];
+      const nextValue = wellnessKey
+        ? (wellnessScoresByReadingId?.get(next.id)?.[wellnessKey].value ?? undefined)
+        : next.reading[condition.field as BiometricField];
+      if (triggerValue === undefined || nextValue === undefined) continue;
 
       comparableCount++;
       if (isImprovement(condition.operator, triggerValue, nextValue)) improvedCount++;
