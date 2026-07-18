@@ -20,11 +20,12 @@ export default function Home() {
 
       <main className="flex-1">
         <section className="relative overflow-hidden">
-          {/* Ambient light glows, not a literal scene — evokes morning
-           * light through a forest canopy without a clichéd leaf/nature
-           * photo or (the previous hero) a robot/AI-generated-human
-           * video, which is exactly the generic-AI-startup look this
-           * product's visual identity is meant to stand apart from. */}
+          {/* Looping metal-human video background, restored per explicit
+           * request after being swapped for ambient glows in an earlier
+           * pass — the ambient-glow layers stay underneath so the new
+           * earthy palette still comes through around the video's edges
+           * and through its darker frames, rather than the video sitting
+           * on a bare canvas. */}
           <div className="pointer-events-none absolute inset-0 z-0 bg-canvas" aria-hidden="true">
             <div
               className="animate-ambient-drift absolute -top-32 -left-24 h-[32rem] w-[32rem] rounded-full opacity-[0.16] blur-[110px]"
@@ -37,6 +38,15 @@ export default function Home() {
             <div
               className="animate-ambient-drift absolute -bottom-40 left-1/4 h-[26rem] w-[26rem] rounded-full opacity-[0.12] blur-[110px]"
               style={{ background: "radial-gradient(circle, var(--terracotta), transparent 70%)", animationDelay: "-11s" }}
+            />
+            <video
+              className="absolute inset-0 h-full w-full object-cover opacity-60"
+              src="/video/metal-human.mp4"
+              poster="/video/metal-human.jpg"
+              autoPlay
+              loop
+              muted
+              playsInline
             />
             <div className="absolute inset-0 bg-gradient-to-b from-canvas/10 via-canvas/60 to-canvas" />
           </div>
