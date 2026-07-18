@@ -2,6 +2,7 @@ import {
   automationRuleRepository,
   automationExecutionLogRepository,
   userPreferencesRepository,
+  resourcePauseRepository,
   biometricReadingRepository,
   userTimezoneRepository,
 } from '@moodsync/database';
@@ -9,7 +10,7 @@ import type { AutomationRuleDefinition, NormalizedBiometricReading } from '@mood
 import { evaluateRules } from './ruleEngine.js';
 import { isWithinCooldown } from './cooldown.js';
 import { executeAction } from './actionExecutors.js';
-import { explainTrigger, explainConflict, explainManualPause, explainRateLimit } from './explain.js';
+import { explainTrigger, explainConflict, explainManualPause, explainRateLimit, explainResourcePause } from './explain.js';
 import { deliverNotification } from './notificationExecutor.js';
 import { computeWellnessScores } from './wellness.js';
 
@@ -187,6 +188,12 @@ export async function dispatchForReading(
   let executedThisPass = 0;
   const executedInLastHour = await automationExecutionLogRepository.countExecutedSince(userId, new Date(now.getTime() - 60 * 60_000));
 
+  // Per-provider manual overrides (e.g. "pause my lights"), alongside the
+  // global automationsPausedUntil check above — fetched once per dispatch
+  // pass, keyed by provider (ResourcePause.resourceKey), same shape as
+  // executedInLastHour.
+  const resourcePauses = await resourcePauseRepository.listActiveForUser(userId, now);
+
   for (const rule of winners) {
     const lastExecutedAt = await automationExecutionLogRepository.findLastExecutedAt(rule.id);
     if (isWithinCooldown(lastExecutedAt, rule.cooldownMinutes, now)) {
@@ -205,10 +212,34 @@ export async function dispatchForReading(
     const reason = explainTrigger(rule, reading, wellnessScores);
     try {
       let anyQueued = false;
+      let anyExecuted = false;
+      const skippedProviders: string[] = [];
       for (const action of rule.actions) {
+        const pausedUntil = resourcePauses.get(action.provider);
+        if (pausedUntil) {
+          skippedProviders.push(action.provider);
+          continue;
+        }
         const { queued } = await executeAction(userId, action, rule.id);
         if (queued) anyQueued = true;
+        else anyExecuted = true;
       }
+
+      // Every action this rule would take targets a currently-paused
+      // provider — same SKIPPED_MANUAL_PAUSE outcome as the global pause
+      // above, scoped to the specific provider(s) paused. A rule with
+      // some actions on a paused provider and others on an unpaused one
+      // still executes the unpaused ones (outcome EXECUTED below) —
+      // sibling actions on a different provider aren't held hostage by
+      // one paused resource.
+      if (!anyQueued && !anyExecuted) {
+        const firstPausedProvider = skippedProviders[0]!;
+        const pauseReason = explainResourcePause(firstPausedProvider, resourcePauses.get(firstPausedProvider)!.toISOString());
+        await recordAndNotify({ userId, rule, readingId, outcome: 'SKIPPED_MANUAL_PAUSE', reason: pauseReason, notifyTitle: 'Automation paused', now });
+        results.push({ ruleId: rule.id, ruleName: rule.name, outcome: 'SKIPPED_MANUAL_PAUSE', reason: pauseReason });
+        continue;
+      }
+
       const outcome = anyQueued ? 'QUEUED_FOR_DEVICE' : 'EXECUTED';
       const notifyTitle = anyQueued ? `${rule.name} queued for your device` : `${rule.name} triggered`;
       await recordAndNotify({ userId, rule, readingId, outcome, reason, notifyTitle, now });

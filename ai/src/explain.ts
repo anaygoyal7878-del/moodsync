@@ -88,6 +88,13 @@ export function explainManualPause(untilIso: string): string {
   return `Automations are paused until ${new Date(untilIso).toLocaleString()} — a manual override you set from the dashboard.`;
 }
 
+/** Same shape as `explainManualPause`, scoped to one provider — see
+ * `ResourcePause` in schema.prisma and `ai/src/dispatch.ts`'s per-action
+ * pause check. */
+export function explainResourcePause(provider: string, untilIso: string): string {
+  return `${provider} automations are paused until ${new Date(untilIso).toLocaleString()} — a manual override you set from the dashboard.`;
+}
+
 export function explainRateLimit(rule: AutomationRuleDefinition, limit: number): string {
   return `"${rule.name}" was skipped because you've reached the safety limit of ${limit} automation${limit === 1 ? '' : 's'} per hour.`;
 }

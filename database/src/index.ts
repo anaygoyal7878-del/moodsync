@@ -15,6 +15,7 @@ export {
   type QueueDigestEntryInput,
 } from './repositories/pendingNotificationDigestRepository.js';
 export { userPreferencesRepository } from './repositories/userPreferencesRepository.js';
+export { resourcePauseRepository } from './repositories/resourcePauseRepository.js';
 export { pendingDeviceCommandRepository } from './repositories/pendingDeviceCommandRepository.js';
 export { userTimezoneRepository } from './repositories/userTimezoneRepository.js';
 export { insightRepository, type CreateInsightInput } from './repositories/insightRepository.js';

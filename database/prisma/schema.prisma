@@ -37,6 +37,7 @@ model User {
   notifications        Notification[]
   pendingNotificationDigestEntries PendingNotificationDigestEntry[]
   pendingDeviceCommands PendingDeviceCommand[]
+  resourcePauses       ResourcePause[]
   preferences          UserPreferences?
 
   @@map("users")
@@ -432,6 +433,23 @@ model UserPreferences {
 enum NotificationDigestMode {
   IMMEDIATE
   HOURLY
+}
+
+/// A per-provider manual override, alongside UserPreferences.automationsPausedUntil
+/// (which pauses everything). resourceKey is a SmartHomeProviderId string
+/// (e.g. "hue") -- provider-level granularity, matching how a user
+/// actually thinks about it ("pause my lights"), not per-action-type. See
+/// ai/src/dispatch.ts's per-action pause check in dispatchForReading.
+model ResourcePause {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resourceKey String
+  pausedUntil DateTime
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, resourceKey])
+  @@map("resource_pauses")
 }
 
 /// Queued notification content awaiting the next

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { userPreferencesRepository } from '@moodsync/database';
+import { userPreferencesRepository, resourcePauseRepository } from '@moodsync/database';
 
 const pauseSchema = z.object({
   // Minutes from now, capped at 24h — a manual override is meant to be
@@ -8,6 +8,12 @@ const pauseSchema = z.object({
   // what a rule's own `enabled` toggle is for).
   minutes: z.number().int().min(1).max(1440).default(60),
 });
+
+// SmartHomeProviderId values (shared/src/wearables.ts) — a resource pause
+// is scoped to a provider, not a wearable, since only smart-home
+// providers take automation actions.
+const RESOURCE_PROVIDERS = ['hue', 'spotify', 'ecobee', 'alexa', 'homekit'] as const;
+const resourceProviderSchema = z.enum(RESOURCE_PROVIDERS);
 
 const timeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Must be "HH:mm" 24-hour time');
 
@@ -51,6 +57,42 @@ export default async function preferencesRoutes(app: FastifyInstance) {
     await userPreferencesRepository.setAutomationsPausedUntil(request.userId!, null);
     return reply.code(204).send();
   });
+
+  /** Per-provider pause, alongside the global one above — see
+   * ResourcePause in schema.prisma and ai/src/dispatch.ts's per-action
+   * pause check. */
+  app.get('/preferences/automation-pause/resource', { preHandler: app.authenticate }, async (request, reply) => {
+    const pauses = await resourcePauseRepository.listActiveForUser(request.userId!);
+    return reply.send({ pauses: Object.fromEntries([...pauses].map(([provider, until]) => [provider, until.toISOString()])) });
+  });
+
+  app.post<{ Params: { provider: string } }>(
+    '/preferences/automation-pause/resource/:provider',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const providerParsed = resourceProviderSchema.safeParse(request.params.provider);
+      if (!providerParsed.success) return reply.code(400).send({ error: `Unknown provider: ${request.params.provider}` });
+
+      const parsed = pauseSchema.safeParse(request.body ?? {});
+      if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+      const pausedUntil = new Date(Date.now() + parsed.data.minutes * 60_000);
+      await resourcePauseRepository.set(request.userId!, providerParsed.data, pausedUntil);
+      return reply.send({ provider: providerParsed.data, pausedUntil: pausedUntil.toISOString() });
+    },
+  );
+
+  app.delete<{ Params: { provider: string } }>(
+    '/preferences/automation-pause/resource/:provider',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const providerParsed = resourceProviderSchema.safeParse(request.params.provider);
+      if (!providerParsed.success) return reply.code(400).send({ error: `Unknown provider: ${request.params.provider}` });
+
+      await resourcePauseRepository.clear(request.userId!, providerParsed.data);
+      return reply.code(204).send();
+    },
+  );
 
   /** Quiet hours + the notifications on/off switch — see
    * ai/src/notificationExecutor.ts's `shouldNotify` for where these are

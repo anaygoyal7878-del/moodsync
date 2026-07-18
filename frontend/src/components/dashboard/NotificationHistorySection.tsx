@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/Card";
 import type { NotificationEntry, NotificationPreferences } from "@/lib/types";
 import { PauseAutomationsButton } from "./PauseAutomationsButton";
+import { ResourcePauseControl } from "./ResourcePauseControl";
 import { NotificationPreferencesForm } from "./NotificationPreferencesForm";
 
 export function NotificationHistorySection({
@@ -8,6 +9,7 @@ export function NotificationHistorySection({
   pausedUntil,
   isPaused,
   preferences,
+  resourcePauses,
 }: {
   notifications: NotificationEntry[];
   pausedUntil: string | null;
@@ -16,6 +18,7 @@ export function NotificationHistorySection({
    * impure calls like Date.now() inside a component body. */
   isPaused: boolean;
   preferences: NotificationPreferences;
+  resourcePauses: Record<string, string>;
 }) {
   return (
     <section className="flex flex-col gap-3">
@@ -29,6 +32,8 @@ export function NotificationHistorySection({
           <p className="text-sm text-ink-secondary">Automations are paused until {new Date(pausedUntil).toLocaleString()}.</p>
         </Card>
       )}
+
+      <ResourcePauseControl activePauses={resourcePauses} />
 
       <NotificationPreferencesForm preferences={preferences} />
 
