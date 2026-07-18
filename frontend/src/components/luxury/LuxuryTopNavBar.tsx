@@ -11,8 +11,7 @@ function timeOfDayGreeting(hour: number): string {
 }
 
 /** Ported from the Superdesign TopNavBar component. `userName`/
- * `userInitial` come from the real /api/me displayName (same source
- * WelcomeBanner.tsx uses on the classic dashboard) — the draft's
+ * `userInitial` come from the real /api/me displayName — the draft's
  * defaults ("Sarah"/"S") never render here. The bell has a real
  * destination (/dashboard/notifications, an existing page) rather than
  * the draft's inert @click emit. */
@@ -22,7 +21,7 @@ export function LuxuryTopNavBar({ userName }: { userName: string }) {
 
   return (
     <header
-      className="shrink-0 sticky top-0 z-40 pt-6 sm:pt-8"
+      className="shrink-0 sticky top-0 z-40 pt-6 sm:hidden"
       style={{ background: "var(--lux-bg-ground)", borderBottom: "1px solid var(--lux-hairline)" }}
     >
       <div className="flex items-center justify-between px-5 pb-4">

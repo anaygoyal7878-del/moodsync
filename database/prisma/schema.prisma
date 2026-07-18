@@ -40,6 +40,7 @@ model User {
   resourcePauses       ResourcePause[]
   musicPlayLogs        MusicPlayLog[]
   locationEvents       LocationEvent[]
+  meditationSessions   MeditationSession[]
   preferences          UserPreferences?
 
   @@map("users")
@@ -517,4 +518,24 @@ model LocationEvent {
 
   @@index([userId, occurredAt])
   @@map("location_events")
+}
+
+/// A completed guided-timer meditation session, logged client-side when
+/// the countdown reaches zero (see frontend's LuxuryMeditation.tsx) —
+/// there is no server-side timer to enforce this, same trust model as
+/// every other client-reported wellness action in this app. `ambience`
+/// names one of the Web Audio-synthesized soundscapes the session
+/// played (rain/forest/ocean/noise), or null if played in silence; it's
+/// not a claim about a licensed audio track, just which generator ran.
+model MeditationSession {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  durationMinutes Int
+  ambience        String?
+  startedAt       DateTime
+  completedAt     DateTime @default(now())
+
+  @@index([userId, completedAt])
+  @@map("meditation_sessions")
 }

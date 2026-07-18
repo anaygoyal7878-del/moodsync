@@ -296,6 +296,46 @@ body {
   --lux-rose: #d9a8c8;
   --lux-ink: #f6f3f8;
   --lux-muted: #9d94a8;
+
+  /* Repoints the app's existing semantic tokens (defined at :root
+   * above) to the dark-luxury palette. Every component built before
+   * this port — AutomationSection, ConnectionsSection, DeviceCard,
+   * TrendChart, ElasticSlider, etc. — already styles itself with
+   * bg-surface/text-ink/text-brand/border-line and friends, so
+   * wrapping the whole dashboard shell in .ms-luxury re-themes all of
+   * it with no per-component edits, rather than hand-porting every
+   * page to a parallel --lux-* class the way the first 3 pages were.
+   * --mood-* (per-wellness-metric accents) are deliberately left
+   * untouched — they're already distinct mid-tone hues that read fine
+   * against a dark ground, and repointing them would lose the
+   * per-metric color-coding WellnessScoreCard depends on. */
+  --canvas: var(--lux-bg-ground);
+  --surface: var(--lux-bg-card);
+  --surface-raised: var(--lux-bg-card-2);
+  --surface-hover: #332b3d;
+  --line: var(--lux-hairline);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --ink: var(--lux-ink);
+  --ink-secondary: #b8b0c2;
+  --ink-muted: var(--lux-muted);
+  --brand: var(--lux-sage);
+  --brand-hover: #72c589;
+  --gold: var(--lux-gold);
+  --gold-bg: rgba(212, 175, 120, 0.14);
+  --terracotta: var(--lux-rose);
+  --terracotta-bg: rgba(217, 168, 200, 0.14);
+  --success: var(--lux-sage);
+  --success-bg: rgba(95, 184, 120, 0.14);
+  --warning: #ff916e;
+  --warning-bg: rgba(255, 145, 110, 0.14);
+  --danger: #ff7a7a;
+  --danger-bg: rgba(255, 122, 122, 0.14);
+  --info: #93b4e0;
+  --info-bg: rgba(147, 180, 224, 0.14);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 12px 28px -10px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 28px 56px -20px rgba(0, 0, 0, 0.6);
+
   background: var(--lux-bg-ground);
   color: var(--lux-ink);
   font-family: var(--font-inter), sans-serif;

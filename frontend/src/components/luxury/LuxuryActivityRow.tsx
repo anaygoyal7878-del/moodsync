@@ -1,15 +1,15 @@
 import type { LucideIcon } from "lucide-react";
 import { timeAgo } from "@/lib/activityDisplay";
-import type { AutomationHistoryEntry } from "@/lib/types";
 
-/** Ported from the Superdesign ActivityRow component, wired to the same
- * real automation-history entries RecentActivity.tsx already renders
- * (see that file's doc comment) — same data, restyled card shell.
- * `icon` is resolved by the caller's map loop (matching
- * RecentActivity.tsx's own pattern) rather than looked up in here,
- * since eslint's react-hooks/static-components rule flags a component
- * reference assigned inside a component's own top-level render body. */
-export function LuxuryActivityRow({ entry, icon: Icon }: { entry: AutomationHistoryEntry; icon: LucideIcon }) {
+/** Ported from the Superdesign ActivityRow component. Generic over
+ * `title`/`timestamp` (rather than a specific entry type) so the same
+ * card renders both real automation-history rows and real completed
+ * meditation sessions on Home's merged activity feed — `icon` is
+ * resolved by the caller's map loop (matching RecentActivity.tsx's own
+ * pattern) rather than looked up in here, since eslint's
+ * react-hooks/static-components rule flags a component reference
+ * assigned inside a component's own top-level render body. */
+export function LuxuryActivityRow({ title, timestamp, icon: Icon }: { title: string; timestamp: string; icon: LucideIcon }) {
   return (
     <div
       className="flex items-center gap-3 rounded-2xl p-3.5"
@@ -23,10 +23,10 @@ export function LuxuryActivityRow({ entry, icon: Icon }: { entry: AutomationHist
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[14px] font-medium" style={{ color: "var(--lux-ink)" }}>
-          {entry.rule.name}
+          {title}
         </p>
         <p className="text-[12px]" style={{ color: "var(--lux-muted)" }}>
-          {timeAgo(entry.executedAt)}
+          {timeAgo(timestamp)}
         </p>
       </div>
     </div>

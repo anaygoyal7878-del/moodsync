@@ -146,3 +146,14 @@ export interface PersistedInsight {
   summary: string | null;
   createdAt: string;
 }
+
+export type MeditationAmbience = "rain" | "forest" | "ocean" | "noise";
+
+export interface MeditationSessionEntry {
+  id: string;
+  userId: string;
+  durationMinutes: number;
+  ambience: MeditationAmbience | null;
+  startedAt: string;
+  completedAt: string;
+}

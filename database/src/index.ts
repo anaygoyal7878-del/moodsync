@@ -22,3 +22,7 @@ export { pendingDeviceCommandRepository } from './repositories/pendingDeviceComm
 export { userTimezoneRepository } from './repositories/userTimezoneRepository.js';
 export { insightRepository, type CreateInsightInput } from './repositories/insightRepository.js';
 export { recommendationRepository, type CreateRecommendationInput } from './repositories/recommendationRepository.js';
+export {
+  meditationSessionRepository,
+  type CreateMeditationSessionInput,
+} from './repositories/meditationSessionRepository.js';

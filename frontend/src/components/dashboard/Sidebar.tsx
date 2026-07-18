@@ -6,12 +6,13 @@ import { LogoutButton } from "@/components/marketing/LogoutButton";
 import { DASHBOARD_SECTIONS as SECTIONS } from "@/lib/dashboardSections";
 
 /** Persistent left-rail navigation for wide viewports — desktop-only
- * (see BottomTabBar.tsx for the mobile equivalent; layout.tsx renders
- * both and CSS breakpoints decide which one is actually visible, rather
- * than one component trying to be both shapes at once). Apple Health/
- * Linear-style app shell: always on screen, not summoned. Active-state
- * is derived from the real current route (usePathname), not a
- * separately-tracked selection. */
+ * (see luxury/LuxuryTopNavBar.tsx + LuxuryBottomNav.tsx for the mobile
+ * equivalent; DashboardShell.tsx renders both and CSS breakpoints
+ * decide which one is actually visible, rather than one component
+ * trying to be both shapes at once). Apple Health/Linear-style app
+ * shell: always on screen, not summoned. Active-state is derived from
+ * the real current route (usePathname), not a separately-tracked
+ * selection. */
 export function Sidebar({ email }: { email: string }) {
   const pathname = usePathname();
 

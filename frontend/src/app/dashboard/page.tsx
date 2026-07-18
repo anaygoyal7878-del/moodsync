@@ -4,7 +4,7 @@ import { QuickActions } from "@/components/dashboard/QuickActions";
 import { LuxuryWeekBars } from "@/components/luxury/LuxuryWeekBars";
 import { LuxuryActivityRow } from "@/components/luxury/LuxuryActivityRow";
 import { iconForRuleName } from "@/lib/activityDisplay";
-import { Zap, Cpu, Wand2, TrendingUp, TrendingDown } from "lucide-react";
+import { Zap, Cpu, Wand2, TrendingUp, TrendingDown, Sparkle } from "lucide-react";
 import type {
   WellnessResponse,
   InsightsResponse,
@@ -12,8 +12,21 @@ import type {
   AutomationRuleDefinition,
   AutomationHistoryEntry,
   RecommendationEntry,
+  MeditationSessionEntry,
 } from "@/lib/types";
 import type { NormalizedBiometricReading } from "@moodsync/shared";
+
+/** A slot LuxuryActivityRow can render regardless of whether it came
+ * from an automation execution or a completed meditation session — the
+ * two are real, differently-shaped records (AutomationHistoryEntry vs
+ * MeditationSessionEntry) merged here purely for display, sorted by
+ * when each actually happened. */
+interface ActivityItem {
+  id: string;
+  title: string;
+  timestamp: string;
+  icon: typeof Sparkle;
+}
 
 /** Home page — ported from the Superdesign project's Dashboard draft
  * (project 4f734257-…). Same fetches the classic /dashboard used, just
@@ -24,17 +37,27 @@ import type { NormalizedBiometricReading } from "@moodsync/shared";
  * invented "mood" series; the activity feed is the same real automation
  * history RecentActivity.tsx renders on the classic dashboard. */
 export default async function DashboardHomePage() {
-  const [wellnessResult, insightsResult, historyResult, connectionsResult, rulesResult, recommendationsResult, automationHistoryResult, pauseResult] =
-    await Promise.all([
-      backendFetch<WellnessResponse>("/api/wellness"),
-      backendFetch<InsightsResponse>("/api/insights?days=14"),
-      backendFetch<{ readings: NormalizedBiometricReading[] }>("/api/biometrics/history?days=7"),
-      backendFetch<ConnectionsResponse>("/api/connections"),
-      backendFetch<{ rules: AutomationRuleDefinition[] }>("/api/automation-rules"),
-      backendFetch<{ recommendations: RecommendationEntry[] }>("/api/recommendations"),
-      backendFetch<{ entries: AutomationHistoryEntry[] }>("/api/automation-history?limit=10"),
-      backendFetch<{ pausedUntil: string | null; isPaused: boolean }>("/api/preferences/automation-pause"),
-    ]);
+  const [
+    wellnessResult,
+    insightsResult,
+    historyResult,
+    connectionsResult,
+    rulesResult,
+    recommendationsResult,
+    automationHistoryResult,
+    pauseResult,
+    meditationSessionsResult,
+  ] = await Promise.all([
+    backendFetch<WellnessResponse>("/api/wellness"),
+    backendFetch<InsightsResponse>("/api/insights?days=14"),
+    backendFetch<{ readings: NormalizedBiometricReading[] }>("/api/biometrics/history?days=7"),
+    backendFetch<ConnectionsResponse>("/api/connections"),
+    backendFetch<{ rules: AutomationRuleDefinition[] }>("/api/automation-rules"),
+    backendFetch<{ recommendations: RecommendationEntry[] }>("/api/recommendations"),
+    backendFetch<{ entries: AutomationHistoryEntry[] }>("/api/automation-history?limit=10"),
+    backendFetch<{ pausedUntil: string | null; isPaused: boolean }>("/api/preferences/automation-pause"),
+    backendFetch<{ sessions: MeditationSessionEntry[] }>("/api/meditation-sessions?limit=5"),
+  ]);
 
   const scores = wellnessResult.ok ? wellnessResult.data.scores : null;
   const wellnessTrends = insightsResult.ok ? insightsResult.data.wellnessTrends : [];
@@ -48,8 +71,22 @@ export default async function DashboardHomePage() {
     ? recommendationsResult.data.recommendations.find((r) => r.status === "PENDING")
     : undefined;
   const automationHistory = automationHistoryResult.ok ? automationHistoryResult.data.entries : [];
-  const recentActivity = automationHistory.filter((h) => h.outcome === "EXECUTED" || h.outcome === "QUEUED_FOR_DEVICE").slice(0, 5);
+  const meditationSessions = meditationSessionsResult.ok ? meditationSessionsResult.data.sessions : [];
   const isPaused = pauseResult.ok ? pauseResult.data.isPaused : false;
+
+  const recentActivity: ActivityItem[] = [
+    ...automationHistory
+      .filter((h) => h.outcome === "EXECUTED" || h.outcome === "QUEUED_FOR_DEVICE")
+      .map((h) => ({ id: h.id, title: h.rule.name, timestamp: h.executedAt, icon: iconForRuleName(h.rule.name) })),
+    ...meditationSessions.map((s) => ({
+      id: s.id,
+      title: `${s.durationMinutes} min meditation`,
+      timestamp: s.completedAt,
+      icon: Sparkle,
+    })),
+  ]
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 5);
 
   return (
     <div className="flex flex-col gap-5">
@@ -127,8 +164,8 @@ export default async function DashboardHomePage() {
             </Link>
           </div>
           <div className="flex flex-col gap-2.5">
-            {recentActivity.map((entry) => (
-              <LuxuryActivityRow key={entry.id} entry={entry} icon={iconForRuleName(entry.rule.name)} />
+            {recentActivity.map((item) => (
+              <LuxuryActivityRow key={item.id} title={item.title} timestamp={item.timestamp} icon={item.icon} />
             ))}
           </div>
         </section>
