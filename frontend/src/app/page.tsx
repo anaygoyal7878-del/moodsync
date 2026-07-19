@@ -4,6 +4,7 @@ import MagicBento from "@/components/marketing/MagicBento";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { CinematicHero } from "@/components/ui/cinematic-hero";
+import { HeartRateWatch } from "@/components/marketing/HeartRateWatch";
 
 const integrations = [
   { name: "WHOOP", status: "Connect today" },
@@ -21,6 +22,21 @@ export default function Home() {
 
       <main className="flex-1">
         <CinematicHero />
+
+        <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 px-6 py-20 md:grid-cols-2">
+          <div>
+            <h2 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+              Every heartbeat, read the moment it happens
+            </h2>
+            <p className="mt-4 max-w-md text-ink-secondary">
+              WHOOP, Fitbit, and Apple Health all stream real heart-rate samples into MoodSync — not a daily
+              average, a live signal your automations can actually react to. That&apos;s what triggers the
+              lights dimming when your stress spikes, or your wind-down playlist starting before you even
+              notice you need it.
+            </p>
+          </div>
+          <HeartRateWatch />
+        </section>
 
         <section id="features" className="mx-auto max-w-6xl px-6 py-20">
           <div className="mb-10 text-center">

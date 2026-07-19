@@ -428,3 +428,32 @@ body {
     animation: none;
   }
 }
+
+/* Landing page HeartRateWatch.tsx — continuously "draws" the ECG trace
+ * left to right in a loop via the classic stroke-dasharray/dashoffset
+ * technique (dasharray set to the path's own length so one dash+one
+ * gap exactly covers it, then the gap is animated across). */
+.heart-rate-trace {
+  stroke-dasharray: 260;
+  stroke-dashoffset: 260;
+  animation: heart-rate-draw 2.2s linear infinite;
+}
+
+@keyframes heart-rate-draw {
+  0% {
+    stroke-dashoffset: 260;
+  }
+  60% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -260;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heart-rate-trace {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
