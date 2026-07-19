@@ -19,11 +19,14 @@ export class AtlasNotConfiguredError extends Error {
   }
 }
 
-/** Free-tier-eligible on Google AI Studio (a real, distinct limitation
- * from Anthropic's paid-only API — see the free-tier rate limits at
- * ai.google.dev/gemini-api/docs/rate-limits: ~15 requests/minute on the
- * free tier as of this writing, subject to change). */
-const MODEL = 'gemini-2.5-flash';
+/** Google's maintained "latest flash" alias rather than a dated model
+ * name (e.g. `gemini-2.5-flash`) — confirmed live against this
+ * project's real key that a dated name can 404 with "no longer
+ * available to new users" even while still listed in `models.list`,
+ * so pinning to a specific version is the wrong tradeoff here; the
+ * alias is what Google itself repoints as models get deprecated.
+ * Free-tier-eligible on Google AI Studio (ai.google.dev/gemini-api/docs/rate-limits). */
+const MODEL = 'gemini-flash-latest';
 
 /** Renders one score for the system prompt, or "no data yet" — Atlas
  * must never guess a number the way it must never fabricate anything
