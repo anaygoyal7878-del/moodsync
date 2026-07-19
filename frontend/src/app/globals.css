@@ -387,3 +387,44 @@ body {
     animation: none;
   }
 }
+
+/* Atlas (the AI wellness assistant, /dashboard/atlas) — a slow,
+ * gentle float + hue drift for the character's aurora-glow sphere
+ * background. Kept separate from ambient-drift above since Atlas's
+ * character needs both a vertical bob (float) and a subtler hue shift
+ * (glow) running at different periods so the motion doesn't read as
+ * mechanically looped. */
+@keyframes atlas-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-14px) scale(1.03);
+  }
+}
+
+@keyframes atlas-glow {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.atlas-orb {
+  animation: atlas-float 7s ease-in-out infinite;
+}
+
+.atlas-orb-glow {
+  animation: atlas-glow 5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-orb,
+  .atlas-orb-glow {
+    animation: none;
+  }
+}

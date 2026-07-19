@@ -22,6 +22,7 @@ import deviceRoutes from './routes/devices.js';
 import recommendationRoutes from './routes/recommendations.js';
 import locationEventRoutes from './routes/locationEvents.js';
 import meditationSessionRoutes from './routes/meditationSessions.js';
+import atlasRoutes from './routes/atlas.js';
 
 export async function buildServer() {
   const app = Fastify({ loggerInstance: logger, trustProxy: true });
@@ -65,6 +66,7 @@ export async function buildServer() {
   await app.register(recommendationRoutes, { prefix: '/api' });
   await app.register(locationEventRoutes, { prefix: '/api' });
   await app.register(meditationSessionRoutes, { prefix: '/api' });
+  await app.register(atlasRoutes, { prefix: '/api' });
 
   return app;
 }
