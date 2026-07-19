@@ -2,6 +2,17 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /**
+   * Next.js's dev server blocks cross-origin requests to its own assets
+   * (HMR, _next/*, etc.) by default from any origin other than
+   * localhost — a real, confirmed dev-mode CSRF hardening feature, not
+   * a config oversight. Without this, loading the dev server from a
+   * phone via the Mac's LAN IP (e.g. testing the iOS-synced dashboard
+   * on a real device) silently fails to hydrate, which looks like the
+   * login button doing nothing. Only takes effect under `next dev` —
+   * production builds have no such restriction.
+   */
+  allowedDevOrigins: ["192.168.68.68"],
+  /**
    * Only needed for local/tunnel-based Alexa testing (see
    * docs/ALEXA_DEVELOPER_GUIDE.md): Amazon's servers call
    * /api/alexa/skill and /api/integrations/alexa/token directly, but a
