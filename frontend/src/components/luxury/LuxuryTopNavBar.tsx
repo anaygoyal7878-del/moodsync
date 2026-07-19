@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Bell } from "lucide-react";
+import { usePlatformPreview } from "@/components/dev/PlatformPreviewContext";
 
 function timeOfDayGreeting(hour: number): string {
   if (hour < 5) return "Good night";
@@ -18,10 +19,12 @@ function timeOfDayGreeting(hour: number): string {
 export function LuxuryTopNavBar({ userName }: { userName: string }) {
   const initial = userName.trim().charAt(0).toUpperCase() || "?";
   const greeting = timeOfDayGreeting(new Date().getHours());
+  const { mode } = usePlatformPreview();
+  const visibilityClass = mode === "mobile" ? "block" : mode === "web" ? "hidden" : "sm:hidden";
 
   return (
     <header
-      className="shrink-0 sticky top-0 z-40 pt-6 sm:hidden"
+      className={`shrink-0 sticky top-0 z-40 pt-6 ${visibilityClass}`}
       style={{ background: "var(--lux-bg-ground)", borderBottom: "1px solid var(--lux-hairline)" }}
     >
       <div className="flex items-center justify-between px-5 pb-4">

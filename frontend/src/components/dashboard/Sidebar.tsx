@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import clsx from "clsx";
 import { LogoutButton } from "@/components/marketing/LogoutButton";
 import { DASHBOARD_SECTIONS as SECTIONS } from "@/lib/dashboardSections";
+import { usePlatformPreview } from "@/components/dev/PlatformPreviewContext";
 
 /** Persistent left-rail navigation for wide viewports — desktop-only
  * (see luxury/LuxuryTopNavBar.tsx + LuxuryBottomNav.tsx for the mobile
@@ -15,11 +17,18 @@ import { DASHBOARD_SECTIONS as SECTIONS } from "@/lib/dashboardSections";
  * selection. */
 export function Sidebar({ email }: { email: string }) {
   const pathname = usePathname();
+  const { mode } = usePlatformPreview();
 
   return (
     <nav
       aria-label="Dashboard"
-      className="hidden shrink-0 sm:flex sm:h-screen sm:w-56 sm:flex-col sm:gap-0.5 sm:overflow-y-auto sm:border-r sm:border-line sm:bg-surface sm:px-3 sm:py-6"
+      className={clsx(
+        "shrink-0",
+        mode === "mobile" && "hidden",
+        mode === "web" && "flex h-screen w-56 flex-col gap-0.5 overflow-y-auto border-r border-line bg-surface px-3 py-6",
+        mode === null &&
+          "hidden sm:flex sm:h-screen sm:w-56 sm:flex-col sm:gap-0.5 sm:overflow-y-auto sm:border-r sm:border-line sm:bg-surface sm:px-3 sm:py-6",
+      )}
     >
       <Link href="/dashboard" className="mb-4 flex items-center gap-2 px-2">
         <span className="h-2 w-2 rounded-full bg-brand" aria-hidden="true" />
