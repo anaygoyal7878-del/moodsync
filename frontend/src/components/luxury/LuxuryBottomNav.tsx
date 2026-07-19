@@ -1,12 +1,13 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { Home, BarChart2, Zap, User, Sparkle } from "lucide-react";
+import { Home, BarChart2, Zap, User, Sparkle, Bot } from "lucide-react";
 import { MagnificationDock, type DockItemData } from "./MagnificationDock";
 import { usePlatformPreview } from "@/components/dev/PlatformPreviewContext";
 
 const TABS = [
   { href: "/dashboard", label: "Home", icon: Home, exact: true },
+  { href: "/dashboard/atlas", label: "Atlas", icon: Bot, exact: false },
   { href: "/dashboard/meditation", label: "Meditate", icon: Sparkle, exact: false },
   { href: "/dashboard/insights", label: "Insights", icon: BarChart2, exact: false },
   { href: "/dashboard/automation", label: "Automations", icon: Zap, exact: false },
@@ -42,7 +43,7 @@ export function LuxuryBottomNav() {
       className={`shrink-0 sticky bottom-0 z-40 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] ${visibilityClass}`}
       style={{ background: "var(--lux-bg-ground)" }}
     >
-      <MagnificationDock items={items} className="mx-auto" panelHeight={60} baseItemSize={44} magnification={64} distance={120} />
+      <MagnificationDock items={items} className="mx-auto" panelHeight={58} baseItemSize={40} magnification={58} distance={100} />
     </footer>
   );
 }
