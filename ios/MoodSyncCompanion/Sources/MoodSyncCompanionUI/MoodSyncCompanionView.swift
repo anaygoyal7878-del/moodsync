@@ -47,6 +47,7 @@ public struct MoodSyncCompanionView: View {
     @State private var accessToken: String?
     @State private var status: String = "Not signed in"
     @State private var isBusy = false
+    @State private var autoSyncTask: Task<Void, Never>?
     #if canImport(CoreLocation)
     @State private var locationController = LocationController()
     // Held strongly here since LocationController.observer is weak (it
@@ -102,14 +103,39 @@ public struct MoodSyncCompanionView: View {
                 .multilineTextAlignment(.center)
         }
         .padding()
-        #if canImport(CoreLocation)
         .onChange(of: accessToken) { _, newValue in
-            guard newValue != nil else { return }
-            let observer = LocationPushObserver(baseURL: baseURL) { accessToken }
-            locationObserver = observer
-            locationController.observer = observer
+            #if canImport(CoreLocation)
+            if newValue != nil {
+                let observer = LocationPushObserver(baseURL: baseURL) { accessToken }
+                locationObserver = observer
+                locationController.observer = observer
+            }
+            #endif
+            restartAutoSync(signedIn: newValue != nil)
         }
-        #endif
+        .onDisappear { autoSyncTask?.cancel() }
+    }
+
+    /// Foreground auto-sync, matching the same `sync()` the "Sync now"
+    /// button calls. Fires every 2.5 minutes while the app is open and
+    /// signed in — that's the real cadence achievable here: iOS doesn't
+    /// let a third-party app request a guaranteed background-execution
+    /// interval (`BGAppRefreshTask` scheduling is OS-controlled and
+    /// typically 15+ minutes, not developer-settable), so this
+    /// intentionally only covers foreground/open-app time rather than
+    /// claiming a background guarantee it can't deliver.
+    private func restartAutoSync(signedIn: Bool) {
+        autoSyncTask?.cancel()
+        autoSyncTask = nil
+        guard signedIn else { return }
+
+        autoSyncTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 150 * 1_000_000_000)
+                if Task.isCancelled { break }
+                await sync()
+            }
+        }
     }
 
     #if canImport(CoreLocation)
