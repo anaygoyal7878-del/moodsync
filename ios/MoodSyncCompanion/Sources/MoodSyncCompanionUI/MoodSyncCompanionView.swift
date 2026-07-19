@@ -48,6 +48,10 @@ public struct MoodSyncCompanionView: View {
     @State private var status: String = "Not signed in"
     @State private var isBusy = false
     @State private var autoSyncTask: Task<Void, Never>?
+    /// QA/demo convenience — see DemoHealthKitReader.swift's doc comment.
+    /// Off by default; real HealthKit data is always what a normal run
+    /// uses unless this is explicitly switched on.
+    @State private var useDemoHealthData = false
     #if canImport(CoreLocation)
     @State private var locationController = LocationController()
     // Held strongly here since LocationController.observer is weak (it
@@ -84,6 +88,15 @@ public struct MoodSyncCompanionView: View {
                 Button(isBusy ? "Syncing…" : "Sync now") { Task { await sync() } }
                     .disabled(isBusy)
                     .buttonStyle(.borderedProminent)
+
+                Toggle("Use demo health data", isOn: $useDemoHealthData)
+                    .toggleStyle(.switch)
+                if useDemoHealthData {
+                    Text("Sync sends fixed sample data instead of reading real HealthKit values — for previewing the app without seeded Health app data.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
 
                 #if canImport(CoreLocation)
                 Button("Set home to current location") { Task { await setHome() } }
@@ -179,7 +192,7 @@ public struct MoodSyncCompanionView: View {
         defer { isBusy = false }
 
         let coordinator = SyncCoordinator(
-            healthKit: HealthKitReader(),
+            healthKit: useDemoHealthData ? DemoHealthKitReader() : HealthKitReader(),
             apiClient: MoodSyncAPIClient(baseURL: baseURL)
         )
         switch await coordinator.sync(accessToken: accessToken) {
