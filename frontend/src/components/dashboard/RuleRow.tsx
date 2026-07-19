@@ -6,15 +6,32 @@ import { Lightbulb, Music, Smartphone, Thermometer, Mic, Bell, BellOff, Zap } fr
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { CONDITION_FIELDS, OPERATOR_LABELS } from "@/lib/conditionFields";
+import { formatKelvin, mirekToKelvin } from "@/lib/colorTemperature";
+import { formatCooldown, formatPriority } from "@/lib/ruleFormPresets";
 import type { AutomationRuleDefinition } from "@/lib/types";
 
 function summarizeCondition(c: AutomationRuleDefinition["conditions"][number]): string {
-  const operators: Record<string, string> = { lt: "<", lte: "≤", gt: ">", gte: "≥", eq: "=" };
-  return `${c.field} ${operators[c.operator] ?? c.operator} ${c.value}`;
+  const meta = CONDITION_FIELDS[c.field as keyof typeof CONDITION_FIELDS];
+  if (!meta) return `${c.field} ${c.operator} ${c.value}`;
+  return `${meta.label} ${OPERATOR_LABELS[c.operator]} ${meta.format(c.value)}`;
 }
 
+const ACTION_LABELS: Record<string, string> = {
+  "hue.set_scene": "Activate Hue scene",
+  "spotify.play_playlist": "Play Spotify playlist",
+  "homekit.activate_scene": "Activate HomeKit scene",
+  "notification.reduce_intensity": "Send notification",
+};
+
 function summarizeAction(a: AutomationRuleDefinition["actions"][number]): string {
-  return a.type;
+  if (a.type === "hue.set_brightness" && typeof a.params.brightness === "number") {
+    return `Set brightness to ${a.params.brightness}%`;
+  }
+  if (a.type === "hue.set_color_temperature" && typeof a.params.mirek === "number") {
+    return `Set color to ${formatKelvin(mirekToKelvin(a.params.mirek))}`;
+  }
+  return ACTION_LABELS[a.type] ?? a.type;
 }
 
 /** First action's provider decides the row's icon — a rule with
@@ -75,8 +92,8 @@ export function RuleRow({ rule }: { rule: AutomationRuleDefinition }) {
           <p className="text-xs text-ink-muted">
             {rule.conditions.length > 0 ? rule.conditions.map(summarizeCondition).join(" and ") : "scheduled"}
             {rule.timeWindow ? ` (${rule.timeWindow.start}-${rule.timeWindow.end})` : ""} &rarr;{" "}
-            {rule.actions.map(summarizeAction).join(", ")} &middot; {rule.cooldownMinutes}m cooldown &middot; priority{" "}
-            {rule.priority}
+            {rule.actions.map(summarizeAction).join(", ")} &middot; {`${formatCooldown(rule.cooldownMinutes)} cooldown`}{" "}
+            &middot; {`priority ${formatPriority(rule.priority)}`}
           </p>
         </div>
       </div>
