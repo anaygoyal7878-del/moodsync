@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { sendAtlasMessage, AtlasNotConfiguredError, type AtlasChatMessage } from '@moodsync/ai';
 
-/** Capped well under Claude's real context window — this is a sanity
+/** Capped well under Gemini's real context window — this is a sanity
  * bound on request size, not a claim about model limits. */
 const chatSchema = z.object({
   messages: z
@@ -34,7 +34,7 @@ export default async function atlasRoutes(app: FastifyInstance) {
       return reply.send({ reply: reply_ });
     } catch (error) {
       if (error instanceof AtlasNotConfiguredError) {
-        return reply.code(503).send({ error: 'Atlas is not configured yet — ask the site owner to add an ANTHROPIC_API_KEY.' });
+        return reply.code(503).send({ error: 'Atlas is not configured yet — ask the site owner to add a GEMINI_API_KEY.' });
       }
       request.log.error(error, 'Atlas chat request failed');
       return reply.code(502).send({ error: "Atlas couldn't respond right now — try again in a moment." });

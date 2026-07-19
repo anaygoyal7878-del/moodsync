@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenAI } from '@google/genai';
 import {
   biometricReadingRepository,
   automationRuleRepository,
@@ -15,11 +15,15 @@ export interface AtlasChatMessage {
 
 export class AtlasNotConfiguredError extends Error {
   constructor() {
-    super('Atlas is not configured — ANTHROPIC_API_KEY is not set.');
+    super('Atlas is not configured — GEMINI_API_KEY is not set.');
   }
 }
 
-const MODEL = 'claude-sonnet-4-5';
+/** Free-tier-eligible on Google AI Studio (a real, distinct limitation
+ * from Anthropic's paid-only API — see the free-tier rate limits at
+ * ai.google.dev/gemini-api/docs/rate-limits: ~15 requests/minute on the
+ * free tier as of this writing, subject to change). */
+const MODEL = 'gemini-2.5-flash';
 
 /** Renders one score for the system prompt, or "no data yet" — Atlas
  * must never guess a number the way it must never fabricate anything
@@ -105,25 +109,31 @@ Keep replies conversational and reasonably short unless the user asks for detail
 }
 
 /**
- * Sends one turn to Atlas via the real Anthropic Messages API — no
- * canned/templated replies. Requires `ANTHROPIC_API_KEY`; callers
- * should catch `AtlasNotConfiguredError` and surface a clear "not set
- * up yet" state rather than a generic 500.
+ * Sends one turn to Atlas via the real Google Gemini API (Google AI
+ * Studio's Gemini Developer API, not Vertex — see `GoogleGenAI({apiKey})`
+ * below) — no canned/templated replies. Requires `GEMINI_API_KEY`;
+ * callers should catch `AtlasNotConfiguredError` and surface a clear
+ * "not set up yet" state rather than a generic 500. Gemini's chat
+ * turns use `role: 'model'` for the assistant side (not 'assistant' —
+ * a real, confirmed difference from Anthropic's/OpenAI's convention),
+ * mapped at the boundary here so the rest of the app can keep using
+ * 'assistant' everywhere else.
  */
 export async function sendAtlasMessage(userId: string, messages: AtlasChatMessage[]): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new AtlasNotConfiguredError();
 
-  const client = new Anthropic({ apiKey });
-  const system = await buildSystemPrompt(userId);
+  const client = new GoogleGenAI({ apiKey });
+  const systemInstruction = await buildSystemPrompt(userId);
 
-  const response = await client.messages.create({
+  const response = await client.models.generateContent({
     model: MODEL,
-    max_tokens: 1024,
-    system,
-    messages: messages.map((m) => ({ role: m.role, content: m.content })),
+    contents: messages.map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    })),
+    config: { systemInstruction },
   });
 
-  const textBlock = response.content.find((block) => block.type === 'text');
-  return textBlock && textBlock.type === 'text' ? textBlock.text : '';
+  return response.text ?? '';
 }
