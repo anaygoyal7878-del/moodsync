@@ -1,10 +1,22 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { LogOut, ChevronRight, CheckCircle2 } from "lucide-react";
 import { WEARABLE_LABELS, SMART_HOME_LABELS, PROVIDER_ICONS } from "@/lib/providerDisplay";
+import { DASHBOARD_SECTIONS } from "@/lib/dashboardSections";
+import { BOTTOM_NAV_TABS } from "@/components/luxury/LuxuryBottomNav";
 import type { ConnectionsResponse } from "@/lib/types";
+
+/** Every dashboard page the bottom nav has no room for. Derived from the
+ * two real lists rather than hand-copied, so adding a page to
+ * DASHBOARD_SECTIONS surfaces it here automatically instead of silently
+ * becoming unreachable on mobile (which is exactly what had happened to
+ * Biometrics and Weekly report — both had zero inbound links below the
+ * `sm:` breakpoint). */
+const BOTTOM_NAV_HREFS = new Set<string>(BOTTOM_NAV_TABS.map((t) => t.href));
+const OVERFLOW_SECTIONS = DASHBOARD_SECTIONS.filter((s) => !BOTTOM_NAV_HREFS.has(s.href));
 
 interface MeData {
   email: string;
@@ -62,6 +74,41 @@ export function LuxuryProfile({ me, connections }: { me: MeData; connections: Co
           }}
         >
           Beta member
+        </div>
+      </section>
+
+      {/* Everything the 6-slot bottom bar can't hold. Without this the
+       * pages below are simply unreachable on a phone. */}
+      <section className="lux-stagger-2 flex flex-col gap-3">
+        <h2 className="px-1 text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--lux-muted)" }}>
+          All sections
+        </h2>
+        <div
+          className="overflow-hidden rounded-3xl"
+          style={{ background: "var(--lux-bg-card)", border: "1px solid var(--lux-hairline)" }}
+        >
+          {OVERFLOW_SECTIONS.map((section, i) => {
+            const Icon = section.icon;
+            return (
+              <Link
+                key={section.href}
+                href={section.href}
+                className="flex items-center gap-3 p-4 transition-colors active:opacity-70"
+                style={i < OVERFLOW_SECTIONS.length - 1 ? { borderBottom: "1px solid var(--lux-hairline)" } : undefined}
+              >
+                <div
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                  style={{ background: "var(--lux-bg-card-2)" }}
+                >
+                  <Icon size={16} style={{ color: "var(--lux-sage)" }} aria-hidden="true" />
+                </div>
+                <span className="flex-1 text-[15px] font-medium" style={{ color: "var(--lux-ink)" }}>
+                  {section.label}
+                </span>
+                <ChevronRight size={18} style={{ color: "var(--lux-muted)" }} aria-hidden="true" />
+              </Link>
+            );
+          })}
         </div>
       </section>
 

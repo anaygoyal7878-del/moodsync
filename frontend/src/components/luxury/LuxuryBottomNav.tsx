@@ -5,7 +5,12 @@ import { Home, BarChart2, Zap, User, Sparkle, Bot } from "lucide-react";
 import { MagnificationDock, type DockItemData } from "./MagnificationDock";
 import { usePlatformPreview } from "@/components/dev/PlatformPreviewContext";
 
-const TABS = [
+/** Exported so LuxuryProfile.tsx can list *everything this bar doesn't*
+ * without the two drifting apart — a fixed bottom bar only fits ~6
+ * items, but every page in DASHBOARD_SECTIONS still has to be reachable
+ * on mobile, and the Sidebar that covers the rest on desktop is
+ * `hidden` below the `sm:` breakpoint. */
+export const BOTTOM_NAV_TABS = [
   { href: "/dashboard", label: "Home", icon: Home, exact: true },
   { href: "/dashboard/atlas", label: "Atlas", icon: Bot, exact: false },
   { href: "/dashboard/meditation", label: "Meditate", icon: Sparkle, exact: false },
@@ -13,6 +18,8 @@ const TABS = [
   { href: "/dashboard/automation", label: "Automations", icon: Zap, exact: false },
   { href: "/dashboard/profile", label: "Profile", icon: User, exact: false },
 ] as const;
+
+const TABS = BOTTOM_NAV_TABS;
 
 /** Mobile-only bottom navigation (Sidebar.tsx covers desktop). Built on
  * MagnificationDock — see that file's doc comment for provenance —
