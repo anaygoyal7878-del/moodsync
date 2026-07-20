@@ -3,23 +3,16 @@
 import Image from "next/image";
 import { motion } from "motion/react";
 
-/** Real product photo (not a CSS/SVG reconstruction) — user-supplied
- * screenshot of Apple's own "Apple Watch" pairing screen, showing all
- * three watches from that lineup, background-keyed to transparent so
- * it sits directly on the page's own dark canvas instead of a visible
- * black rectangle. Background removal used a soft luminance threshold
- * (near-black -> transparent, with a short ramp for anti-aliased
- * edges) rather than a hard cutout, to avoid a jagged edge around the
- * watch cases. See frontend/public/images/apple-watch-lineup.png.
- *
- * This is Apple's own marketing photography, not MoodSync's — using it
- * here is the same "we show what we integrate with" pattern as the
- * WHOOP/Fitbit/Hue logos elsewhere on this page, not a claim that
- * MoodSync made this hardware or this UI. */
+/** User-supplied AI-generated illustration (not real product photography
+ * of any specific vendor's hardware — generic watch faces/band, not a
+ * claim that this is a WHOOP/Fitbit/Apple Watch screenshot) showing three
+ * wearables, supplied pre-cut with a real alpha channel (no background
+ * layer at all) — no local background-removal pass needed for this
+ * version. See frontend/public/images/watch-lineup.png. */
 export function HeartRateWatch() {
   return (
     <motion.div
-      className="relative mx-auto w-full max-w-[640px]"
+      className="relative mx-auto w-full max-w-[420px]"
       animate={{ y: [0, -14, 0] }}
       transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
     >
@@ -29,10 +22,10 @@ export function HeartRateWatch() {
         aria-hidden="true"
       />
       <Image
-        src="/images/apple-watch-lineup.png"
-        alt="Apple Watch lineup — one of the wearables MoodSync reads real biometric signals from"
-        width={1014}
-        height={646}
+        src="/images/watch-lineup.png"
+        alt="Three wearable devices — the kind of watch and fitness band MoodSync reads real biometric signals from"
+        width={912}
+        height={1170}
         className="h-auto w-full drop-shadow-[0_30px_60px_rgba(0,0,0,0.55)]"
         priority
       />
