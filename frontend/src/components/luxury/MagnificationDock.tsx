@@ -23,7 +23,7 @@ import {
   type SpringOptions,
   AnimatePresence,
 } from "motion/react";
-import React, { Children, cloneElement, useEffect, useMemo, useRef, useState } from "react";
+import React, { Children, cloneElement, useEffect, useRef, useState } from "react";
 
 export type DockItemData = {
   icon: React.ReactNode;
@@ -39,7 +39,6 @@ export type DockProps = {
   distance?: number;
   panelHeight?: number;
   baseItemSize?: number;
-  dockHeight?: number;
   magnification?: number;
   spring?: SpringOptions;
 };
@@ -172,32 +171,24 @@ export function MagnificationDock({
   magnification = 70,
   distance = 150,
   panelHeight = 60,
-  dockHeight = 200,
   baseItemSize = 46,
 }: DockProps) {
   const mouseX = useMotionValue(Infinity);
-  const isHovered = useMotionValue(0);
 
-  const maxHeight = useMemo(() => Math.max(dockHeight, magnification + magnification / 2 + 4), [dockHeight, magnification]);
-  const heightRow = useTransform(isHovered, [0, 1], [panelHeight, maxHeight]);
-  const height = useSpring(heightRow, spring);
-
+  // The reference dock sprung this container's own height from
+  // panelHeight up to a taller "hovered" height, so the row could grow
+  // to fit magnified icons. Inside a `sticky bottom-0` footer that
+  // reads as the whole bar jumping upward whenever it's touched — and
+  // on a touchscreen it was pure cost: `onTouchStart` triggered the
+  // growth, but touch never sets mouseX, so no icon actually magnified.
+  // The container is now a fixed height and magnified icons simply
+  // overflow upward out of the panel (which is what the macOS dock this
+  // is modelled on does anyway), so the bar itself never moves.
   return (
-    <motion.div style={{ height, scrollbarWidth: "none" }} className={`flex max-w-full items-center justify-center ${className}`}>
+    <div style={{ height: panelHeight }} className={`flex max-w-full items-end justify-center ${className}`}>
       <motion.div
-        onMouseMove={({ pageX }) => {
-          isHovered.set(1);
-          mouseX.set(pageX);
-        }}
-        onMouseLeave={() => {
-          isHovered.set(0);
-          mouseX.set(Infinity);
-        }}
-        onTouchStart={() => isHovered.set(1)}
-        onTouchEnd={() => {
-          isHovered.set(0);
-          mouseX.set(Infinity);
-        }}
+        onMouseMove={({ pageX }) => mouseX.set(pageX)}
+        onMouseLeave={() => mouseX.set(Infinity)}
         className="flex w-fit items-end gap-2.5 rounded-[28px] px-3 pb-2 shadow-xl backdrop-blur-md"
         style={{
           height: panelHeight,
@@ -224,7 +215,7 @@ export function MagnificationDock({
           </DockItem>
         ))}
       </motion.div>
-    </motion.div>
+    </div>
   );
 }
 

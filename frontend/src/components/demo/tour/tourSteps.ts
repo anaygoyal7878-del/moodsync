@@ -127,8 +127,8 @@ export const TOUR_STEPS: TourStep[] = [
     kind: "roadmap",
     title: "Where this goes next",
     body:
-      "Scent and diffuser automation, geofenced arrival/departure triggers, and calendar-aware rules are designed and specced — but not built yet.",
+      "Smart locks and security-system alerts, scent and diffuser automation, geofenced arrival and departure triggers, and calendar-aware rules — all designed and specced, none built yet.",
     detail:
-      "They're shown in the demo gallery under a Concept badge. Everything in the eight steps before this one is running against a real backend today.",
+      "Each is shown in the demo gallery under a Concept badge. Everything in the eight steps before this one runs against a real backend today.",
   },
 ];
