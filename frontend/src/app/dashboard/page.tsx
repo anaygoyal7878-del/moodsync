@@ -92,6 +92,7 @@ export default async function DashboardHomePage() {
     <div className="flex flex-col gap-5">
       {/* Wellness Hero Card */}
       <section
+        data-tour="wellness-score"
         className="lux-stagger-1 relative overflow-hidden rounded-[26px] p-6"
         style={{
           background: "linear-gradient(160deg, #241a2c 0%, #1d1622 55%, #171220 100%)",
@@ -141,6 +142,7 @@ export default async function DashboardHomePage() {
 
       {/* Wellness Pattern */}
       <section
+        data-tour="recovery-pattern"
         className="lux-stagger-3 rounded-[24px] p-5"
         style={{ background: "var(--lux-bg-card)", border: "1px solid var(--lux-hairline)" }}
       >
@@ -154,7 +156,7 @@ export default async function DashboardHomePage() {
       </section>
 
       {recentActivity.length > 0 && (
-        <section className="lux-stagger-4 flex flex-col gap-3">
+        <section data-tour="activity" className="lux-stagger-4 flex flex-col gap-3">
           <div className="flex items-center justify-between px-1">
             <h2 className="font-luxury-display text-[16px] font-semibold" style={{ color: "var(--lux-ink)" }}>
               Recent Activity

@@ -6,5 +6,10 @@ export default async function RecommendationsPage() {
   const recommendationsResult = await backendFetch<{ recommendations: RecommendationEntry[] }>("/api/recommendations");
   const recommendations = recommendationsResult.ok ? recommendationsResult.data.recommendations : [];
 
-  return <RecommendationsSection recommendations={recommendations} />;
+  // Wrapper is a walkthrough anchor only — see tourSteps.ts.
+  return (
+    <div data-tour="recommendations">
+      <RecommendationsSection recommendations={recommendations} />
+    </div>
+  );
 }

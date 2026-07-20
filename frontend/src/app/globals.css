@@ -388,6 +388,50 @@ body {
   }
 }
 
+/* Guided walkthrough card (components/demo/tour/ProductTour.tsx). Keyed
+ * on the step id, so this replays on every step change rather than only
+ * on first mount — the transition between steps is the animation.
+ * Deliberately unscoped: the tour portals onto document.body and adds
+ * `.ms-luxury` itself for the colour tokens, but the animation needs no
+ * theme context, so leaving it global keeps it usable anywhere. */
+@keyframes ms-tour-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ms-tour-card {
+  animation: ms-tour-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* The dimming layer fades in rather than sliding — its geometry is
+ * driven per-frame from the anchor's measured rect, so animating
+ * position here would fight that. */
+@keyframes ms-tour-dim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ms-tour-spotlight {
+  animation: ms-tour-dim-in 0.35s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-tour-card,
+  .ms-tour-spotlight {
+    animation: none;
+  }
+}
+
 /* Atlas (the AI wellness assistant, /dashboard/atlas) — a slow,
  * gentle float + hue drift for the character's aurora-glow sphere
  * background. Kept separate from ambient-drift above since Atlas's

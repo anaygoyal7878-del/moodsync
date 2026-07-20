@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { LogOut, ChevronRight, CheckCircle2 } from "lucide-react";
+import { LogOut, ChevronRight, CheckCircle2, PlayCircle } from "lucide-react";
+import { restartProductTour } from "@/components/demo/tour/ProductTour";
 import { WEARABLE_LABELS, SMART_HOME_LABELS, PROVIDER_ICONS } from "@/lib/providerDisplay";
 import { DASHBOARD_SECTIONS } from "@/lib/dashboardSections";
 import { BOTTOM_NAV_TABS } from "@/components/luxury/LuxuryBottomNav";
@@ -76,6 +77,31 @@ export function LuxuryProfile({ me, connections }: { me: MeData; connections: Co
           Beta member
         </div>
       </section>
+
+      {/* Replays the guided walkthrough — the "show me that again" path
+       * for anyone demoing the product. Clears the seen-flag and reloads
+       * onto the dashboard, where ProductTour picks it up from step one. */}
+      <button
+        onClick={restartProductTour}
+        className="lux-stagger-2 flex items-center gap-3 rounded-3xl p-4 text-left transition-opacity active:opacity-70"
+        style={{ background: "var(--lux-bg-card)", border: "1px solid var(--lux-hairline)" }}
+      >
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+          style={{ background: "rgba(95,184,120,0.12)" }}
+        >
+          <PlayCircle size={17} style={{ color: "var(--lux-sage)" }} aria-hidden="true" />
+        </div>
+        <div className="flex flex-1 flex-col">
+          <span className="text-[15px] font-medium" style={{ color: "var(--lux-ink)" }}>
+            Replay the walkthrough
+          </span>
+          <span className="text-[12px]" style={{ color: "var(--lux-muted)" }}>
+            A three-minute guided tour of how MoodSync works
+          </span>
+        </div>
+        <ChevronRight size={18} style={{ color: "var(--lux-muted)" }} aria-hidden="true" />
+      </button>
 
       {/* Everything the 6-slot bottom bar can't hold. Without this the
        * pages below are simply unreachable on a phone. */}

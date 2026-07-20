@@ -6,5 +6,11 @@ export default async function WellnessPage() {
   const wellnessResult = await backendFetch<WellnessResponse>("/api/wellness");
   const wellnessScores = wellnessResult.ok ? wellnessResult.data.scores : null;
 
-  return <WellnessScoreCard scores={wellnessScores} />;
+  // The wrapper exists purely as a walkthrough anchor (see
+  // components/demo/tour/tourSteps.ts) — it adds no layout of its own.
+  return (
+    <div data-tour="wellness-detail">
+      <WellnessScoreCard scores={wellnessScores} />
+    </div>
+  );
 }

@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/dashboard/Sidebar";
 import { LuxuryTopNavBar } from "@/components/luxury/LuxuryTopNavBar";
 import { LuxuryBottomNav } from "@/components/luxury/LuxuryBottomNav";
 import { DashboardShellFrame } from "@/components/dashboard/DashboardShellFrame";
+import { ProductTour } from "@/components/demo/tour/ProductTour";
 
 /** The single app shell for every /dashboard/* route. Two nav
  * components split by viewport, not by route — Sidebar.tsx (desktop)
@@ -31,12 +32,17 @@ export function DashboardShell({
   const name = displayName ?? email.split("@")[0];
 
   return (
-    <DashboardShellFrame
-      sidebar={<Sidebar email={email} />}
-      topNav={<LuxuryTopNavBar userName={name} />}
-      bottomNav={<LuxuryBottomNav />}
-    >
-      {children}
-    </DashboardShellFrame>
+    <>
+      <DashboardShellFrame
+        sidebar={<Sidebar email={email} />}
+        topNav={<LuxuryTopNavBar userName={name} />}
+        bottomNav={<LuxuryBottomNav />}
+      >
+        {children}
+      </DashboardShellFrame>
+      {/* Renders into a portal on document.body, so it sits above both
+       * nav systems regardless of which one the viewport is showing. */}
+      <ProductTour />
+    </>
   );
 }

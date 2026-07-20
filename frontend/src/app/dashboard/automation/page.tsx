@@ -16,7 +16,10 @@ export default async function AutomationPage() {
   const devices = connections.smartHome.flatMap((c) => c.devices);
   const spotifyConnected = connections.smartHome.some((c) => c.provider === "SPOTIFY" && c.status === "ACTIVE");
 
+  // Wrapper is a walkthrough anchor only — see tourSteps.ts.
   return (
-    <AutomationSection rules={rules} history={automationHistory} devices={devices} spotifyConnected={spotifyConnected} />
+    <div data-tour="automations">
+      <AutomationSection rules={rules} history={automationHistory} devices={devices} spotifyConnected={spotifyConnected} />
+    </div>
   );
 }
