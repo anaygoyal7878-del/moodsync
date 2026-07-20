@@ -7,7 +7,7 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "prisma generate && tsc -b",
-    "typecheck": "tsc -b --noEmit",
+    "typecheck": "prisma generate && tsc -b",
     "test": "vitest run",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

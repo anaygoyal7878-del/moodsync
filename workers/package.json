@@ -12,7 +12,7 @@
     "start:weekly-report": "node dist/weeklyReportWorker.js",
     "start:notification-digest": "node dist/notificationDigestWorker.js",
     "start:spotify-playback-check": "node dist/spotifyPlaybackCheckWorker.js",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b"
   },
   "dependencies": {
     "@moodsync/ai": "*",

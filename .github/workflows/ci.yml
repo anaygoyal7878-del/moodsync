@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# One shared job rather than a matrix per package — this is an npm
+# workspaces monorepo where backend/frontend/workers all depend on
+# @moodsync/shared and @moodsync/database's *built* output (see each
+# package's own build script), so packages have to build in dependency
+# order regardless; splitting into parallel jobs would just mean
+# redoing that same ordered build inside every job.
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      # prisma generate reads schema.prisma's `env("DATABASE_URL")` at
+      # build time — it doesn't need a reachable database, just a
+      # non-empty value. No test in this repo's `npm test` touches a
+      # live database (confirmed: no test file imports PrismaClient) —
+      # every DB/network-touching path is live-verified manually
+      # against a real local Postgres during development instead, per
+      # this project's established convention, not mocked in CI.
+      DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci_placeholder"
+      JWT_ACCESS_SECRET: "ci-placeholder-access-secret-at-least-32-chars"
+      JWT_REFRESH_SECRET: "ci-placeholder-refresh-secret-at-least-32-chars"
+      OAUTH_TOKEN_ENCRYPTION_KEY: "BkCbD/K1N5p92drajhReA59szs0xwyvTVPaHWCotcl0="
+      OAUTH_STATE_SECRET: "ci-placeholder-oauth-state-secret-at-least-32-chars"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build

@@ -4,13 +4,13 @@
   "version": "0.1.0",
   "description": "MoodSync: the intelligence layer between wearable health data and smart home platforms.",
   "workspaces": [
-    "frontend",
-    "backend",
     "shared",
     "database",
+    "integrations/*",
     "ai",
+    "backend",
     "workers",
-    "integrations/*"
+    "frontend"
   ],
   "engines": {
     "node": ">=20.0.0"
