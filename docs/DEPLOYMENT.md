@@ -69,11 +69,21 @@ Directory to `/` and Config File Path to the path above.
 
 ## 3. Environment variables
 
-Set these as **shared variables** at the Railway *project* level (Project
-Settings → Shared Variables) so every service inherits them without
-copy-pasting into each one individually — that's also the sane place to
-put `DATABASE_URL`, since backend, frontend build, and every worker all
-need it.
+Define these once at the Railway *project* level (Project Settings →
+Shared Variables) to avoid retyping the same value repeatedly, **but
+note that Railway does not auto-inject shared variables into every
+service** — each service only gets a shared variable after you
+explicitly click "Share" for it (or add it via that service's own
+Variables tab → "Shared Variable"), which creates a
+`${{shared.VARIABLE_KEY}}` reference on that service. Skipping this step
+is a real, easy-to-hit failure mode: the backend boots, `prisma migrate
+deploy` succeeds (if `DATABASE_URL` was added directly), and then the
+zod env schema throws `Invalid environment configuration` naming
+exactly the variables that were defined as shared but never shared into
+that service. Confirm each service's own Variables tab actually lists
+`DATABASE_URL` and the four secrets below — as real values or explicit
+references, not just present on the Shared Variables page — before
+assuming they're wired up.
 
 ### Required on every service that boots the backend's env schema (backend + all 5 workers)
 
