@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import { LogoutButton } from "@/components/marketing/LogoutButton";
 import { DASHBOARD_SECTIONS as SECTIONS } from "@/lib/dashboardSections";
-import { usePlatformPreview } from "@/components/dev/PlatformPreviewContext";
+import { useViewMode } from "@/components/shell/ViewModeContext";
 
 /** Persistent left-rail navigation for wide viewports — desktop-only
  * (see luxury/LuxuryTopNavBar.tsx + LuxuryBottomNav.tsx for the mobile
@@ -17,7 +17,7 @@ import { usePlatformPreview } from "@/components/dev/PlatformPreviewContext";
  * selection. */
 export function Sidebar({ email }: { email: string }) {
   const pathname = usePathname();
-  const { mode } = usePlatformPreview();
+  const { mode } = useViewMode();
 
   return (
     <nav

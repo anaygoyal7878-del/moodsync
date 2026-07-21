@@ -9,9 +9,9 @@ import { ProductTour } from "@/components/demo/tour/ProductTour";
  * and LuxuryTopNavBar/LuxuryBottomNav (mobile) — mirroring the
  * "laptop" vs "app style" split the whole dashboard is meant to
  * support. Which one is actually visible is normally decided by the
- * `sm:` CSS breakpoint (real viewport width); DashboardShellFrame adds
- * a dev-only override on top of that for previewing both without
- * resizing the window (see lib/platformPreview.ts) — this file stays a
+ * `sm:` CSS breakpoint (real viewport width), or by the always-on
+ * ViewModeSwitcher (see lib/viewMode.ts) for anyone who wants to see
+ * both without resizing their window — this file stays a
  * server component either way, since the override logic lives entirely
  * in DashboardShellFrame's client boundary. The dark palette itself
  * comes from wrapping everything in `.ms-luxury` (see globals.css):

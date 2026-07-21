@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Bell } from "lucide-react";
-import { usePlatformPreview } from "@/components/dev/PlatformPreviewContext";
+import { useViewMode } from "@/components/shell/ViewModeContext";
 
 function timeOfDayGreeting(hour: number): string {
   if (hour < 5) return "Good night";
@@ -19,7 +19,7 @@ function timeOfDayGreeting(hour: number): string {
 export function LuxuryTopNavBar({ userName }: { userName: string }) {
   const initial = userName.trim().charAt(0).toUpperCase() || "?";
   const greeting = timeOfDayGreeting(new Date().getHours());
-  const { mode } = usePlatformPreview();
+  const { mode } = useViewMode();
   const visibilityClass = mode === "mobile" ? "block" : mode === "web" ? "hidden" : "sm:hidden";
 
   return (

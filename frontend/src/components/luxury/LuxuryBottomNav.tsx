@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { Home, BarChart2, Zap, User, Sparkle, Bot } from "lucide-react";
 import { MagnificationDock, type DockItemData } from "./MagnificationDock";
-import { usePlatformPreview } from "@/components/dev/PlatformPreviewContext";
+import { useViewMode } from "@/components/shell/ViewModeContext";
 
 /** Exported so LuxuryProfile.tsx can list *everything this bar doesn't*
  * without the two drifting apart — a fixed bottom bar only fits ~6
@@ -25,12 +25,12 @@ const TABS = BOTTOM_NAV_TABS;
  * MagnificationDock — see that file's doc comment for provenance —
  * ported into a real nav (each item routes via `router.push`, not the
  * reference's `alert()` demo callbacks) instead of a decorative
- * showcase. `platform-preview` support (mode/`sm:hidden` swap) is a
- * dev-only addition — see lib/platformPreview.ts. */
+ * showcase. Honors the view-mode override (mode/`sm:hidden` swap) — see
+ * lib/viewMode.ts. */
 export function LuxuryBottomNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const { mode } = usePlatformPreview();
+  const { mode } = useViewMode();
 
   const visibilityClass = mode === "mobile" ? "block" : mode === "web" ? "hidden" : "sm:hidden";
 
