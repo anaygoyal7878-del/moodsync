@@ -34,6 +34,18 @@ export function AuthForm({ mode }: AuthFormProps) {
       });
 
       if (!response.ok) {
+        // A 500 means the backend's own error handler already stripped
+        // the real cause on purpose (see server.ts's doc comment — this
+        // is deliberate, not a bug, so a Prisma stack trace can't leak
+        // to the client). Its body is the literal string "Internal
+        // server error" in that case, which reads as a broken app if
+        // shown verbatim — every other status has a message worth
+        // showing as-is (wrong password, validation errors, etc).
+        if (response.status >= 500) {
+          setError("MoodSync is temporarily unavailable. Please try again in a moment.");
+          return;
+        }
+
         const data = await response.json().catch(() => ({}));
         // Zod validation errors come back as { error: { fieldErrors } };
         // auth failures come back as { error: "message" } — handle both
