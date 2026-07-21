@@ -14,18 +14,24 @@ const STORAGE_KEY = "moodsync.tour.v1";
  * `usePathname` change. */
 const ANCHOR_TIMEOUT_MS = 2500;
 
-/** localStorage is read through useSyncExternalStore rather than an
- * effect, which keeps it out of the render path on the server (where
- * there is no storage) without a `mounted` flag and its extra render.
- * The subscribe is a no-op on purpose: nothing else in the app writes
- * this key mid-session — `finish` pairs its write with local state, and
- * `restartProductTour` does a full page load. */
+/** sessionStorage (not localStorage) is the whole mechanism behind
+ * "always starts on login, but X closes it for that visit": the flag
+ * this sets lives only as long as the browser tab does, so it can never
+ * permanently suppress the tour the way a localStorage "done forever"
+ * flag would. AuthForm.tsx additionally clears this key on every
+ * successful login before navigating to /dashboard — that's what
+ * guarantees a fresh trigger even when someone logs out and back in
+ * inside the same tab, where sessionStorage alone would still carry the
+ * previous dismissal across the two sessions. Read through
+ * useSyncExternalStore rather than an effect, which keeps it out of the
+ * render path on the server (no storage there) without a `mounted`
+ * flag and its extra render. */
 const NEVER_CHANGES = () => () => {};
 
-function readStored(): "done" | null {
+function readStored(): "dismissed" | null {
   if (typeof window === "undefined") return null;
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === "done" ? "done" : null;
+    return window.sessionStorage.getItem(STORAGE_KEY) === "dismissed" ? "dismissed" : null;
   } catch {
     // Private-mode / storage-disabled: treat as unseen rather than
     // crashing the dashboard for the sake of a walkthrough.
@@ -33,20 +39,28 @@ function readStored(): "done" | null {
   }
 }
 
-function writeStored(value: "done" | null) {
+function writeStored(value: "dismissed" | null) {
   try {
-    if (value === null) window.localStorage.removeItem(STORAGE_KEY);
-    else window.localStorage.setItem(STORAGE_KEY, value);
+    if (value === null) window.sessionStorage.removeItem(STORAGE_KEY);
+    else window.sessionStorage.setItem(STORAGE_KEY, value);
   } catch {
     /* no-op — see readStored */
   }
 }
 
 /** Exposed so a "Restart demo" control anywhere in the app can clear the
- * seen-flag and reload into the tour. */
+ * dismissed-flag and reload into the tour. */
 export function restartProductTour() {
   writeStored(null);
   window.location.href = "/dashboard";
+}
+
+/** Exposed for AuthForm.tsx to call right before it navigates into
+ * /dashboard on a successful login — see the storage doc comment above
+ * for why this is the piece that actually makes "always on login" true,
+ * not just sessionStorage's natural per-tab scoping. */
+export function resetProductTourForNewLogin() {
+  writeStored(null);
 }
 
 interface Rect {
@@ -62,7 +76,7 @@ export function ProductTour() {
 
   const alreadySeen = useSyncExternalStore(
     NEVER_CHANGES,
-    () => readStored() === "done",
+    () => readStored() === "dismissed",
     // Server snapshot: treat as seen so the tour renders nothing during
     // SSR. The client's first paint agrees, then storage decides.
     () => true,
@@ -133,7 +147,7 @@ export function ProductTour() {
   }, [running, step?.anchor, step?.id, pathname]);
 
   const finish = useCallback(() => {
-    writeStored("done");
+    writeStored("dismissed");
     setDismissed(true);
   }, []);
 

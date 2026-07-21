@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
+import { resetProductTourForNewLogin } from "@/components/demo/tour/ProductTour";
 
 interface AuthFormProps {
   mode: "login" | "signup";
@@ -58,6 +59,14 @@ export function AuthForm({ mode }: AuthFormProps) {
         setError(message);
         return;
       }
+
+      // Login specifically (not signup — a brand-new account's tab has
+      // no dismissal recorded yet, so the tour already shows there by
+      // default) guarantees the walkthrough fires on this visit even if
+      // the same tab previously logged in, saw it, and X'd it out —
+      // sessionStorage's normal per-tab persistence would otherwise
+      // carry that dismissal across a logout/login cycle in one tab.
+      if (!isSignup) resetProductTourForNewLogin();
 
       const returnTo = searchParams.get("returnTo") ?? (isSignup ? "/onboarding" : "/dashboard");
       router.push(returnTo);
