@@ -1,7 +1,7 @@
 export { evaluateRule, evaluateRules, withinTimeWindow } from './ruleEngine.js';
 export { isWithinCooldown } from './cooldown.js';
 export { dispatchForReading, dispatchForLocationEvent, type DispatchResult } from './dispatch.js';
-export { executeHueAction } from './hueActionExecutor.js';
+export { executeHueAction, setAllHueLights } from './hueActionExecutor.js';
 // executeSpotifyAction wasn't previously exported publicly (only used
 // internally by dispatch.ts) — the Alexa integration's named-rule voice
 // intents (see docs/ALEXA_ARCHITECTURE.md §9) need to run a rule's full

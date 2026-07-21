@@ -25,8 +25,9 @@ import {
   wearableConnectionRepository,
   biometricReadingRepository,
   automationRuleRepository,
+  automationExecutionLogRepository,
 } from '@moodsync/database';
-import { executeHueAction, executeSpotifyAction } from '@moodsync/ai';
+import { executeHueAction, executeSpotifyAction, setAllHueLights } from '@moodsync/ai';
 import type { AutomationRuleDefinition, NormalizedBiometricReading } from '@moodsync/shared';
 import { env } from '../config/env.js';
 import { whoopService } from './whoopService.js';
@@ -232,8 +233,14 @@ export const alexaService = {
         return this.handleGetStatus(userId);
       case ALEXA_INTENTS.GET_SLEEP_SUMMARY:
         return this.handleGetSleepSummary(userId);
+      case ALEXA_INTENTS.GET_REPORT:
+        return this.handleGetReport(userId);
       case ALEXA_INTENTS.SYNC_DEVICES:
         return this.handleSyncDevices(userId);
+      case ALEXA_INTENTS.TURN_ON_LIGHTS:
+        return this.handleTurnLights(userId, true);
+      case ALEXA_INTENTS.TURN_OFF_LIGHTS:
+        return this.handleTurnLights(userId, false);
       case ALEXA_INTENTS.START_RELAXATION:
       case ALEXA_INTENTS.IMPROVE_FOCUS:
       case ALEXA_INTENTS.ACTIVATE_EVENING_ROUTINE:
@@ -263,6 +270,46 @@ export const alexaService = {
       return plainTextResponse("I don't have a recent sleep score for you yet.");
     }
     return plainTextResponse(`Your most recent sleep score is ${Math.round(latest.reading.sleepScore)} out of 100.`);
+  },
+
+  /** GetReportIntent — a fuller spoken summary than GetStatusIntent:
+   * current biometrics plus how many of the user's automations have
+   * actually run in the last 24 hours. Every number here comes from a
+   * real query (biometricReadingRepository/automationExecutionLogRepository)
+   * — there's no separate "demo mode" data path; "demo report" is just
+   * one of this intent's sample utterances (see interactionModel.json),
+   * so it reports the same real numbers a live account has. */
+  async handleGetReport(userId: string): Promise<ResponseEnvelope> {
+    const [latest, automationsRunToday] = await Promise.all([
+      biometricReadingRepository.findLatestNormalized(userId),
+      automationExecutionLogRepository.countExecutedSince(userId, new Date(Date.now() - 24 * 60 * 60 * 1000)),
+    ]);
+
+    const parts: string[] = [];
+    parts.push(latest ? describeReading(latest.reading) : "I don't have any recent health data for you yet.");
+    parts.push(
+      automationsRunToday === 0
+        ? "No automations have run in the last 24 hours."
+        : `${automationsRunToday} automation${automationsRunToday === 1 ? ' has' : 's have'} run in the last 24 hours.`,
+    );
+    return plainTextResponse(`Here's your report. ${parts.join(' ')}`);
+  },
+
+  /** TurnOnLightsIntent/TurnOffLightsIntent — direct device control
+   * through the skill, not a named-rule replay. Toggles every light on
+   * the user's Hue connection (see setAllHueLights's doc comment in
+   * ai/src/hueActionExecutor.ts for why "all lights" rather than one
+   * specific light). */
+  async handleTurnLights(userId: string, on: boolean): Promise<ResponseEnvelope> {
+    let count: number;
+    try {
+      count = await setAllHueLights(userId, on);
+    } catch {
+      return plainTextResponse("I couldn't reach your lights — check that Hue is still connected in the MoodSync dashboard.");
+    }
+    if (count === 0) return plainTextResponse("I didn't find any lights connected to your Hue account.");
+    const verb = on ? 'on' : 'off';
+    return plainTextResponse(`Done — I've turned ${verb} your ${count} light${count === 1 ? '' : 's'}.`);
   },
 
   /** CheckSecurityIntent — see docs/DECISION_ENGINE_ROADMAP.md for why

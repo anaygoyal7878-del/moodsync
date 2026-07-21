@@ -13,6 +13,20 @@ export const ALEXA_INTENTS = {
   GET_STATUS: 'GetStatusIntent',
   GET_SLEEP_SUMMARY: 'GetSleepSummaryIntent',
   SYNC_DEVICES: 'SyncDevicesIntent',
+  /** A fuller spoken summary than GetStatusIntent — biometrics plus how
+   * many automations have run recently — see handleGetReport in
+   * alexaService.ts. "Demo report" is one of its sample utterances
+   * specifically so a reviewer/demo audience saying that phrase gets a
+   * real, data-backed answer rather than a fallback. */
+  GET_REPORT: 'GetReportIntent',
+  /** Direct device control (not a named-rule replay) — turns every light
+   * on the user's Hue connection on/off. See setAllHueLights in
+   * ai/src/hueActionExecutor.ts for why this is "all lights" rather than
+   * one specific light: Alexa's voice request has no way to pick a
+   * `deviceId` without a slot, and CLIP v2 has no group/room resource to
+   * target instead. */
+  TURN_ON_LIGHTS: 'TurnOnLightsIntent',
+  TURN_OFF_LIGHTS: 'TurnOffLightsIntent',
   START_RELAXATION: 'StartRelaxationIntent',
   IMPROVE_FOCUS: 'ImproveFocusIntent',
   ACTIVATE_EVENING_ROUTINE: 'ActivateEveningRoutineIntent',
@@ -41,9 +55,9 @@ export const NAMED_RULE_INTENT_KEYWORDS: Partial<Record<AlexaIntentName, string>
 };
 
 export const HELP_SPEECH =
-  "You can ask MoodSync how you're doing, for your sleep summary, to sync your devices, " +
-  'to start a relaxation session, to improve your focus, to activate your evening routine, ' +
-  'or if your house is secure.';
+  "You can ask MoodSync how you're doing, for your sleep summary, for a report, to sync your devices, " +
+  'to turn your lights on or off, to start a relaxation session, to improve your focus, ' +
+  'to activate your evening routine, or if your house is secure.';
 
 /** No lock/security integration exists yet (see
  * docs/DECISION_ENGINE_ROADMAP.md) — this is the honest response, not a

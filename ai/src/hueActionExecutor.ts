@@ -42,16 +42,23 @@ async function getFreshHueTokens(
   return { accessToken: refreshed.access_token, applicationKey: tokens.providerSecret };
 }
 
+/** Shared by `executeHueAction` and `setAllHueLights` — both need a
+ * ready-to-use client for the user's Hue connection, not just an action
+ * to run against it. */
+async function getHueClientForUser(userId: string): Promise<HueClient> {
+  const connection = await smartHomeConnectionRepository.findByUserAndProvider(userId, 'HUE');
+  if (!connection?.oauthTokenId) throw new Error('No Hue connection for this user');
+
+  const { accessToken, applicationKey } = await getFreshHueTokens(connection.oauthTokenId, requireHueConfig());
+  return new HueClient(accessToken, applicationKey);
+}
+
 /** Executes one Hue action. Param shapes are validated here (not via a
  * shared schema) since they're intentionally per-action-type and
  * `AutomationAction.params` is typed `Record<string, unknown>` at rest —
  * see shared/src/automation.ts for why. */
 export async function executeHueAction(userId: string, action: AutomationAction): Promise<void> {
-  const connection = await smartHomeConnectionRepository.findByUserAndProvider(userId, 'HUE');
-  if (!connection?.oauthTokenId) throw new Error('No Hue connection for this user');
-
-  const { accessToken, applicationKey } = await getFreshHueTokens(connection.oauthTokenId, requireHueConfig());
-  const client = new HueClient(accessToken, applicationKey);
+  const client = await getHueClientForUser(userId);
 
   switch (action.type) {
     case 'hue.set_scene': {
@@ -79,4 +86,20 @@ export async function executeHueAction(userId: string, action: AutomationAction)
     default:
       throw new Error(`Action type "${action.type}" is not a Hue action`);
   }
+}
+
+/** Turns every light on the user's Hue connection on or off — there's no
+ * "all lights"/group resource in the CLIP v2 API (see
+ * integrations/hue/src/client.ts), so this lists every individual light
+ * and sets each one directly. Used by the Alexa voice intents
+ * (TurnOnLightsIntent/TurnOffLightsIntent), which have no `deviceId` slot
+ * to target one specific light the way a rule's `hue.set_brightness`
+ * action does. Returns the count of lights toggled so the caller can
+ * speak an accurate response (e.g. "I couldn't reach any lights" vs.
+ * "I've turned on your 3 lights"). */
+export async function setAllHueLights(userId: string, on: boolean): Promise<number> {
+  const client = await getHueClientForUser(userId);
+  const lights = await client.listLights();
+  await Promise.all(lights.map((light) => client.setLightState(light.id, { on })));
+  return lights.length;
 }

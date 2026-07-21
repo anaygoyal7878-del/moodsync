@@ -260,7 +260,9 @@ to handlers that call existing repositories/executors.
 |---|---|---|
 | "how I'm doing today" | `GetStatusIntent` | `biometricReadingRepository.findLatestNormalized` — same data the dashboard shows |
 | "my sleep summary" | `GetSleepSummaryIntent` | Latest reading's `sleepScore`, falls back to "no recent sleep data" if unset |
+| "for a report" / "for a demo report" | `GetReportIntent` | Combines `describeReading` (same source as `GetStatusIntent`) with `automationExecutionLogRepository.countExecutedSince` over the trailing 24h — real numbers either way, "demo report" is just a sample utterance, not a separate data path |
 | "sync my devices" | `SyncDevicesIntent` | Calls the same sync-now service functions as the dashboard's `SyncButton`, for every connected provider |
+| "turn on/off my lights" | `TurnOnLightsIntent` / `TurnOffLightsIntent` | `setAllHueLights(userId, on)` (`ai/src/hueActionExecutor.ts`) — lists every light on the user's Hue connection and sets each directly. Real device control taken *by* the skill, scoped to devices MoodSync itself manages (Hue) — not a claim of visibility into devices from unrelated Alexa skills, which the platform doesn't expose to a Custom Skill (see §1) |
 | "start a relaxation session" | `StartRelaxationIntent` | Finds the user's enabled `AutomationRule` whose name contains "relax" (case-insensitive); executes its actions directly via `executeHueAction`/`executeSpotifyAction` (bypassing condition/cooldown checks — this is an explicit command, not a biometric trigger) |
 | "improve my focus" | `ImproveFocusIntent` | Same pattern, matching rule name contains "focus" |
 | "activate my evening routine" | `ActivateEveningRoutineIntent` | Same pattern, matching rule name contains "evening" |

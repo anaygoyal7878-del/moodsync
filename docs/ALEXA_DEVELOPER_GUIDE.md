@@ -36,8 +36,15 @@ configured, and tested through Amazon's own console and services.
 1. In the console's **Build** tab → **JSON Editor**.
 2. Paste the contents of
    `integrations/alexa/src/interactionModel.json` — this defines the
-   invocation name ("mood sync") and all six custom intents plus the
+   invocation name ("mood sync") and all nine custom intents plus the
    required Amazon built-ins.
+
+   **If you're updating an already-published/certified skill**: uploading
+   a changed interaction model here re-triggers Amazon's certification
+   review for the skill. Don't do this while a submission is actively
+   pending a publish decision — wait for that decision first, then
+   update and resubmit, so you don't restart the review clock in the
+   middle of an existing one.
 3. Click **Save Model**, then **Build Model** (this compiles the NLU
    model — takes a minute or two).
 
@@ -191,7 +198,7 @@ Confirmed directly from Amazon's hosting/certification documentation
 |---|---|
 | Backend OAuth-as-authorization-server flow (authorize, token exchange, refresh) | ✅ Done, verified end-to-end against the real running backend (`scripts/demoAlexaVoiceCommand.mjs`) |
 | Request signature/timestamp verification logic | ✅ Done, logic-verified against a synthetic certificate chain (real Amazon-signed traffic can only be tested once a real skill exists — see integrations/alexa/src/verifyRequest.ts's doc comment) |
-| All six voice intent handlers | ✅ Done, verified end-to-end including both the "no data yet" and "real data" cases |
+| All nine voice intent handlers (status, sleep, report, sync, lights on/off, 3 named routines, security) | ✅ Done, verified end-to-end including both the "no data yet" and "real data" cases |
 | Dashboard Connections card | ✅ Done, verified in-browser |
 | Creating the actual skill in the Alexa Developer Console | ❌ Requires an Amazon Developer account |
 | Uploading/building the interaction model | ❌ Requires the Developer Console |

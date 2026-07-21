@@ -46,6 +46,39 @@
           "slots": []
         },
         {
+          "name": "GetReportIntent",
+          "samples": [
+            "for my report",
+            "for a report",
+            "for a demo report",
+            "for my demo report",
+            "to give me a report",
+            "for my full report",
+            "for a summary report"
+          ],
+          "slots": []
+        },
+        {
+          "name": "TurnOnLightsIntent",
+          "samples": [
+            "to turn on my lights",
+            "to turn my lights on",
+            "to turn the lights on",
+            "turn on my lights"
+          ],
+          "slots": []
+        },
+        {
+          "name": "TurnOffLightsIntent",
+          "samples": [
+            "to turn off my lights",
+            "to turn my lights off",
+            "to turn the lights off",
+            "turn off my lights"
+          ],
+          "slots": []
+        },
+        {
           "name": "StartRelaxationIntent",
           "samples": [
             "to start a relaxation session",
