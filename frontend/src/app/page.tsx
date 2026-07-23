@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { CinematicHero } from "@/components/ui/cinematic-hero";
 import { HeartRateWatch } from "@/components/marketing/HeartRateWatch";
 import Strands from "@/components/ui/Strands";
+import { FadeInSection } from "@/components/ui/FadeInSection";
 
 const integrations = [
   { name: "WHOOP", status: "Connect today" },
@@ -24,31 +25,33 @@ export default function Home() {
       <main className="flex-1">
         <CinematicHero />
 
-        <section className="relative flex h-[70vh] min-h-[420px] w-full items-center justify-center overflow-hidden bg-black">
-          <div className="absolute inset-0">
-            <Strands
-              colors={["#10B981", "#054933", "#8aafa3"]}
-              count={3}
-              speed={0.5}
-              amplitude={1}
-              waviness={1}
-              thickness={0.7}
-              glow={2.6}
-              taper={3}
-              spread={1}
-              intensity={0.6}
-              saturation={1.5}
-              opacity={1}
-              scale={1.5}
-            />
-          </div>
-          <h2
-            className="relative z-10 px-6 text-center text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl"
-            style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
-          >
-            Turn stats into adaptivity.
-          </h2>
-        </section>
+        <FadeInSection>
+          <section className="relative flex h-[70vh] min-h-[420px] w-full items-center justify-center overflow-hidden bg-black">
+            <div className="absolute inset-0">
+              <Strands
+                colors={["#10B981", "#054933", "#8aafa3"]}
+                count={3}
+                speed={0.5}
+                amplitude={1}
+                waviness={1}
+                thickness={0.7}
+                glow={2.6}
+                taper={3}
+                spread={1}
+                intensity={0.6}
+                saturation={1.5}
+                opacity={1}
+                scale={1.5}
+              />
+            </div>
+            <h2
+              className="relative z-10 px-6 text-center text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl"
+              style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
+            >
+              Turn stats into adaptivity.
+            </h2>
+          </section>
+        </FadeInSection>
 
         <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 px-6 py-20 md:grid-cols-2">
           <div>
