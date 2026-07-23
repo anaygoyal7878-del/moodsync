@@ -166,7 +166,6 @@ const INJECTED_STYLES = `
 `;
 
 export interface CinematicHeroProps extends React.HTMLAttributes<HTMLDivElement> {
-  brandName?: string;
   tagline1?: string;
   tagline2?: string;
   cardHeading?: string;
@@ -178,7 +177,6 @@ export interface CinematicHeroProps extends React.HTMLAttributes<HTMLDivElement>
 }
 
 export function CinematicHero({
-  brandName = "MoodSync",
   tagline1 = "The intelligence layer",
   tagline2 = "between wearable and home.",
   cardHeading = "Automation, without the app-switching.",
@@ -240,6 +238,34 @@ export function CinematicHero({
   // 2. Complex Cinematic Scroll Timeline
   useEffect(() => {
     const isMobile = window.innerWidth < 768;
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // The browser restores scroll position on reload/back-navigation by
+    // default (history.scrollRestoration === "auto"). Since this whole
+    // section's content starts CSS-hidden (`.gsap-reveal { visibility:
+    // hidden }`) and is only ever revealed by this scroll-scrubbed
+    // timeline, landing mid-scroll on mount desyncs the restored scrollY
+    // from a timeline that hasn't built its ScrollTrigger yet — the
+    // content can stay permanently invisible. Forcing scroll-to-top before
+    // building the timeline guarantees the intro always starts in sync.
+    if ("scrollRestoration" in history) {
+      history.scrollRestoration = "manual";
+    }
+    window.scrollTo(0, 0);
+
+    if (prefersReducedMotion) {
+      // Skip the scroll-jack entirely: lay out the final, readable state
+      // with no motion and no scroll hijacking.
+      gsap.set(".text-track, .text-days", { autoAlpha: 1, y: 0, scale: 1, filter: "none", rotationX: 0, clipPath: "none" });
+      gsap.set(".main-card", { autoAlpha: 1, y: 0 });
+      gsap.set([".card-left-text", ".card-right-text", ".mockup-scroll-wrapper", ".floating-badge", ".phone-widget"], {
+        autoAlpha: 1,
+      });
+      gsap.set(".counter-val", { innerHTML: metricValue });
+      gsap.set(".progress-ring", { strokeDashoffset: 60 });
+      gsap.set(".cta-wrapper", { autoAlpha: 0 });
+      return;
+    }
 
     const ctx = gsap.context(() => {
       gsap.set(".text-track", { autoAlpha: 0, y: 60, scale: 0.85, filter: "blur(20px)", rotationX: -20 });
@@ -368,14 +394,7 @@ export function CinematicHero({
           <div className="card-sheen" aria-hidden="true" />
 
           {/* DYNAMIC RESPONSIVE GRID: Flex-col on mobile to force order, Grid on desktop */}
-          <div className="relative w-full h-full max-w-7xl mx-auto px-4 lg:px-12 flex flex-col justify-evenly lg:grid lg:grid-cols-3 items-center lg:gap-8 z-10 py-6 lg:py-0">
-            {/* 1. TOP (Mobile) / RIGHT (Desktop): BRAND NAME */}
-            <div className="card-right-text gsap-reveal order-1 lg:order-3 flex justify-center lg:justify-end z-20 w-full">
-              <h2 className="text-6xl md:text-[6rem] lg:text-[8rem] font-black uppercase tracking-tighter text-card-silver-matte lg:mt-0">
-                {brandName}
-              </h2>
-            </div>
-
+          <div className="relative w-full h-full max-w-7xl mx-auto px-4 lg:px-12 flex flex-col justify-evenly lg:grid lg:grid-cols-2 items-center lg:gap-8 z-10 py-6 lg:py-0">
             {/* 2. MIDDLE (Mobile) / CENTER (Desktop): IPHONE MOCKUP */}
             <div
               className="mockup-scroll-wrapper order-2 lg:order-2 relative w-full h-[380px] lg:h-[600px] flex items-center justify-center z-10"
