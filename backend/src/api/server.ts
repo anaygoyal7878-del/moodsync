@@ -14,6 +14,7 @@ import spotifyRoutes from './routes/integrations/spotify.js';
 import appleHealthRoutes from './routes/integrations/appleHealth.js';
 import alexaRoutes from './routes/integrations/alexa.js';
 import amazfitRoutes from './routes/integrations/amazfit.js';
+import appleMusicRoutes from './routes/integrations/appleMusic.js';
 import automationRuleRoutes from './routes/automationRules.js';
 import dashboardRoutes from './routes/dashboard.js';
 import notificationRoutes from './routes/notifications.js';
@@ -58,6 +59,7 @@ export async function buildServer() {
   await app.register(appleHealthRoutes, { prefix: '/api' });
   await app.register(alexaRoutes, { prefix: '/api' });
   await app.register(amazfitRoutes, { prefix: '/api' });
+  await app.register(appleMusicRoutes, { prefix: '/api' });
   await app.register(automationRuleRoutes, { prefix: '/api' });
   await app.register(dashboardRoutes, { prefix: '/api' });
   await app.register(notificationRoutes, { prefix: '/api' });

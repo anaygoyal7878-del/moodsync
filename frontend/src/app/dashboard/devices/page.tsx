@@ -6,7 +6,7 @@ export default async function DevicesPage() {
   const connectionsResult = await backendFetch<ConnectionsResponse>("/api/connections");
   const connections: ConnectionsResponse = connectionsResult.ok
     ? connectionsResult.data
-    : { wearables: [], smartHome: [] };
+    : { wearables: [], smartHome: [], appleMusic: null };
 
   return <DevicesSection smartHome={connections.smartHome} />;
 }

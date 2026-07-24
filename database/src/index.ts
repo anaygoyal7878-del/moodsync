@@ -26,3 +26,7 @@ export {
   meditationSessionRepository,
   type CreateMeditationSessionInput,
 } from './repositories/meditationSessionRepository.js';
+export {
+  appleMusicConnectionRepository,
+  type AppleMusicConnectionSummary,
+} from './repositories/appleMusicConnectionRepository.js';

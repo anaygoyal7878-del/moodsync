@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   wearableConnectionRepository,
   smartHomeConnectionRepository,
+  appleMusicConnectionRepository,
   biometricReadingRepository,
   automationRuleRepository,
   automationExecutionLogRepository,
@@ -19,9 +20,13 @@ const insightsHistoryQuerySchema = z.object({
 
 export default async function dashboardRoutes(app: FastifyInstance) {
   app.get('/connections', { preHandler: app.authenticate }, async (request, reply) => {
-    const [wearables, smartHome] = await Promise.all([
+    const [wearables, smartHome, appleMusic] = await Promise.all([
       wearableConnectionRepository.listForUser(request.userId!),
       smartHomeConnectionRepository.listForUser(request.userId!),
+      // Not a SmartHomeConnection row — see AppleMusicConnection's schema
+      // doc comment for why this is its own table and its own parallel
+      // fetch here, rather than folding into the `smartHome` array above.
+      appleMusicConnectionRepository.findByUser(request.userId!),
     ]);
 
     return reply.send({
@@ -48,6 +53,14 @@ export default async function dashboardRoutes(app: FastifyInstance) {
           isOnline: d.isOnline,
         })),
       })),
+      appleMusic: appleMusic
+        ? {
+            id: appleMusic.id,
+            status: appleMusic.status,
+            storefront: appleMusic.storefront,
+            lastSyncedAt: appleMusic.lastSyncedAt,
+          }
+        : null,
     });
   });
 

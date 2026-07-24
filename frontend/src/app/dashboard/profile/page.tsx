@@ -27,7 +27,7 @@ export default async function ProfilePage() {
     );
   }
 
-  const connections: ConnectionsResponse = connectionsResult.ok ? connectionsResult.data : { wearables: [], smartHome: [] };
+  const connections: ConnectionsResponse = connectionsResult.ok ? connectionsResult.data : { wearables: [], smartHome: [], appleMusic: null };
 
   return <LuxuryProfile me={meResult.data} connections={connections} />;
 }

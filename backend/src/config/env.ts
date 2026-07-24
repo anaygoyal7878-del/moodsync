@@ -46,6 +46,25 @@ const envSchema = z.object({
   SPOTIFY_CLIENT_SECRET: z.string().optional(),
   SPOTIFY_REDIRECT_URI: z.string().optional(),
 
+  // Apple's MusicKit — unlike every OAuth provider above, there's no
+  // client secret and no redirect URI: MoodSync authenticates itself to
+  // Apple by signing its own developer token (a JWT) with a private key
+  // Apple issues once from the Developer Program's Certificates,
+  // Identifiers & Profiles > Keys page (a MusicKit key, downloaded once
+  // as a .p8 file — Apple will not let you download it again, so it must
+  // be saved securely the moment it's generated). The end user then
+  // authorizes THEIR library access separately, client-side, via
+  // MusicKit JS — that produces a per-user Music User Token, which is
+  // what appleMusicConnectionRepository stores, not this key. See
+  // docs/APPLE_MUSIC_ARCHITECTURE.md.
+  APPLE_MUSIC_TEAM_ID: z.string().optional(),
+  APPLE_MUSIC_KEY_ID: z.string().optional(),
+  /** The .p8 file's contents verbatim (PEM, including the
+   * `-----BEGIN PRIVATE KEY-----`/`-----END PRIVATE KEY-----` lines) —
+   * store literal `\n` line breaks in the env var and this is used as-is
+   * by jose's `importPKCS8`, which expects real PEM text. */
+  APPLE_MUSIC_PRIVATE_KEY: z.string().optional(),
+
   // MoodSync is the OAuth 2.0 authorization SERVER for Alexa account
   // linking (Amazon redirects users to MoodSync's own authorize
   // endpoint), not a client of a third party's OAuth — see

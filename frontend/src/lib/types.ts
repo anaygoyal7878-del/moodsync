@@ -35,9 +35,25 @@ export interface SmartHomeConnectionSummary {
   devices: DeviceSummary[];
 }
 
+/** Not a SmartHomeConnectionSummary — Apple Music has no OAuth client
+ * secret/redirect flow and no fixed token expiry, so it doesn't fit that
+ * shape server-side either (see AppleMusicConnection's schema doc
+ * comment). `null` means no connection exists yet; it does NOT
+ * distinguish "server isn't configured for Apple Music at all" from
+ * "user hasn't authorized" — that distinction only surfaces when
+ * actually trying to fetch a developer token (a 503 means the former).
+ */
+export interface AppleMusicConnectionSummary {
+  id: string;
+  status: ConnectionStatus;
+  storefront: string | null;
+  lastSyncedAt: string | null;
+}
+
 export interface ConnectionsResponse {
   wearables: WearableConnectionSummary[];
   smartHome: SmartHomeConnectionSummary[];
+  appleMusic: AppleMusicConnectionSummary | null;
 }
 
 export type AutomationOutcome =

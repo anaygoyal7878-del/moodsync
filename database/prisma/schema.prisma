@@ -41,6 +41,7 @@ model User {
   musicPlayLogs        MusicPlayLog[]
   locationEvents       LocationEvent[]
   meditationSessions   MeditationSession[]
+  appleMusicConnection AppleMusicConnection?
   preferences          UserPreferences?
 
   @@map("users")
@@ -169,6 +170,33 @@ model SmartHomeConnection {
   @@unique([userId, provider])
   @@index([provider, status])
   @@map("smart_home_connections")
+}
+
+/// Deliberately NOT a SmartHomeConnection + OAuthToken pair like every
+/// other provider — Apple's MusicKit issues a "Music User Token" via
+/// client-side MusicKit JS authorization (no server-side OAuth redirect
+/// exists for it at all), and that token has no fixed expiry Apple
+/// documents, unlike OAuthToken's non-nullable `expiresAt`. Forcing a
+/// fabricated expiry onto it to fit the shared table would be modeling
+/// something Apple never actually told us, so this gets its own minimal
+/// table instead — one row per user, the encrypted token plus enough
+/// metadata to know whether it's still connected. See
+/// docs/APPLE_MUSIC_ARCHITECTURE.md.
+model AppleMusicConnection {
+  id                       String           @id @default(uuid())
+  userId                   String           @unique
+  user                     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status                   ConnectionStatus @default(ACTIVE)
+  musicUserTokenCiphertext Bytes
+  musicUserTokenNonce      Bytes
+  /// Apple Music storefront/region code (e.g. "us") returned alongside
+  /// the user token — catalog searches are storefront-scoped.
+  storefront               String?
+  lastSyncedAt             DateTime?
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+
+  @@map("apple_music_connections")
 }
 
 model ConnectedDevice {

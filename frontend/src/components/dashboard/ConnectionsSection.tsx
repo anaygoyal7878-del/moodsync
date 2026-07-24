@@ -3,10 +3,11 @@ import { Card } from "@/components/ui/Card";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { DisconnectButton } from "./DisconnectButton";
 import { SyncButton } from "./SyncButton";
+import { AppleMusicConnectButton } from "./AppleMusicConnectButton";
 import { ConnectionStatusBadge, needsReconnect } from "./ConnectionStatusBadge";
 import { ALEXA_VOICE_COMMANDS } from "@/lib/alexaCommands";
 import { WEARABLE_LABELS, SMART_HOME_LABELS, PROVIDER_ICONS } from "@/lib/providerDisplay";
-import type { ConnectionsResponse, WearableConnectionSummary, SmartHomeConnectionSummary } from "@/lib/types";
+import type { ConnectionsResponse, WearableConnectionSummary, SmartHomeConnectionSummary, AppleMusicConnectionSummary } from "@/lib/types";
 
 function ProviderIcon({ provider }: { provider: string }) {
   const Icon = PROVIDER_ICONS[provider];
@@ -364,6 +365,36 @@ function AlexaCard({ connection }: { connection: SmartHomeConnectionSummary | un
   );
 }
 
+/** Apple's own required program: playback and library access need an
+ * active Apple Music subscription, independent of whether MoodSync's
+ * MusicKit key is configured — an authorized-but-unsubscribed account
+ * can still authorize, it just gets empty/restricted results back from
+ * Apple, which is worth setting expectations for up front rather than
+ * looking broken later. */
+function AppleMusicCard({ connection }: { connection: AppleMusicConnectionSummary | null }) {
+  const isActive = connection?.status === "ACTIVE";
+
+  return (
+    <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <ProviderIcon provider="APPLE_MUSIC" />
+          <p className="text-sm font-medium">{SMART_HOME_LABELS.APPLE_MUSIC}</p>
+        </div>
+        {connection ? (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <ConnectionStatusBadge status={connection.status} />
+          </div>
+        ) : (
+          <p className="mt-1 text-xs text-ink-muted">Not connected</p>
+        )}
+        <p className="mt-1 text-xs text-ink-muted">Requires an active Apple Music subscription for playback and library access.</p>
+      </div>
+      <AppleMusicConnectButton isActive={isActive} />
+    </Card>
+  );
+}
+
 export function ConnectionsSection({ connections }: { connections: ConnectionsResponse }) {
   const whoop = connections.wearables.find((c) => c.provider === "WHOOP");
   const fitbit = connections.wearables.find((c) => c.provider === "GOOGLE_HEALTH");
@@ -384,6 +415,7 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
       <HueCard connection={hue} />
       <SpotifyCard connection={spotify} />
       <AlexaCard connection={alexa} />
+      <AppleMusicCard connection={connections.appleMusic} />
     </section>
   );
 }
