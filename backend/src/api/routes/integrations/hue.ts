@@ -35,8 +35,13 @@ export default async function hueRoutes(app: FastifyInstance) {
   });
 
   app.post('/integrations/hue/sync-devices', { preHandler: app.authenticate }, async (request, reply) => {
-    const deviceCount = await hueService.syncDevices(request.userId!);
-    return reply.send({ deviceCount });
+    try {
+      const deviceCount = await hueService.syncDevices(request.userId!);
+      return reply.send({ deviceCount });
+    } catch (error) {
+      if (error instanceof HueNotConfiguredError) return reply.code(503).send({ error: error.message });
+      throw error;
+    }
   });
 
   app.put<{ Params: { deviceId: string } }>(
@@ -46,8 +51,13 @@ export default async function hueRoutes(app: FastifyInstance) {
       const parsed = lightStateSchema.safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
-      await hueService.setLightState(request.userId!, request.params.deviceId, parsed.data);
-      return reply.code(204).send();
+      try {
+        await hueService.setLightState(request.userId!, request.params.deviceId, parsed.data);
+        return reply.code(204).send();
+      } catch (error) {
+        if (error instanceof HueNotConfiguredError) return reply.code(503).send({ error: error.message });
+        throw error;
+      }
     },
   );
 

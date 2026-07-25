@@ -72,14 +72,14 @@ export function RuleRow({ rule }: { rule: AutomationRuleDefinition }) {
   const Icon = PROVIDER_ICONS[rule.actions[0]?.provider ?? ""] ?? Zap;
 
   return (
-    <Card className="flex items-center justify-between gap-4 py-3.5">
-      <div className="flex items-center gap-3">
+    <Card className="flex flex-wrap items-center justify-between gap-4 py-3.5">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-raised text-ink-secondary">
           <Icon size={16} aria-hidden="true" />
         </span>
-        <div>
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium">{rule.name}</p>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-sm font-medium">{rule.name}</p>
             <Badge variant={rule.enabled ? "success" : "neutral"} dot>
               {rule.enabled ? "Enabled" : "Disabled"}
             </Badge>

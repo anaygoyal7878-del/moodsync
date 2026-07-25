@@ -57,20 +57,22 @@ export function AutomationSection({
           <div className="flex flex-col gap-2">
             {history.map((entry) => (
               <div key={entry.id} className="border-b border-line pb-2 text-sm last:border-0 last:pb-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-ink-secondary">{entry.rule.name}</span>
-                  <span
-                    className={
-                      entry.outcome === "EXECUTED"
-                        ? "text-brand"
-                        : entry.outcome === "FAILED"
-                          ? "text-danger"
-                          : "text-ink-muted"
-                    }
-                  >
-                    {OUTCOME_LABELS[entry.outcome]}
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
+                  <span className="min-w-0 truncate text-ink-secondary">{entry.rule.name}</span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span
+                      className={
+                        entry.outcome === "EXECUTED"
+                          ? "text-brand"
+                          : entry.outcome === "FAILED"
+                            ? "text-danger"
+                            : "text-ink-muted"
+                      }
+                    >
+                      {OUTCOME_LABELS[entry.outcome]}
+                    </span>
+                    <span className="text-xs text-ink-muted">{new Date(entry.executedAt).toLocaleString()}</span>
                   </span>
-                  <span className="text-xs text-ink-muted">{new Date(entry.executedAt).toLocaleString()}</span>
                 </div>
                 {entry.reason && <p className="mt-0.5 text-xs text-ink-muted">{entry.reason}</p>}
               </div>
