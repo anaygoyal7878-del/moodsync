@@ -57,6 +57,8 @@ function toNormalized(row: BiometricReadingRow): NormalizedBiometricReading {
     activityLevel: row.activityLevel ?? undefined,
     steps: row.steps ?? undefined,
     calories: row.calories ?? undefined,
+    activeMinutes: row.activeMinutes ?? undefined,
+    heartRateZoneMinutes: row.heartRateZoneMinutes ?? undefined,
   };
 }
 
@@ -87,6 +89,8 @@ export const biometricReadingRepository = {
         activityLevel: r.activityLevel ?? null,
         steps: r.steps ?? null,
         calories: r.calories ?? null,
+        activeMinutes: r.activeMinutes ?? null,
+        heartRateZoneMinutes: r.heartRateZoneMinutes ?? null,
       })),
       skipDuplicates: true,
     });

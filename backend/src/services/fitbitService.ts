@@ -32,6 +32,11 @@ function requireGoogleHealthConfig(): GoogleHealthOAuthConfig {
 
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60_000;
 
+/** Same rationale as workers/src/providers/fitbit.ts's equivalent —
+ * duplicated because this service can't reach into the workers
+ * deployable's internals (and vice versa). */
+const SYNC_CURSOR_OVERLAP_MS = 5 * 60_000;
+
 /** Same transparent-refresh rationale as whoopService.ts's equivalent. */
 async function getFreshAccessToken(oauthTokenId: string, config: GoogleHealthOAuthConfig): Promise<string> {
   const tokens = await oauthTokenRepository.getDecrypted(oauthTokenId);
@@ -97,7 +102,14 @@ export const fitbitService = {
     }
 
     const accessToken = await getFreshAccessToken(connection.oauthTokenId, requireGoogleHealthConfig());
-    const readings = await fetchAndNormalizeGoogleHealthData({ accessToken, userId, sinceDays: days });
+    // Real incremental cursor once a prior sync exists — a manual "Sync
+    // now" click after the first one shouldn't re-request the same
+    // 7-day window every time. `days` (the wide first-sync default)
+    // still applies to a genuinely first-ever sync.
+    const since = connection.lastSyncedAt
+      ? new Date(connection.lastSyncedAt.getTime() - SYNC_CURSOR_OVERLAP_MS)
+      : undefined;
+    const readings = await fetchAndNormalizeGoogleHealthData({ accessToken, userId, since, sinceDays: days });
     const inserted = await biometricReadingRepository.bulkInsert(readings);
     await wearableConnectionRepository.markSynced(connection.id);
     await syncDeviceInfo(connection.id, accessToken);

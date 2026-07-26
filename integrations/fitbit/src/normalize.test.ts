@@ -224,3 +224,60 @@ describe('normalizeGoogleHealthData', () => {
     expect(result).toHaveLength(0);
   });
 });
+
+describe('activeMinutes and heartRateZoneMinutes', () => {
+  it('buckets active minutes by UTC day, summing across activity levels', () => {
+    const result = normalizeGoogleHealthData({
+      userId: 'user-1',
+      stepsRollups: [],
+      heartRateRollups: [],
+      caloriesRollups: [],
+      restingHeartRates: [],
+      sleeps: [],
+      activeMinutes: [
+        {
+          name: 'a',
+          data: {
+            activeMinutes: {
+              interval: { startTime: '2026-07-10T08:00:00Z', endTime: '2026-07-10T09:00:00Z' },
+              activeMinutesByActivityLevel: { MODERATE: { minutes: 20 }, VIGOROUS: { minutes: 10 } },
+            },
+          },
+        },
+      ],
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]?.activeMinutes).toBe(30);
+  });
+
+  it('sums heart-rate-zone minutes across multiple entries for the same day', () => {
+    const result = normalizeGoogleHealthData({
+      userId: 'user-1',
+      stepsRollups: [],
+      heartRateRollups: [],
+      caloriesRollups: [],
+      restingHeartRates: [],
+      sleeps: [],
+      heartRateZones: [
+        { name: 'a', data: { timeInHeartRateZone: { interval: { startTime: '2026-07-10T08:00:00Z' }, minutes: 15 } } },
+        { name: 'b', data: { timeInHeartRateZone: { interval: { startTime: '2026-07-10T18:00:00Z' }, minutes: 5 } } },
+      ],
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]?.heartRateZoneMinutes).toBe(20);
+  });
+
+  it('does not crash on a malformed/unexpected active-minutes or heart-rate-zone shape', () => {
+    const result = normalizeGoogleHealthData({
+      userId: 'user-1',
+      stepsRollups: [],
+      heartRateRollups: [],
+      caloriesRollups: [],
+      restingHeartRates: [],
+      sleeps: [],
+      activeMinutes: [{ name: 'a', data: {} }],
+      heartRateZones: [{ name: 'b', data: {} }],
+    });
+    expect(result).toHaveLength(0);
+  });
+});

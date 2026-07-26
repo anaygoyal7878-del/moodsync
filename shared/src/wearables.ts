@@ -48,6 +48,17 @@ export interface NormalizedBiometricReading {
   activityLevel?: number | undefined;
   steps?: number | undefined;
   calories?: number | undefined;
+  /** Minutes of at-or-above-moderate activity intensity for the day.
+   * Google Health-only today (`active-minutes` data type) — see
+   * integrations/fitbit/src/normalize.ts. Not independently confirmed
+   * against a live account (see that file's doc comments); a wrong
+   * field guess degrades to 0/undefined rather than throwing. */
+  activeMinutes?: number | undefined;
+  /** Total minutes spent in an elevated heart-rate zone (sum across all
+   * zone types above resting) for the day. Google Health-only today
+   * (`time-in-heart-rate-zone` data type). Same not-independently-
+   * confirmed caveat as `activeMinutes`. */
+  heartRateZoneMinutes?: number | undefined;
 }
 
 export type WearableProviderId = 'whoop' | 'google_health' | 'garmin' | 'apple_health' | 'amazfit';

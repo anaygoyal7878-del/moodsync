@@ -5,6 +5,8 @@ import type {
   SleepDataPoint,
   HeartRateSamplePoint,
   SleepStageSummaryEntry,
+  ActiveMinutesDataPoint,
+  HeartRateZoneDataPoint,
 } from './client.js';
 
 /** Sums `stagesSummary` entries (int64-as-string `minutes`, see
@@ -29,6 +31,42 @@ function stageMinutes(
 
 function dayKey(c: { year: number; month: number; day: number }): string {
   return `${c.year}-${String(c.month).padStart(2, '0')}-${String(c.day).padStart(2, '0')}`;
+}
+
+/** `active-minutes`/`time-in-heart-rate-zone` data points key by an ISO
+ * `interval.startTime`, not a `CivilDateTime` like the rollup types —
+ * this buckets them into the same day keys `dayKey` produces, using the
+ * UTC calendar day of the interval start. */
+/** Inverse of `dayKey` — parses a "YYYY-MM-DD" key back into the
+ * `{year,month,day}` shape `getOrCreate` expects, so `dayKeyFromIso`'s
+ * output can reuse the same bucketing entry point as every other
+ * data source in this file instead of duplicating the map lookup. */
+function dayKeyToDateParts(key: string): { year: number; month: number; day: number } {
+  const [year, month, day] = key.split('-').map(Number);
+  return { year: year!, month: month!, day: day! };
+}
+
+function dayKeyFromIso(iso: string | undefined): string | undefined {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+/** Not independently confirmed against a live account (see
+ * `ActiveMinutesDataPoint`'s doc comment) — sums whatever numeric
+ * `minutes` values are present under `activeMinutesByActivityLevel`
+ * without assuming which activity-level keys exist, so an unexpected
+ * key shape degrades to 0 rather than throwing. */
+function sumActiveMinutes(point: ActiveMinutesDataPoint): number {
+  const byLevel = point.data?.activeMinutes?.activeMinutesByActivityLevel;
+  if (!byLevel) return 0;
+  let total = 0;
+  for (const entry of Object.values(byLevel)) {
+    const n = Number(entry?.minutes);
+    if (Number.isFinite(n)) total += n;
+  }
+  return total;
 }
 
 /** Google Health's Sleep `summary` exposes `minutesAsleep` and
@@ -77,9 +115,20 @@ export function normalizeGoogleHealthData(params: {
   restingHeartRates: DailyRestingHeartRatePoint[];
   sleeps: SleepDataPoint[];
   heartRateSamples?: HeartRateSamplePoint[];
+  activeMinutes?: ActiveMinutesDataPoint[];
+  heartRateZones?: HeartRateZoneDataPoint[];
 }): NormalizedBiometricReading[] {
-  const { userId, stepsRollups, heartRateRollups, caloriesRollups, restingHeartRates, sleeps, heartRateSamples } =
-    params;
+  const {
+    userId,
+    stepsRollups,
+    heartRateRollups,
+    caloriesRollups,
+    restingHeartRates,
+    sleeps,
+    heartRateSamples,
+    activeMinutes,
+    heartRateZones,
+  } = params;
 
   const byDay = new Map<string, NormalizedBiometricReading>();
 
@@ -116,6 +165,24 @@ export function normalizeGoogleHealthData(params: {
     if (reading.steps !== undefined) {
       reading.activityLevel = Math.min(100, (reading.steps / STEPS_FOR_FULL_ACTIVITY) * 100);
     }
+  }
+
+  for (const point of activeMinutes ?? []) {
+    const key = dayKeyFromIso(point.data?.activeMinutes?.interval?.startTime);
+    if (!key) continue;
+    const minutes = sumActiveMinutes(point);
+    if (minutes <= 0) continue;
+    const reading = getOrCreate(dayKeyToDateParts(key));
+    reading.activeMinutes = (reading.activeMinutes ?? 0) + minutes;
+  }
+
+  for (const point of heartRateZones ?? []) {
+    const zone = point.data?.timeInHeartRateZone;
+    const key = dayKeyFromIso(zone?.interval?.startTime);
+    const minutes = Number(zone?.minutes);
+    if (!key || !Number.isFinite(minutes) || minutes <= 0) continue;
+    const reading = getOrCreate(dayKeyToDateParts(key));
+    reading.heartRateZoneMinutes = (reading.heartRateZoneMinutes ?? 0) + minutes;
   }
 
   const mostRecentSleep = sleeps[0];

@@ -253,6 +253,15 @@ model BiometricReading {
   activityLevel        Float?
   steps                Int?
   calories             Float?
+  /// Minutes of at-or-above-moderate activity intensity. Google Health-only
+  /// today (`active-minutes` data type) — see
+  /// integrations/fitbit/src/normalize.ts and its doc comments on
+  /// confidence level (not independently verified against a live account).
+  activeMinutes        Float?
+  /// Total minutes in an elevated heart-rate zone. Google Health-only
+  /// today (`time-in-heart-rate-zone` data type). Same confidence caveat
+  /// as activeMinutes.
+  heartRateZoneMinutes Float?
   createdAt            DateTime         @default(now())
 
   // Frequent-polling providers (e.g. Fitbit heart-rate samples on a

@@ -17,6 +17,10 @@ export class GoogleHealthApiError extends Error {
      * needing a live out-of-band request to reproduce, which is how the
      * bug this field exists to prevent was originally found. */
     readonly responseBody?: string,
+    /** Parsed from Google's `Retry-After` response header (seconds,
+     * converted to ms) when present — lets the retry loop honor the
+     * server's own guidance instead of guessing via backoff alone. */
+    readonly retryAfterMs?: number,
   ) {
     super(message);
   }
@@ -151,19 +155,75 @@ export function pickPrimaryDevice(devices: PairedDevice[]): PairedDevice | undef
   return devices.find((d) => d.deviceType === 'TRACKER') ?? devices[0];
 }
 
+/** Retried statuses: 429 (Google's own per-user rate limit, see
+ * docs/MILESTONES.md's 5-minute-cadence rate-limit math) and 5xx
+ * (transient server-side failures) — never 4xx other than 429, since
+ * those (400/401/403/404) indicate a request that will fail identically
+ * on retry (bad filter syntax, expired/invalid token, wrong scope). */
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
+const MAX_RETRIES = 3;
+const BASE_BACKOFF_MS = 500;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export class GoogleHealthClient {
   constructor(private readonly accessToken: string) {}
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
-    const res = await fetch(`${BASE_URL}${path}`, {
-      ...init,
-      headers: { ...init?.headers, Authorization: `Bearer ${this.accessToken}` },
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new GoogleHealthApiError(`Google Health API request failed: ${path} -> ${res.status}`, res.status, body);
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        // Honor Google's own `Retry-After` header when present (real
+        // rate-limit guidance from the server), otherwise fall back to
+        // exponential backoff with jitter — same shape as the
+        // reconnect/backoff pattern already documented for other
+        // providers in this codebase.
+        const retryAfterMs = lastError instanceof GoogleHealthApiError ? lastError.retryAfterMs : undefined;
+        const backoff = retryAfterMs ?? BASE_BACKOFF_MS * 2 ** (attempt - 1) + Math.random() * 200;
+        await sleep(backoff);
+      }
+
+      let res: Response;
+      try {
+        res = await fetch(`${BASE_URL}${path}`, {
+          ...init,
+          headers: { ...init?.headers, Authorization: `Bearer ${this.accessToken}` },
+        });
+      } catch (error) {
+        // Network-level failure (DNS, connection reset, timeout) — no
+        // response at all, so no status to check; retry the same as a
+        // 5xx, since these are equally transient.
+        lastError = error;
+        if (attempt === MAX_RETRIES) throw error;
+        continue;
+      }
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        const retryAfterHeader = res.headers.get('Retry-After');
+        const retryAfterMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : undefined;
+        const apiError = new GoogleHealthApiError(
+          `Google Health API request failed: ${path} -> ${res.status}`,
+          res.status,
+          body,
+          Number.isFinite(retryAfterMs) ? retryAfterMs : undefined,
+        );
+        if (!isRetryableStatus(res.status) || attempt === MAX_RETRIES) throw apiError;
+        lastError = apiError;
+        continue;
+      }
+
+      return res.json() as Promise<T>;
     }
-    return res.json() as Promise<T>;
+    // Unreachable in practice (the loop always throws or returns before
+    // exhausting MAX_RETRIES+1 iterations) — satisfies the compiler's
+    // control-flow analysis without a fake return value.
+    throw lastError;
   }
 
   async dailyRollUp(dataType: RollupDataType, since: Date, until: Date): Promise<RollupDataPoint[]> {
@@ -231,4 +291,83 @@ export class GoogleHealthClient {
     const { pairedDevices } = await this.request<{ pairedDevices?: PairedDevice[] }>('/users/me/pairedDevices');
     return pairedDevices ?? [];
   }
+
+  /** `active-minutes` is a confirmed-shipped Activity & Fitness data
+   * type (Google Health API release notes, checked live this session —
+   * not "coming soon"). **Unlike every other method in this file, the
+   * exact response field names below are NOT confirmed against a real
+   * linked account** — this integration has always required reproducing
+   * a live 400 error to nail down exact field casing (see
+   * `CivilDateTime`'s and `listDailyRestingHeartRate`'s doc comments for
+   * two real examples of the documented shape being wrong), and no live
+   * Google Health account was available to do that for this method.
+   * Parsing in `normalize.ts` is defensive (falls back to 0 / skips
+   * rather than throwing) specifically because of this uncertainty. */
+  async listActiveMinutes(since: Date): Promise<ActiveMinutesDataPoint[]> {
+    const filter = `active_minutes.interval.end_time >= "${since.toISOString()}"`;
+    const path = `/users/me/dataTypes/active-minutes/dataPoints?filter=${encodeURIComponent(filter)}`;
+    const { dataPoints } = await this.request<{ dataPoints?: ActiveMinutesDataPoint[] }>(path);
+    return dataPoints ?? [];
+  }
+
+  /** `time-in-heart-rate-zone` — same "shipped but not live-confirmed"
+   * caveat as `listActiveMinutes` above. */
+  async listHeartRateZoneMinutes(since: Date): Promise<HeartRateZoneDataPoint[]> {
+    const filter = `time_in_heart_rate_zone.interval.end_time >= "${since.toISOString()}"`;
+    const path = `/users/me/dataTypes/time-in-heart-rate-zone/dataPoints?filter=${encodeURIComponent(filter)}`;
+    const { dataPoints } = await this.request<{ dataPoints?: HeartRateZoneDataPoint[] }>(path);
+    return dataPoints ?? [];
+  }
+
+  /** `exercise` — confirmed-shipped session data type with write support
+   * too (this integration only reads). Same "not live-confirmed" caveat.
+   * Workouts are deliberately NOT folded into `NormalizedBiometricReading`
+   * (a daily scalar snapshot) — a workout is a discrete event with its
+   * own start/end/type, which doesn't fit a one-row-per-day shape
+   * without losing information. See docs/GOOGLE_HEALTH_SYNC_ARCHITECTURE.md
+   * for why full workout/session modeling is out of scope this round. */
+  async listExercise(since: Date): Promise<ExerciseDataPoint[]> {
+    const filter = `exercise.interval.end_time >= "${since.toISOString()}"`;
+    const path = `/users/me/dataTypes/exercise/dataPoints?filter=${encodeURIComponent(filter)}`;
+    const { dataPoints } = await this.request<{ dataPoints?: ExerciseDataPoint[] }>(path);
+    return dataPoints ?? [];
+  }
+}
+
+/** Not independently confirmed against a live account — see
+ * `listActiveMinutes`'s doc comment. Modeled loosely (optional fields,
+ * no assumed nesting depth beyond what the docs describe) so a wrong
+ * guess fails soft in `normalize.ts` rather than throwing. */
+export interface ActiveMinutesDataPoint {
+  name: string;
+  data?: {
+    activeMinutes?: {
+      interval?: { startTime?: string; endTime?: string };
+      activeMinutesByActivityLevel?: Record<string, { minutes?: number | string }>;
+    };
+  };
+}
+
+export interface HeartRateZoneDataPoint {
+  name: string;
+  data?: {
+    timeInHeartRateZone?: {
+      interval?: { startTime?: string; endTime?: string };
+      heartRateZoneType?: string;
+      minutes?: number | string;
+    };
+  };
+}
+
+export interface ExerciseDataPoint {
+  name: string;
+  data?: {
+    exercise?: {
+      interval?: { startTime?: string; endTime?: string };
+      exerciseType?: string;
+      displayName?: string;
+      activeDuration?: string;
+      metricsSummary?: { calories?: number; distanceMeters?: number; averageHeartRate?: number };
+    };
+  };
 }

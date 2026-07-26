@@ -22,6 +22,21 @@ function requireGoogleHealthConfig(): GoogleHealthOAuthConfig {
 
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60_000;
 
+/** Safety overlap subtracted from `lastSyncedAt` before using it as the
+ * incremental cursor — tolerates clock skew between this process and
+ * Google's servers, and a request that started just before
+ * `lastSyncedAt` was written but whose data landed just after. The
+ * `BiometricReading` unique constraint + `skipDuplicates` absorbs the
+ * resulting overlap-region duplicates for free (same mechanism the
+ * heart-rate-sample lookback already relies on). */
+const SYNC_CURSOR_OVERLAP_MS = 5 * 60_000;
+
+/** First-ever sync for a connection with no `lastSyncedAt` yet — same
+ * 1-day default this worker has always used for its regular cadence
+ * (a manual "sync now" click gets a wider 7-day backfill instead, see
+ * backend/src/services/fitbitService.ts). */
+const FIRST_SYNC_LOOKBACK_DAYS = 1;
+
 /** Same rationale and logic as backend/src/services/fitbitService.ts's
  * equivalent — duplicated rather than imported because workers is a
  * separate deployable that can't reach into the backend app's internals. */
@@ -73,10 +88,18 @@ export function createFitbitSyncRunner(): ProviderSyncRunner {
     logPrefix: 'fitbit-sync',
     async syncConnection(connection: WearableConnection): Promise<number> {
       const accessToken = await getFreshAccessToken(connection.oauthTokenId!, config);
+      // Real incremental cursor: resume from this connection's own last
+      // successful sync instead of always re-requesting a fixed trailing
+      // window from Date.now() — see fetchAndNormalizeGoogleHealthData's
+      // `since` param doc comment.
+      const since = connection.lastSyncedAt
+        ? new Date(connection.lastSyncedAt.getTime() - SYNC_CURSOR_OVERLAP_MS)
+        : undefined;
       const readings = await fetchAndNormalizeGoogleHealthData({
         accessToken,
         userId: connection.userId,
-        sinceDays: 1,
+        since,
+        sinceDays: FIRST_SYNC_LOOKBACK_DAYS,
       });
       const inserted = await biometricReadingRepository.bulkInsert(readings);
       await syncDeviceInfo(connection.id, accessToken);
