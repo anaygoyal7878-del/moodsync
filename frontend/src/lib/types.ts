@@ -173,3 +173,69 @@ export interface MeditationSessionEntry {
   startedAt: string;
   completedAt: string;
 }
+
+/** Cached Apple Home state — pushed by the iOS companion app
+ * (HomeKitController.fetchHomeSnapshot()), since the backend can never
+ * query HomeKit directly. See docs/HOME_SCENES_ARCHITECTURE.md. */
+export type HomeAccessoryCategory =
+  | "LOCK"
+  | "GARAGE_DOOR"
+  | "ALARM_SYSTEM"
+  | "SMOKE_DETECTOR"
+  | "LEAK_SENSOR"
+  | "WINDOW_COVERING"
+  | "DOORBELL"
+  | "OUTLET_OR_SWITCH"
+  | "LIGHT"
+  | "THERMOSTAT_OR_SENSOR"
+  | "OTHER";
+
+export interface HomeRoomEntry {
+  id: string;
+  roomId: string;
+  name: string;
+  temperatureC: number | null;
+  humidityPct: number | null;
+  airQuality: string | null;
+}
+
+export interface HomeAccessoryEntry {
+  id: string;
+  accessoryId: string;
+  name: string;
+  roomId: string | null;
+  category: HomeAccessoryCategory;
+  manufacturer: string | null;
+  model: string | null;
+  firmwareVersion: string | null;
+  reachable: boolean;
+  batteryLevelPct: number | null;
+  statusValue: string | null;
+  isSecurityAccessory: boolean;
+}
+
+export interface HomeSceneEntry {
+  id: string;
+  sceneId: string;
+  name: string;
+  accessoryIds: string[];
+  isFavorite: boolean;
+  lastRunAt: string | null;
+  runCount: number;
+}
+
+export interface HomeSnapshotEntry {
+  id: string;
+  homeId: string;
+  homeName: string;
+  isMatterHome: boolean;
+  pushedAt: string;
+  rooms: HomeRoomEntry[];
+  zones: { id: string; zoneId: string; name: string; roomIds: string[] }[];
+  accessories: HomeAccessoryEntry[];
+  scenes: HomeSceneEntry[];
+}
+
+export interface HomeSnapshotResponse {
+  snapshot: HomeSnapshotEntry | null;
+}

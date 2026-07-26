@@ -1,4 +1,4 @@
-import { Home, Link2, Activity, Sparkles, Sparkle, Zap, Bell, TrendingUp, Cpu, Wand2, CalendarClock, User, Bot, Music } from "lucide-react";
+import { Home, Link2, Activity, Sparkles, Sparkle, Zap, Bell, TrendingUp, Cpu, Wand2, CalendarClock, User, Bot, Music, DoorOpen } from "lucide-react";
 
 /** Every real /dashboard/* page, in one place — Sidebar.tsx (desktop
  * nav) and SearchBar.tsx (the "jump to a page" part of dashboard search)
@@ -12,6 +12,7 @@ export const DASHBOARD_SECTIONS = [
   { href: "/dashboard/meditation", label: "Meditate", icon: Sparkle },
   { href: "/dashboard/music", label: "Music", icon: Music },
   { href: "/dashboard/wellness", label: "Wellness", icon: Sparkles },
+  { href: "/dashboard/home", label: "Apple Home", icon: DoorOpen },
   { href: "/dashboard/biometrics", label: "Biometrics", icon: Activity },
   { href: "/dashboard/automation", label: "Automations", icon: Zap },
   { href: "/dashboard/recommendations", label: "Recommendations", icon: Wand2 },
