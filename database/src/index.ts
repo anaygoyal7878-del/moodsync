@@ -30,3 +30,11 @@ export {
   appleMusicConnectionRepository,
   type AppleMusicConnectionSummary,
 } from './repositories/appleMusicConnectionRepository.js';
+export {
+  homeSnapshotRepository,
+  type HomeSnapshotInput,
+  type HomeSnapshotRoomInput,
+  type HomeSnapshotZoneInput,
+  type HomeSnapshotAccessoryInput,
+  type HomeSnapshotSceneInput,
+} from './repositories/homeSnapshotRepository.js';

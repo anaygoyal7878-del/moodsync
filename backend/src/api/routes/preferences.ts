@@ -111,4 +111,21 @@ export default async function preferencesRoutes(app: FastifyInstance) {
     const prefs = await userPreferencesRepository.getNotificationPreferences(request.userId!);
     return reply.send(prefs);
   });
+
+  /** Disabled by default — the only way `homekit.security_control`
+   * actions (locks/garage/alarm) are ever queued. See
+   * ai/src/actionExecutors.ts's homekit executor and
+   * docs/HOME_SCENES_ARCHITECTURE.md. */
+  app.get('/preferences/security-control', { preHandler: app.authenticate }, async (request, reply) => {
+    const enabled = await userPreferencesRepository.getSecurityControlEnabled(request.userId!);
+    return reply.send({ enabled });
+  });
+
+  app.patch('/preferences/security-control', { preHandler: app.authenticate }, async (request, reply) => {
+    const parsed = z.object({ enabled: z.boolean() }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    await userPreferencesRepository.setSecurityControlEnabled(request.userId!, parsed.data.enabled);
+    return reply.send({ enabled: parsed.data.enabled });
+  });
 }
