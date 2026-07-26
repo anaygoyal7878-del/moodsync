@@ -186,6 +186,7 @@ requesting a capability the app doesn't use.
 | `NSLocationAlwaysAndWhenInUseUsageDescription` | Required before `requestAlwaysAuthorization()` can show a prompt — the **Always** tier that makes geofencing work while the app is closed. `NSLocationAlwaysUsageDescription` alone (the older, iOS-10-era key) is not sufficient on current iOS; this combined key is the one Apple's current docs describe for the two-step flow. |
 | `UIBackgroundModes`: `fetch`, `location` | `fetch` supports periodic background HealthKit sync; `location` is required for the system to wake the app on a region-crossing event after it's been suspended or the device rebooted — confirmed via `docs/GEOFENCING_ARCHITECTURE.md`'s citations. |
 | `NSAppTransportSecurity` → `NSAllowsLocalNetworking: true` | A narrow, dev-only exception (confirmed against [developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity/nsallowslocalnetworking](https://developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity/nsallowslocalnetworking)) that allows plain HTTP **only** to hosts on the device's local network — exactly "your Mac's dev server on the same Wi-Fi," nothing else. **Remove this before ever pointing the app at a real production HTTPS backend.** |
+| `NSBluetoothAlwaysUsageDescription` | Required before CoreBluetooth will do anything at all (scan, connect) — added for direct Bluetooth control of Bridge-less Hue bulbs, see `docs/HUE_BLE_ARCHITECTURE.md`. No entitlement needed for this (unlike HealthKit/HomeKit) — CoreBluetooth's central role is available to any app, gated purely by this usage string. |
 
 ### Capabilities deliberately NOT added, and why
 
@@ -204,15 +205,18 @@ doesn't actually use:
   `UNUserNotificationCenter.requestAuthorization`, and register a real
   push-notification service (APNs) server-side — none of that exists
   yet.
-- **Bluetooth**: no code anywhere in this repo talks to a diffuser or
-  any BLE peripheral — `docs/INTEGRATIONS_RESEARCH.md`'s scent/diffuser
-  section is still unimplemented. **When a real diffuser integration is
-  built**: add `NSBluetoothAlwaysUsageDescription` to `Info.plist` and
-  the `bluetooth-central` (and/or `bluetooth-peripheral`) value to
-  `UIBackgroundModes`, matching whatever the actual BLE communication
-  pattern with real diffuser hardware turns out to need — that's a
-  research-before-code task in its own right per this project's
-  standing rule, not something to guess at now.
+- **Bluetooth background mode**: `NSBluetoothAlwaysUsageDescription` *is*
+  now present (added for direct control of Bridge-less Hue bulbs — see
+  `docs/HUE_BLE_ARCHITECTURE.md`), but `UIBackgroundModes` does **not**
+  include `bluetooth-central` — commands only run in the foreground
+  (when you open the app), matching HomeKit's own foreground-only
+  limitation. Add `bluetooth-central` only if background BLE execution
+  is deliberately built later; it changes the app's background
+  behavior and App Review story, so it shouldn't be switched on
+  speculatively. No diffuser/other BLE peripheral integration exists —
+  `docs/INTEGRATIONS_RESEARCH.md`'s scent/diffuser section is still
+  unimplemented, and would need its own research-before-code pass per
+  this project's standing rule.
 - **Motion & Fitness** (`NSMotionUsageDescription`): also not present,
   correctly — MoodSync reads step count via HealthKit's
   `HKQuantityTypeIdentifier.stepCount`, not Core Motion's
