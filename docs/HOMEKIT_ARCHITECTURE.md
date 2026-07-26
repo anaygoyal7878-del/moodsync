@@ -17,9 +17,17 @@ server-side integration.
 
 Two further real constraints (not assumptions) shape this design:
 
-- **Third-party apps can only trigger pre-configured Scenes** (`HMActionSet`)
-  — never control individual accessories directly the way Apple's own
-  Home app can, and never query arbitrary accessory state either.
+- **Third-party apps can only *control* accessories by triggering
+  pre-configured Scenes** (`HMActionSet`) — never write to an individual
+  accessory's characteristics directly the way Apple's own Home app can.
+  **Correction (verified via live web search, see
+  docs/HOME_SCENES_ARCHITECTURE.md):** reading accessory *metadata* is a
+  separately real, public capability this doc previously understated —
+  `HMAccessory` exposes name, room, reachability, firmware version, and
+  an "Accessory Information" service (manufacturer/model/serial) to any
+  third-party app with Home access, no special entitlement needed. The
+  real constraint is control-only, not metadata-only; MoodSync's Home
+  Dashboard reads this metadata without gaining any new control surface.
 - **Background control (without the app open) requires a special
   entitlement Apple grants case-by-case** via Developer Technical Support
   request — not available by default the way HealthKit's background
