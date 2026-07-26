@@ -12,7 +12,7 @@ const pauseSchema = z.object({
 // SmartHomeProviderId values (shared/src/wearables.ts) — a resource pause
 // is scoped to a provider, not a wearable, since only smart-home
 // providers take automation actions.
-const RESOURCE_PROVIDERS = ['hue', 'spotify', 'ecobee', 'alexa', 'homekit'] as const;
+const RESOURCE_PROVIDERS = ['hue', 'spotify', 'ecobee', 'alexa', 'homekit', 'hue_ble'] as const;
 const resourceProviderSchema = z.enum(RESOURCE_PROVIDERS);
 
 const timeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Must be "HH:mm" 24-hour time');

@@ -213,8 +213,18 @@ public struct MoodSyncCompanionView: View {
 
     #if canImport(HomeKit)
     private func checkPendingDeviceCommands(accessToken: String) async {
+        // Both queued-command providers are wired here — HomeKit scenes
+        // and Bluetooth-only Hue bulbs. The coordinator routes each
+        // command to the right one; see its `execute(_:)`.
+        #if canImport(CoreBluetooth)
+        let hueBLE: HueBLEControlling? = HueBLEController()
+        #else
+        let hueBLE: HueBLEControlling? = nil
+        #endif
+
         let coordinator = DeviceCommandCoordinator(
             homeKit: HomeKitController(),
+            hueBLE: hueBLE,
             apiClient: MoodSyncAPIClient(baseURL: baseURL)
         )
         switch await coordinator.run(accessToken: accessToken) {
@@ -222,10 +232,10 @@ public struct MoodSyncCompanionView: View {
             break
         case .completed(let executed, let failed):
             if executed > 0 || failed > 0 {
-                status += " · HomeKit: \(executed) scene\(executed == 1 ? "" : "s") activated" + (failed > 0 ? ", \(failed) failed" : "")
+                status += " · Devices: \(executed) command\(executed == 1 ? "" : "s") run" + (failed > 0 ? ", \(failed) failed" : "")
             }
         case .failure(let message):
-            status += " · HomeKit check failed: \(message)"
+            status += " · Device command check failed: \(message)"
         }
     }
     #else

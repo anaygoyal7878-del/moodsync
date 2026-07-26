@@ -44,6 +44,13 @@ const registry: Partial<Record<SmartHomeProviderId, ActionExecutor>> = {
     await pendingDeviceCommandRepository.create({ userId, provider: 'HOMEKIT', action, ruleId });
     return { queued: true };
   },
+  // Same "can't execute server-side" situation as homekit, different
+  // reason: Bluetooth needs physical proximity, not a cloud API — see
+  // docs/HUE_BLE_ARCHITECTURE.md.
+  hue_ble: async (userId, action, ruleId) => {
+    await pendingDeviceCommandRepository.create({ userId, provider: 'HUE_BLE', action, ruleId });
+    return { queued: true };
+  },
 };
 
 export async function executeAction(userId: string, action: AutomationAction, ruleId: string): Promise<ActionExecutionResult> {

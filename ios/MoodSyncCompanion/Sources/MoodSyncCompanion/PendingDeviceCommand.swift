@@ -17,10 +17,12 @@ public struct PendingDeviceCommand: Decodable, Sendable, Equatable {
 }
 
 /// Minimal `Decodable` box for `AutomationAction.params`'s
-/// `Record<string, unknown>` shape (shared/src/automation.ts) — this app
-/// only ever reads `params.sceneName` (a string) today, but decoding the
-/// whole params object as untyped JSON keeps this resilient to future
-/// param shapes rather than failing to decode entirely.
+/// `Record<string, unknown>` shape (shared/src/automation.ts) — read via
+/// `.stringValue`/`.numberValue`/`.boolValue` depending on the action
+/// (e.g. HomeKit's `sceneName` is a string, Bluetooth Hue's `brightness`
+/// is a number, its `on` is a bool). Decoding the whole params object as
+/// untyped JSON keeps this resilient to future param shapes rather than
+/// failing to decode entirely.
 public enum JSONValue: Decodable, Sendable, Equatable {
     case string(String)
     case number(Double)
@@ -42,6 +44,16 @@ public enum JSONValue: Decodable, Sendable, Equatable {
 
     public var stringValue: String? {
         if case .string(let value) = self { return value }
+        return nil
+    }
+
+    public var numberValue: Double? {
+        if case .number(let value) = self { return value }
+        return nil
+    }
+
+    public var boolValue: Bool? {
+        if case .bool(let value) = self { return value }
         return nil
     }
 }

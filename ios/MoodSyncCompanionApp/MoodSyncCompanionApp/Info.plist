@@ -22,6 +22,8 @@
 	<string>MoodSync reads your heart rate, sleep, and activity data to automate your smart home based on how you're feeling.</string>
 	<key>NSHomeKitUsageDescription</key>
 	<string>MoodSync activates HomeKit scenes you've configured (like "Relax" or "Focus") based on your biometrics.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>MoodSync connects directly to your Bluetooth Philips Hue lights to turn them on or off and set their brightness when your automations run.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>MoodSync uses your location to detect when you arrive at or leave the home region you set, so it can trigger arrival/departure automations.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

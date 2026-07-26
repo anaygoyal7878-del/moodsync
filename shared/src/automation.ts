@@ -51,7 +51,19 @@ export type ActionType =
    * only the native framework running on the user's own device, so
    * dispatch queues this as a `PendingDeviceCommand` for the iOS
    * companion app to pick up and execute the next time it's opened. */
-  | 'homekit.activate_scene';
+  | 'homekit.activate_scene'
+  /** Bluetooth-only Hue bulbs (no Bridge) via a reverse-engineered BLE
+   * GATT protocol — NOT Philips' official Remote API (that's the
+   * `hue.*` actions above, which require a Bridge and use a completely
+   * different provider/connection). Same "can't execute server-side"
+   * situation as homekit.activate_scene, for a different reason:
+   * Bluetooth requires physical proximity, and MoodSync's backend runs
+   * in the cloud, nowhere near the bulb — so this queues a
+   * PendingDeviceCommand too. See docs/HUE_BLE_ARCHITECTURE.md for the
+   * protocol sourcing and its honesty caveats (unofficial, reverse
+   * engineered, not Philips-supported). */
+  | 'hue_ble.set_power'
+  | 'hue_ble.set_brightness';
 
 export interface AutomationAction {
   type: ActionType;

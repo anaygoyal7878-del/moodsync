@@ -74,6 +74,13 @@ export function RuleForm({
   const [sceneName, setSceneName] = useState<string>(
     deepLinkedTemplate && "sceneName" in deepLinkedTemplate ? deepLinkedTemplate.sceneName : "",
   );
+  // Bluetooth-only Hue bulbs have no server-side device list (unlike
+  // cloud Hue's `devices` prop) — the iOS companion matches by the
+  // bulb's advertised BLE name, so this is free text, same reasoning as
+  // HomeKit's sceneName above.
+  const [blePeripheralName, setBlePeripheralName] = useState("");
+  const [blePower, setBlePower] = useState<"on" | "off">("on");
+  const [bleBrightness, setBleBrightness] = useState<number>(80);
   const [cooldownMinutes, setCooldownMinutes] = useState<number>(Number(deepLinkedTemplate?.cooldownMinutes ?? "30"));
   const [customCooldown, setCustomCooldown] = useState(
     !COOLDOWN_PRESETS.some((p) => p.minutes === Number(deepLinkedTemplate?.cooldownMinutes ?? "30")),
@@ -147,6 +154,10 @@ export function RuleForm({
         return { playlistUri };
       case "homekit.activate_scene":
         return { sceneName };
+      case "hue_ble.set_power":
+        return { peripheralName: blePeripheralName, on: blePower === "on" };
+      case "hue_ble.set_brightness":
+        return { peripheralName: blePeripheralName, brightness: bleBrightness };
     }
   }
 
@@ -162,6 +173,12 @@ export function RuleForm({
         return playlistUri ? "Play your Spotify playlist" : "Play a Spotify playlist";
       case "homekit.activate_scene":
         return sceneName ? `Activate HomeKit scene "${sceneName}"` : "Activate a HomeKit scene";
+      case "hue_ble.set_power":
+        return blePeripheralName ? `Turn ${blePower} "${blePeripheralName}"` : `Turn a Bluetooth Hue light ${blePower}`;
+      case "hue_ble.set_brightness":
+        return blePeripheralName
+          ? `Set "${blePeripheralName}" to ${bleBrightness}%`
+          : `Set a Bluetooth Hue light to ${bleBrightness}%`;
     }
   }
 
@@ -444,6 +461,49 @@ export function RuleForm({
                 Must exactly match a scene you&apos;ve already created in Apple&apos;s Home app — MoodSync can only
                 activate existing scenes, not create or control individual accessories. Runs the next time you open the
                 MoodSync companion app on your iPhone, not instantly.
+              </p>
+            </div>
+          )}
+
+          {(actionType === "hue_ble.set_power" || actionType === "hue_ble.set_brightness") && (
+            <div className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
+              <p className="text-xs font-semibold tracking-wide text-ink-muted uppercase">Bluetooth Hue (no Bridge)</p>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium text-ink">Light name</span>
+                <Input
+                  placeholder='The bulb&apos;s Bluetooth name, e.g. "Hue lamp"'
+                  value={blePeripheralName}
+                  onChange={(e) => setBlePeripheralName(e.target.value)}
+                  required
+                />
+              </div>
+
+              {actionType === "hue_ble.set_power" && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium text-ink">Power</span>
+                  <Select value={blePower} onChange={(e) => setBlePower(e.target.value as "on" | "off")}>
+                    <option value="on">Turn on</option>
+                    <option value="off">Turn off</option>
+                  </Select>
+                </div>
+              )}
+
+              {actionType === "hue_ble.set_brightness" && (
+                <LabeledSlider
+                  label="Brightness"
+                  value={bleBrightness}
+                  min={1}
+                  max={100}
+                  onChange={setBleBrightness}
+                  formatValue={(v) => `${v}%`}
+                />
+              )}
+
+              <p className="text-xs text-ink-muted">
+                Uses a reverse-engineered Bluetooth protocol, not Philips&apos; official API — Philips doesn&apos;t
+                document or support direct control of Bluetooth-only bulbs. Best-effort, not guaranteed to keep working
+                across bulb firmware updates. Runs the next time you open the MoodSync companion app while within
+                Bluetooth range of the bulb, not instantly. See docs/HUE_BLE_ARCHITECTURE.md.
               </p>
             </div>
           )}

@@ -79,6 +79,12 @@ enum SmartHomeProvider {
   ECOBEE
   ALEXA
   HOMEKIT
+  /// Direct Bluetooth LE control of Hue bulbs running in Bluetooth-only
+  /// mode (no Hue Bridge) — a different provider from HUE (the official
+  /// cloud Remote API, which requires a Bridge and is unreachable
+  /// without one). Never creates a SmartHomeConnection row, same as
+  /// HOMEKIT — see docs/HUE_BLE_ARCHITECTURE.md.
+  HUE_BLE
 }
 
 enum ConnectionStatus {

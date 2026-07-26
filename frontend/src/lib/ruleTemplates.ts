@@ -13,6 +13,12 @@ export const ACTION_TYPES = [
   // this always queues for the iOS companion app rather than needing a
   // connect step first.
   { value: "homekit.activate_scene", label: "Activate a HomeKit scene (via iOS app)", provider: "homekit" },
+  // Bluetooth-only Hue bulbs (no Bridge) — a reverse-engineered protocol,
+  // not Philips' official API, and same "no cloud path" situation as
+  // HomeKit for a different reason (Bluetooth needs the phone physically
+  // near the bulb). See docs/HUE_BLE_ARCHITECTURE.md.
+  { value: "hue_ble.set_power", label: "Turn a Bluetooth Hue light on/off (via iOS app)", provider: "hue_ble" },
+  { value: "hue_ble.set_brightness", label: "Set a Bluetooth Hue light's brightness (via iOS app)", provider: "hue_ble" },
 ] as const;
 
 export type ActionType = (typeof ACTION_TYPES)[number]["value"];
