@@ -56,6 +56,11 @@ public protocol MoodSyncAPIClientProtocol: Sendable {
     /// `backend/src/api/routes/locationEvents.ts`'s
     /// `{ type, occurredAt }` request body exactly.
     func postLocationEvent(type: LocationEventType, occurredAt: Date, accessToken: String) async throws
+    /// Pushes a full Home/Room/Zone/Accessory/Scene enumeration to
+    /// `POST /api/home/snapshot` — see `HomeKitController.fetchHomeSnapshot()`
+    /// and docs/HOME_SCENES_ARCHITECTURE.md. Same "device pushes,
+    /// backend caches" direction as `ingest`, not `fetchPendingDeviceCommands`.
+    func pushHomeSnapshot(_ snapshot: HomeSnapshotDTO, accessToken: String) async throws
 }
 
 /// ARRIVED/DEPARTED — mirrors `LocationEventType` in
@@ -156,6 +161,15 @@ public actor MoodSyncAPIClient: MoodSyncAPIClientProtocol {
         let _: Response = try await post(
             path: "/api/location-events",
             body: LocationEventRequest(type: type.rawValue, occurredAt: occurredAt),
+            accessToken: accessToken
+        )
+    }
+
+    public func pushHomeSnapshot(_ snapshot: HomeSnapshotDTO, accessToken: String) async throws {
+        struct EmptyResponse: Decodable {}
+        let _: EmptyResponse? = try await postAllowingEmptyResponse(
+            path: "/api/home/snapshot",
+            body: snapshot,
             accessToken: accessToken
         )
     }

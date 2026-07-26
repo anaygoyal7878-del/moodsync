@@ -66,11 +66,22 @@ public final class DeviceCommandCoordinator {
     /// loudly rather than silently skipping.
     private func execute(_ command: PendingDeviceCommand) async throws {
         switch command.action.type {
-        case "homekit.activate_scene":
+        case "homekit.activate_scene", "homekit.run_scene":
             guard let sceneName = command.action.params["sceneName"]?.stringValue else {
                 throw HomeKitError.activationFailed("Missing params.sceneName")
             }
             try await homeKit.activateScene(named: sceneName)
+
+        case "homekit.security_control":
+            // Deliberately unimplemented on the device side, not just
+            // gated — the backend already refuses to queue this action
+            // at all while UserPreferences.securityControlEnabled is
+            // false (see ai/src/actionExecutors.ts), and no actual
+            // lock/garage/alarm write path has been built here this
+            // round (out of scope — see docs/HOME_SCENES_ARCHITECTURE.md).
+            // Failing loudly here is a second, independent line of
+            // defense: even a wrongly-queued command can't execute.
+            throw HomeKitError.activationFailed("Security-accessory control is not implemented on this device.")
 
         case "hue_ble.set_power":
             let controller = try requireHueBLE()

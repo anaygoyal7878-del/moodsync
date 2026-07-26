@@ -16,6 +16,10 @@ private final class FakeHomeKitController: HomeKitControlling, @unchecked Sendab
     }
 
     func isRestricted() -> Bool { false }
+
+    func fetchHomeSnapshot() async throws -> HomeSnapshotDTO {
+        HomeSnapshotDTO(homeId: "home-1", homeName: "Fake Home", rooms: [], zones: [], accessories: [], scenes: [])
+    }
 }
 
 private final class FakeHueBLEController: HueBLEControlling, @unchecked Sendable {
@@ -57,6 +61,8 @@ private final class FakeDeviceCommandAPIClient: MoodSyncAPIClientProtocol, @unch
     }
 
     func postLocationEvent(type: LocationEventType, occurredAt: Date, accessToken: String) async throws {}
+
+    func pushHomeSnapshot(_ snapshot: HomeSnapshotDTO, accessToken: String) async throws {}
 }
 
 private func makeCommand(id: String = "cmd-1", sceneName: String = "MoodSync Relax") -> PendingDeviceCommand {
@@ -234,5 +240,45 @@ final class DeviceCommandCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(result, .completed(executed: 0, failed: 1))
         XCTAssertTrue(hueBLE.powerCalls.isEmpty)
+    }
+
+    func testHomeKitRunSceneRoutesToActivateSceneLikeActivateScene() async {
+        let homeKit = FakeHomeKitController()
+        let api = FakeDeviceCommandAPIClient()
+        api.pendingCommands = [
+            PendingDeviceCommand(
+                id: "cmd-run-scene",
+                action: PendingDeviceCommand.Action(type: "homekit.run_scene", provider: "homekit", params: ["sceneName": .string("Wind Down")])
+            ),
+        ]
+        let coordinator = DeviceCommandCoordinator(homeKit: homeKit, apiClient: api)
+
+        let result = await coordinator.run(accessToken: "token")
+
+        XCTAssertEqual(result, .completed(executed: 1, failed: 0))
+        XCTAssertEqual(homeKit.activatedScenes, ["Wind Down"])
+    }
+
+    func testSecurityControlIsRefusedOnTheDeviceEvenIfSomehowQueued() async {
+        let api = FakeDeviceCommandAPIClient()
+        api.pendingCommands = [
+            PendingDeviceCommand(
+                id: "cmd-security",
+                action: PendingDeviceCommand.Action(
+                    type: "homekit.security_control",
+                    provider: "homekit",
+                    params: ["accessoryId": .string("acc-1"), "command": .string("unlock")]
+                )
+            ),
+        ]
+        let coordinator = DeviceCommandCoordinator(homeKit: FakeHomeKitController(), apiClient: api)
+
+        let result = await coordinator.run(accessToken: "token")
+
+        XCTAssertEqual(result, .completed(executed: 0, failed: 1))
+        guard case .failed(let reason) = api.completions.first?.outcome else {
+            return XCTFail("expected a failed outcome")
+        }
+        XCTAssertTrue(reason.contains("not implemented"))
     }
 }

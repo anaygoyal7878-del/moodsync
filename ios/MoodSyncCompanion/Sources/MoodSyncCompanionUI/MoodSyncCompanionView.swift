@@ -209,7 +209,29 @@ public struct MoodSyncCompanionView: View {
         // point available to a third-party app without Apple's
         // case-by-case background-execution entitlement.
         await checkPendingDeviceCommands(accessToken: accessToken)
+        await pushHomeSnapshot(accessToken: accessToken)
     }
+
+    #if canImport(HomeKit)
+    /// Pushes the current Home/Room/Zone/Accessory/Scene enumeration so
+    /// the backend has a cached copy to serve the Home Dashboard/Scene
+    /// Manager/Room View/Device Management/Home Safety pages from — it
+    /// can never query HomeKit directly. Best-effort: a HomeKit error
+    /// here (no home configured, restricted, timed out) only updates
+    /// the status string, it never fails the overall sync. See
+    /// docs/HOME_SCENES_ARCHITECTURE.md.
+    private func pushHomeSnapshot(accessToken: String) async {
+        let homeKit = HomeKitController()
+        do {
+            let snapshot = try await homeKit.fetchHomeSnapshot()
+            try await MoodSyncAPIClient(baseURL: baseURL).pushHomeSnapshot(snapshot, accessToken: accessToken)
+        } catch {
+            status += " · Home snapshot not sent: \(error.localizedDescription)"
+        }
+    }
+    #else
+    private func pushHomeSnapshot(accessToken: String) async {}
+    #endif
 
     #if canImport(HomeKit)
     private func checkPendingDeviceCommands(accessToken: String) async {

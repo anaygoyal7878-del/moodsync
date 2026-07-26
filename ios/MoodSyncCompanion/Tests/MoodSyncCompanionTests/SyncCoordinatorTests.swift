@@ -47,6 +47,8 @@ private final class FakeAPIClient: MoodSyncAPIClientProtocol, @unchecked Sendabl
     }
 
     func postLocationEvent(type: LocationEventType, occurredAt: Date, accessToken: String) async throws {}
+
+    func pushHomeSnapshot(_ snapshot: HomeSnapshotDTO, accessToken: String) async throws {}
 }
 
 final class SyncCoordinatorTests: XCTestCase {
