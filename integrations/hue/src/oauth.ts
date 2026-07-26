@@ -1,11 +1,11 @@
 /**
- * Philips Hue Remote API OAuth 2.0. The token endpoint path
- * (`/v2/oauth2/token` on api.meethue.com) is confirmed directly from
- * working production code (peter-murray/node-hue-api's RemoteApi client).
- * The authorize endpoint follows the same versioned path alongside it and
- * is consistent with Hue's own "Get Started" walkthrough, but — unlike
- * the token endpoint — was not independently confirmed against a second
- * source; spot-check against a live Hue developer app before shipping.
+ * Philips Hue Remote API OAuth 2.0. Both the token and authorize
+ * endpoint paths (`/v2/oauth2/token` and `/v2/oauth2/authorize` on
+ * api.meethue.com) are now independently confirmed current — Philips'
+ * own developer site (developers.meethue.com, via search-indexed
+ * content, since the full docs page requires a logged-in developer
+ * account) explicitly states the v1 `/oauth2` path was deprecated in
+ * July 2020 in favor of `/v2/oauth2`, matching what's used here.
  */
 const AUTHORIZE_URL = 'https://api.meethue.com/v2/oauth2/authorize';
 const TOKEN_URL = 'https://api.meethue.com/v2/oauth2/token';
