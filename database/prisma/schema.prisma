@@ -43,6 +43,7 @@ model User {
   meditationSessions   MeditationSession[]
   appleMusicConnection AppleMusicConnection?
   preferences          UserPreferences?
+  homeSnapshot         HomeSnapshot?
 
   @@map("users")
 }
@@ -320,6 +321,12 @@ enum ExecutionOutcome {
   /// from EXECUTED because dispatch genuinely doesn't know the outcome
   /// yet (see ai/src/dispatch.ts, docs/HOMEKIT_ARCHITECTURE.md).
   QUEUED_FOR_DEVICE
+  /// A homekit.security_control action was matched but
+  /// UserPreferences.securityControlEnabled is false — distinct from
+  /// SKIPPED_DISABLED (that's a whole rule disabled) since only the
+  /// security-control action itself was blocked, not the rule. See
+  /// docs/HOME_SCENES_ARCHITECTURE.md.
+  SKIPPED_SECURITY_CONTROL_DISABLED
   FAILED
 }
 
@@ -393,6 +400,127 @@ model PendingDeviceCommand {
 
   @@index([userId, status, createdAt])
   @@map("pending_device_commands")
+}
+
+/// Cached snapshot of the user's primary Apple Home, pushed by the iOS
+/// companion app (HomeKitController.swift's fetchHomeSnapshot()) — the
+/// backend can never query HomeKit directly (no cloud API exists at
+/// all, see docs/HOMEKIT_ARCHITECTURE.md), so this is the same "device
+/// pushes full state, backend caches the latest copy" shape as Apple
+/// Health ingest. Replaced wholesale on every push (delete+recreate
+/// children in a transaction), not diffed incrementally — see
+/// docs/HOME_SCENES_ARCHITECTURE.md.
+model HomeSnapshot {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  homeId String
+  homeName String
+  /// Matter accessories added via Apple Home appear as ordinary
+  /// HMAccessory objects — there is no third-party "Matter detection"
+  /// API. This field currently always reads false; kept as an honest
+  /// placeholder rather than fabricated detection logic. See
+  /// docs/HOME_SCENES_ARCHITECTURE.md's sourcing table.
+  isMatterHome Boolean @default(false)
+  pushedAt DateTime @default(now())
+
+  rooms       HomeRoomSnapshot[]
+  zones       HomeZoneSnapshot[]
+  accessories HomeAccessorySnapshot[]
+  scenes      HomeSceneSnapshot[]
+
+  @@map("home_snapshots")
+}
+
+model HomeRoomSnapshot {
+  id             String       @id @default(uuid())
+  homeSnapshotId String
+  homeSnapshot   HomeSnapshot @relation(fields: [homeSnapshotId], references: [id], onDelete: Cascade)
+  roomId         String
+  name           String
+  temperatureC   Float?
+  humidityPct    Float?
+  /// Raw HMCharacteristicValueAirQuality string, if any accessory in the
+  /// room exposes one — null for most rooms, no sensor present.
+  airQuality     String?
+
+  @@index([homeSnapshotId])
+  @@map("home_room_snapshots")
+}
+
+model HomeZoneSnapshot {
+  id             String       @id @default(uuid())
+  homeSnapshotId String
+  homeSnapshot   HomeSnapshot @relation(fields: [homeSnapshotId], references: [id], onDelete: Cascade)
+  zoneId         String
+  name           String
+  roomIds        String[]
+
+  @@index([homeSnapshotId])
+  @@map("home_zone_snapshots")
+}
+
+enum HomeAccessoryCategory {
+  LOCK
+  GARAGE_DOOR
+  ALARM_SYSTEM
+  SMOKE_DETECTOR
+  LEAK_SENSOR
+  WINDOW_COVERING
+  DOORBELL
+  OUTLET_OR_SWITCH
+  LIGHT
+  THERMOSTAT_OR_SENSOR
+  OTHER
+}
+
+model HomeAccessorySnapshot {
+  id              String                @id @default(uuid())
+  homeSnapshotId  String
+  homeSnapshot    HomeSnapshot          @relation(fields: [homeSnapshotId], references: [id], onDelete: Cascade)
+  accessoryId     String
+  name            String
+  roomId          String?
+  category        HomeAccessoryCategory
+  /// From the accessory's "Accessory Information" service — real,
+  /// public, third-party-readable per HomeKit's HMAccessory API.
+  manufacturer    String?
+  model           String?
+  firmwareVersion String?
+  reachable       Boolean
+  batteryLevelPct Int?
+  /// Coarse status string, category-dependent (e.g. "locked"/"unlocked",
+  /// "closed"/"open", "armed_away"/"disarmed") — deliberately a loose
+  /// string, not a typed enum per category, since HomeKit's characteristic
+  /// value sets vary by accessory and over-modeling them risks
+  /// fabricating a taxonomy Apple doesn't publish. Security/safety
+  /// characteristic read access is not independently confirmed this
+  /// session — see docs/HOME_SCENES_ARCHITECTURE.md.
+  statusValue         String?
+  /// True for LOCK | GARAGE_DOOR | ALARM_SYSTEM — gates whether this
+  /// accessory can ever appear in a security-control command, alongside
+  /// UserPreferences.securityControlEnabled.
+  isSecurityAccessory Boolean @default(false)
+
+  @@index([homeSnapshotId])
+  @@map("home_accessory_snapshots")
+}
+
+model HomeSceneSnapshot {
+  id             String       @id @default(uuid())
+  homeSnapshotId String
+  homeSnapshot   HomeSnapshot @relation(fields: [homeSnapshotId], references: [id], onDelete: Cascade)
+  sceneId        String
+  name           String
+  accessoryIds   String[]
+  /// MoodSync's own concept, not a HomeKit-native flag — pushed back up
+  /// on each snapshot so it survives a replace.
+  isFavorite     Boolean   @default(false)
+  lastRunAt      DateTime?
+  runCount       Int       @default(0)
+
+  @@index([homeSnapshotId])
+  @@map("home_scene_snapshots")
 }
 
 enum InsightPeriod {
@@ -487,6 +615,14 @@ model UserPreferences {
   /// instead, and workers/src/notificationDigestWorker.ts batches each
   /// user's queued entries into one combined Notification per run.
   notificationDigestMode NotificationDigestMode @default(IMMEDIATE)
+  /// Disabled by default. When false, neither the backend (dispatch.ts)
+  /// nor the iOS companion (DeviceCommandCoordinator) will ever act on a
+  /// homekit.security_control action — the backend refuses to queue one
+  /// (logs SKIPPED_SECURITY_CONTROL_DISABLED instead) and the companion
+  /// app independently refuses to execute one even if it somehow found
+  /// its way into the queue. Flipping this on is the only way
+  /// security-accessory control (locks/garage/alarm) ever activates.
+  securityControlEnabled Boolean @default(false)
   updatedAt              DateTime  @updatedAt
 
   @@map("user_preferences")

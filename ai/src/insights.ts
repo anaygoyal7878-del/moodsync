@@ -148,6 +148,7 @@ interface ExecutionLogLike {
     | 'SKIPPED_MANUAL_PAUSE'
     | 'SKIPPED_SAFETY_RATE_LIMIT'
     | 'QUEUED_FOR_DEVICE'
+    | 'SKIPPED_SECURITY_CONTROL_DISABLED'
     | 'FAILED';
 }
 

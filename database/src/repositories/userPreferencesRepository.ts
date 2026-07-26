@@ -79,4 +79,23 @@ export const userPreferencesRepository = {
     const row = await prisma.userPreferences.findUnique({ where: { userId }, select: { notificationDigestMode: true } });
     return row?.notificationDigestMode ?? 'IMMEDIATE';
   },
+
+  /** Disabled by default (schema default `false`) — a missing row means
+   * security-accessory control has never been enabled, same "absence,
+   * not failure" convention as every other preference here. Checked on
+   * the hot dispatch path (ai/src/actionExecutors.ts's homekit
+   * executor) before any `homekit.security_control` action is queued.
+   * See docs/HOME_SCENES_ARCHITECTURE.md. */
+  async getSecurityControlEnabled(userId: string): Promise<boolean> {
+    const row = await prisma.userPreferences.findUnique({ where: { userId }, select: { securityControlEnabled: true } });
+    return row?.securityControlEnabled ?? false;
+  },
+
+  async setSecurityControlEnabled(userId: string, enabled: boolean): Promise<void> {
+    await prisma.userPreferences.upsert({
+      where: { userId },
+      create: { userId, securityControlEnabled: enabled },
+      update: { securityControlEnabled: enabled },
+    });
+  },
 };

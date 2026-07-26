@@ -63,7 +63,24 @@ export type ActionType =
    * protocol sourcing and its honesty caveats (unofficial, reverse
    * engineered, not Philips-supported). */
   | 'hue_ble.set_power'
-  | 'hue_ble.set_brightness';
+  | 'hue_ble.set_brightness'
+  /** Runs a cached Apple Home Scene (see docs/HOME_SCENES_ARCHITECTURE.md)
+   * from the Automation Engine or an accepted AI Recommendation — same
+   * queue mechanics as `homekit.activate_scene`, kept as a distinct type
+   * so dispatch/analytics can tell "a rule triggered this scene" apart
+   * from a manual/recommendation-driven one-off run. params: { sceneId:
+   * string, sceneName: string }. */
+  | 'homekit.run_scene'
+  /** Locks/unlocks, arms/disarms, or opens/closes a security-category
+   * HomeKit accessory (LOCK | GARAGE_DOOR | ALARM_SYSTEM). Gated behind
+   * UserPreferences.securityControlEnabled, which defaults to false —
+   * dispatch refuses to queue this action at all while disabled (logs
+   * SKIPPED_SECURITY_CONTROL_DISABLED), and the iOS companion
+   * independently refuses to execute one even if it were somehow
+   * queued. params: { accessoryId: string, command: 'lock' | 'unlock' |
+   * 'arm' | 'disarm' | 'open' | 'close' }. See
+   * docs/HOME_SCENES_ARCHITECTURE.md. */
+  | 'homekit.security_control';
 
 export interface AutomationAction {
   type: ActionType;

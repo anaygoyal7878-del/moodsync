@@ -42,6 +42,8 @@ const actionSchema = z.object({
     'homekit.activate_scene',
     'hue_ble.set_power',
     'hue_ble.set_brightness',
+    'homekit.run_scene',
+    'homekit.security_control',
   ]),
   provider: z.enum(['hue', 'spotify', 'ecobee', 'notification', 'homekit', 'hue_ble']),
   params: z.record(z.string(), z.unknown()),

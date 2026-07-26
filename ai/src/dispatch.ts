@@ -34,6 +34,7 @@ export type DispatchOutcome =
   | 'SKIPPED_MANUAL_PAUSE'
   | 'SKIPPED_SAFETY_RATE_LIMIT'
   | 'QUEUED_FOR_DEVICE'
+  | 'SKIPPED_SECURITY_CONTROL_DISABLED'
   | 'FAILED';
 
 export interface DispatchResult {
@@ -202,6 +203,7 @@ async function dispatchMatchedRules(
     try {
       let anyQueued = false;
       let anyExecuted = false;
+      let anySecurityControlDisabled = false;
       const skippedProviders: string[] = [];
       for (const action of rule.actions) {
         const pausedUntil = resourcePauses.get(action.provider);
@@ -209,9 +211,27 @@ async function dispatchMatchedRules(
           skippedProviders.push(action.provider);
           continue;
         }
-        const { queued } = await executeAction(userId, action, rule.id);
-        if (queued) anyQueued = true;
-        else anyExecuted = true;
+        const { queued, skippedSecurityControlDisabled } = await executeAction(userId, action, rule.id);
+        if (skippedSecurityControlDisabled) {
+          anySecurityControlDisabled = true;
+        } else if (queued) {
+          anyQueued = true;
+        } else {
+          anyExecuted = true;
+        }
+      }
+
+      // Every action was a security-control action refused by the
+      // disabled-by-default UserPreferences.securityControlEnabled
+      // toggle (and nothing else in the rule ran) — a distinct outcome
+      // from SKIPPED_MANUAL_PAUSE since this is a standing safety
+      // default, not a temporary user pause. See
+      // docs/HOME_SCENES_ARCHITECTURE.md.
+      if (!anyQueued && !anyExecuted && anySecurityControlDisabled) {
+        const reason = 'Security-accessory control is disabled by default — enable it in Home Safety settings to allow this automation to run.';
+        await recordAndNotify({ userId, rule, readingId, outcome: 'SKIPPED_SECURITY_CONTROL_DISABLED', reason, notifyTitle: 'Automation skipped (security control disabled)', now });
+        results.push({ ruleId: rule.id, ruleName: rule.name, outcome: 'SKIPPED_SECURITY_CONTROL_DISABLED', reason });
+        continue;
       }
 
       // Every action this rule would take targets a currently-paused

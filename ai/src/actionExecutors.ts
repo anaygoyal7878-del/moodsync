@@ -1,4 +1,4 @@
-import { pendingDeviceCommandRepository } from '@moodsync/database';
+import { pendingDeviceCommandRepository, userPreferencesRepository } from '@moodsync/database';
 import type { AutomationAction, SmartHomeProviderId } from '@moodsync/shared';
 import { executeHueAction } from './hueActionExecutor.js';
 import { executeSpotifyAction } from './spotifyActionExecutor.js';
@@ -9,6 +9,13 @@ export interface ActionExecutionResult {
    * cloud API (see docs/HOMEKIT_ARCHITECTURE.md), so its "execution" is
    * always a queue write, never an immediate side effect. */
   queued: boolean;
+  /** Set when a `homekit.security_control` action was matched but
+   * UserPreferences.securityControlEnabled is false — the action is
+   * refused outright, never queued, distinct from `queued: false`
+   * (which otherwise means "executed synchronously"). dispatch.ts
+   * records this as SKIPPED_SECURITY_CONTROL_DISABLED for the action's
+   * rule. See docs/HOME_SCENES_ARCHITECTURE.md. */
+  skippedSecurityControlDisabled?: boolean;
 }
 
 export type ActionExecutor = (userId: string, action: AutomationAction, ruleId: string) => Promise<ActionExecutionResult>;
@@ -41,6 +48,12 @@ const registry: Partial<Record<SmartHomeProviderId, ActionExecutor>> = {
     return { queued: false };
   },
   homekit: async (userId, action, ruleId) => {
+    if (action.type === 'homekit.security_control') {
+      const enabled = await userPreferencesRepository.getSecurityControlEnabled(userId);
+      if (!enabled) {
+        return { queued: false, skippedSecurityControlDisabled: true };
+      }
+    }
     await pendingDeviceCommandRepository.create({ userId, provider: 'HOMEKIT', action, ruleId });
     return { queued: true };
   },
