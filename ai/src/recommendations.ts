@@ -27,9 +27,31 @@ export interface RecommendationCandidate {
    * skip-rate heuristic below suggests swapping a specific playlist,
    * not adopting a new template, so it needs its own action shape
    * rather than stretching `templateId` to mean something it doesn't. */
-  kind: 'template' | 'edit-rule';
+  kind: 'template' | 'edit-rule' | 'run-scene';
   templateId?: string;
   ruleId?: string;
+  /** Only present when `kind === 'run-scene'` — points at a cached
+   * `HomeSceneSnapshot.sceneId` (see docs/HOME_SCENES_ARCHITECTURE.md).
+   * Distinct from `kind: 'template'`/`'edit-rule'` because "run this
+   * Apple Home scene right now" is a one-shot action, not adopting or
+   * editing an `AutomationRule` — there was no existing shape for that
+   * until this. Accepting queues a `homekit.run_scene` command via the
+   * same `POST /home/scenes/:id/run` a manual Scene Manager button
+   * press uses; MoodSync never runs it automatically just by
+   * recommending it. */
+  sceneId?: string;
+  sceneName?: string;
+}
+
+/** Best-effort keyword match against cached scene names — HomeKit gives
+ * MoodSync no semantic understanding of what a scene *does*, only its
+ * name, so this is a heuristic string match, not real comprehension.
+ * Documented as such rather than implying MoodSync understands scene
+ * content. */
+const RELAX_SCENE_KEYWORDS = ['relax', 'wind down', 'wind-down', 'calm', 'unwind'];
+
+function findRelaxScene(scenes: { sceneId: string; name: string }[]): { sceneId: string; name: string } | undefined {
+  return scenes.find((s) => RELAX_SCENE_KEYWORDS.some((keyword) => s.name.toLowerCase().includes(keyword)));
 }
 
 export interface PlaylistSkipStat {
@@ -66,18 +88,36 @@ export function generateRecommendations(params: {
   wellnessTrends: TrendResult[];
   existingRules: AutomationRuleDefinition[];
   playlistSkipStats?: PlaylistSkipStat[];
+  /** Cached Apple Home scenes (see docs/HOME_SCENES_ARCHITECTURE.md) —
+   * lets this heuristic suggest running a real, existing scene instead
+   * of only ever suggesting a new Hue-based rule template. Optional so
+   * every existing caller (and test) that has no Home snapshot yet
+   * keeps working unchanged. */
+  cachedScenes?: { sceneId: string; name: string }[];
 }): RecommendationCandidate[] {
-  const { wellnessTrends, existingRules, playlistSkipStats = [] } = params;
+  const { wellnessTrends, existingRules, playlistSkipStats = [], cachedScenes = [] } = params;
   const candidates: RecommendationCandidate[] = [];
 
   const stress = wellnessTrends.find((t) => t.metric === 'stress');
-  if (stress && stress.direction === 'up' && stress.current >= 65 && !hasMatchingRule(existingRules, ['heartRate', 'wellness.stress'])) {
-    candidates.push({
-      kind: 'template',
-      templateId: 'elevated-stress',
-      title: 'Try the "Elevated Stress" automation',
-      description: `Your computed Stress score has trended up recently (${stress.previous} → ${stress.current}). The "Elevated Stress" template dims your Hue lights and shifts to a warmer color temperature when your heart rate spikes — you don't have a rule reacting to this yet.`,
-    });
+  if (stress && stress.direction === 'up' && stress.current >= 65) {
+    const relaxScene = findRelaxScene(cachedScenes);
+    if (relaxScene) {
+      candidates.push({
+        kind: 'run-scene',
+        sceneId: relaxScene.sceneId,
+        sceneName: relaxScene.name,
+        title: `Run your "${relaxScene.name}" scene?`,
+        description: `Your computed Stress score has trended up recently (${stress.previous} → ${stress.current}). You appear stressed — want to run your "${relaxScene.name}" Apple Home scene now?`,
+      });
+    }
+    if (!hasMatchingRule(existingRules, ['heartRate', 'wellness.stress'])) {
+      candidates.push({
+        kind: 'template',
+        templateId: 'elevated-stress',
+        title: 'Try the "Elevated Stress" automation',
+        description: `Your computed Stress score has trended up recently (${stress.previous} → ${stress.current}). The "Elevated Stress" template dims your Hue lights and shifts to a warmer color temperature when your heart rate spikes — you don't have a rule reacting to this yet.`,
+      });
+    }
   }
 
   const recovery = wellnessTrends.find((t) => t.metric === 'recovery');

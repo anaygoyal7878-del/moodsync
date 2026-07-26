@@ -131,10 +131,18 @@ export interface AutomationEffectivenessResult {
   effectivenessRate: number | null;
 }
 
+export interface SceneUsageResult {
+  sceneId: string;
+  sceneName: string;
+  runCount: number;
+  lastRunAt: string | null;
+}
+
 export interface InsightsResponse {
   trends: TrendResult[];
   wellnessTrends: TrendResult[];
   automationEffectiveness: AutomationEffectivenessResult[];
+  sceneUsage: SceneUsageResult[];
 }
 
 export interface WellnessResponse {
@@ -146,7 +154,11 @@ export interface RecommendationEntry {
   title: string;
   description: string;
   status: "PENDING" | "ACCEPTED" | "DISMISSED" | "EXPIRED";
-  suggestedActions: { kind: "template"; templateId: string } | { kind: "edit-rule"; ruleId: string } | { templateId: string };
+  suggestedActions:
+    | { kind: "template"; templateId: string }
+    | { kind: "edit-rule"; ruleId: string }
+    | { kind: "run-scene"; sceneId: string; sceneName: string }
+    | { templateId: string };
   createdAt: string;
   respondedAt: string | null;
 }

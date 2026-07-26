@@ -12,8 +12,10 @@ export {
   computeTrends,
   computeWellnessTrends,
   computeAutomationEffectiveness,
+  computeSceneUsageFrequency,
   type TrendResult,
   type AutomationEffectivenessResult,
+  type SceneUsageResult,
 } from './insights.js';
 export {
   computeWellnessScores,

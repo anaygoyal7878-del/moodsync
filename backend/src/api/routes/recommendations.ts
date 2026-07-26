@@ -2,7 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import {
   automationRuleRepository,
   biometricReadingRepository,
+  homeSnapshotRepository,
   musicPlayLogRepository,
+  pendingDeviceCommandRepository,
   recommendationRepository,
 } from '@moodsync/database';
 import { computeWellnessTrends, generateRecommendations, type PlaylistSkipStat } from '@moodsync/ai';
@@ -57,13 +59,15 @@ export default async function recommendationRoutes(app: FastifyInstance) {
    */
   app.get('/recommendations', { preHandler: app.authenticate }, async (request, reply) => {
     const userId = request.userId!;
-    const [readings, rules] = await Promise.all([
+    const [readings, rules, snapshot] = await Promise.all([
       biometricReadingRepository.listRecentNormalized(userId, TREND_WINDOW_DAYS),
       automationRuleRepository.listForUser(userId),
+      homeSnapshotRepository.getForUser(userId),
     ]);
     const wellnessTrends = computeWellnessTrends([...readings].reverse());
     const playlistSkipStats = await computePlaylistSkipStats(userId, rules);
-    const candidates = generateRecommendations({ wellnessTrends, existingRules: rules, playlistSkipStats });
+    const cachedScenes = snapshot?.scenes.map((s) => ({ sceneId: s.sceneId, name: s.name })) ?? [];
+    const candidates = generateRecommendations({ wellnessTrends, existingRules: rules, playlistSkipStats, cachedScenes });
 
     for (const candidate of candidates) {
       if (await recommendationRepository.hasBeenSuggested(userId, candidate.title)) continue;
@@ -74,7 +78,9 @@ export default async function recommendationRoutes(app: FastifyInstance) {
         suggestedActions:
           candidate.kind === 'edit-rule'
             ? { kind: 'edit-rule', ruleId: candidate.ruleId }
-            : { kind: 'template', templateId: candidate.templateId },
+            : candidate.kind === 'run-scene'
+              ? { kind: 'run-scene', sceneId: candidate.sceneId, sceneName: candidate.sceneName }
+              : { kind: 'template', templateId: candidate.templateId },
       });
     }
 
@@ -86,8 +92,26 @@ export default async function recommendationRoutes(app: FastifyInstance) {
     '/recommendations/:id/accept',
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const updated = await recommendationRepository.updateStatus(request.params.id, request.userId!, 'ACCEPTED');
+      const userId = request.userId!;
+      const recommendation = await recommendationRepository.findById(request.params.id, userId);
+      const updated = await recommendationRepository.updateStatus(request.params.id, userId, 'ACCEPTED');
       if (!updated) return reply.code(404).send({ error: 'Recommendation not found or already responded to' });
+
+      // A run-scene recommendation is a one-shot action, not a rule to
+      // adopt/edit — accepting it queues the same homekit.run_scene
+      // command a manual Scene Manager "Run" button press does (see
+      // backend/src/api/routes/home.ts), clearly the user's own explicit
+      // action (accepting an AI-generated suggestion), never automatic.
+      const suggestedActions = recommendation?.suggestedActions as { kind?: string; sceneId?: string; sceneName?: string } | undefined;
+      if (suggestedActions?.kind === 'run-scene' && suggestedActions.sceneId && suggestedActions.sceneName) {
+        await pendingDeviceCommandRepository.create({
+          userId,
+          provider: 'HOMEKIT',
+          action: { type: 'homekit.run_scene', provider: 'homekit', params: { sceneId: suggestedActions.sceneId, sceneName: suggestedActions.sceneName } },
+        });
+        await homeSnapshotRepository.recordSceneRun(userId, suggestedActions.sceneId);
+      }
+
       return reply.code(204).send();
     },
   );

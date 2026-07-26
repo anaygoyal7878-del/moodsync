@@ -28,16 +28,25 @@ function RecommendationCard({ recommendation, onResponded }: { recommendation: R
 
   const actions = recommendation.suggestedActions;
   const isEditRule = "kind" in actions && actions.kind === "edit-rule";
+  const isRunScene = "kind" in actions && actions.kind === "run-scene";
   const templateId = "templateId" in actions ? actions.templateId : undefined;
   const templateName = templateId ? (TEMPLATE_NAMES[templateId] ?? templateId) : undefined;
 
   return (
     <Card>
       <div className="flex flex-col gap-2">
+        <span className="w-fit rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
+          AI-generated
+        </span>
         <p className="text-sm font-medium text-ink">{recommendation.title}</p>
         <p className="text-sm text-ink-secondary">{recommendation.description}</p>
         <p className="text-xs text-ink-muted">
-          {isEditRule ? (
+          {isRunScene ? (
+            <>
+              This only suggests running your Apple Home scene — accepting queues it for your iOS companion app to
+              run next time it&rsquo;s opened, MoodSync never runs a scene without you accepting first.
+            </>
+          ) : isEditRule ? (
             <>
               To use it: open this rule below and change its playlist — this only suggests it, MoodSync never edits
               a rule for you.
@@ -51,7 +60,7 @@ function RecommendationCard({ recommendation, onResponded }: { recommendation: R
         </p>
         <div className="flex items-center gap-2">
           <Button variant="secondary" disabled={submitting !== null} onClick={() => respond("accept")}>
-            {submitting === "accept" ? "Accepting…" : "Got it, I'll set this up"}
+            {submitting === "accept" ? (isRunScene ? "Running…" : "Accepting…") : isRunScene ? "Run scene" : "Got it, I'll set this up"}
           </Button>
           <Button variant="ghost" disabled={submitting !== null} onClick={() => respond("dismiss")}>
             {submitting === "dismiss" ? "Dismissing…" : "Dismiss"}

@@ -51,6 +51,10 @@ export const recommendationRepository = {
     return existing !== null;
   },
 
+  async findById(id: string, userId: string) {
+    return prisma.recommendation.findFirst({ where: { id, userId } });
+  },
+
   /** `updateMany` (not `update`) so the userId ownership check is
    * enforced by the database query itself — same pattern as
    * notificationRepository.markRead. */

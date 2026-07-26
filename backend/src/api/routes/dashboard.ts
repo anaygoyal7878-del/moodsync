@@ -8,8 +8,9 @@ import {
   automationRuleRepository,
   automationExecutionLogRepository,
   insightRepository,
+  homeSnapshotRepository,
 } from '@moodsync/database';
-import { computeTrends, computeWellnessTrends, computeAutomationEffectiveness, computeWellnessScores } from '@moodsync/ai';
+import { computeTrends, computeWellnessTrends, computeAutomationEffectiveness, computeWellnessScores, computeSceneUsageFrequency } from '@moodsync/ai';
 
 const historyQuerySchema = z.object({ days: z.coerce.number().int().min(1).max(30).default(7) });
 const insightsQuerySchema = z.object({ days: z.coerce.number().int().min(1).max(30).default(14) });
@@ -82,10 +83,11 @@ export default async function dashboardRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
     const userId = request.userId!;
-    const [readingsWithId, rules, logs] = await Promise.all([
+    const [readingsWithId, rules, logs, homeSnapshot] = await Promise.all([
       biometricReadingRepository.listRecentNormalizedWithId(userId, parsed.data.days),
       automationRuleRepository.listForUser(userId),
       automationExecutionLogRepository.listForUser(userId, 200),
+      homeSnapshotRepository.getForUser(userId),
     ]);
 
     const readings = readingsWithId.map((r) => r.reading);
@@ -106,7 +108,13 @@ export default async function dashboardRoutes(app: FastifyInstance) {
       wellnessScoresByReadingId,
     });
 
-    return reply.send({ trends, wellnessTrends, automationEffectiveness });
+    // Most Used Scenes analytics — reuses HomeSceneSnapshot's
+    // already-tracked runCount/lastRunAt (bumped by every scene run,
+    // see homeSnapshotRepository.recordSceneRun), not a new metric
+    // pipeline. See docs/HOME_SCENES_ARCHITECTURE.md.
+    const sceneUsage = computeSceneUsageFrequency(homeSnapshot?.scenes ?? []);
+
+    return reply.send({ trends, wellnessTrends, automationEffectiveness, sceneUsage });
   });
 
   /** Persisted history — distinct from `/insights` above, which computes

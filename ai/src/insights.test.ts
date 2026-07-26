@@ -169,3 +169,17 @@ describe('computeAutomationEffectiveness', () => {
     expect(result[0]).toMatchObject({ metric: 'wellness.stress', comparableCount: 0, effectivenessRate: null });
   });
 });
+
+describe('computeSceneUsageFrequency', () => {
+  it('sorts scenes by runCount descending', async () => {
+    const { computeSceneUsageFrequency } = await import('./insights.js');
+    const result = computeSceneUsageFrequency([
+      { sceneId: 'a', name: 'Focus', runCount: 2, lastRunAt: null },
+      { sceneId: 'b', name: 'Wind Down', runCount: 10, lastRunAt: new Date('2026-01-01') },
+    ]);
+    expect(result.map((r) => r.sceneId)).toEqual(['b', 'a']);
+    expect(result[0]).toMatchObject({ sceneName: 'Wind Down', runCount: 10 });
+    expect(result[0]!.lastRunAt).toBe('2026-01-01T00:00:00.000Z');
+    expect(result[1]!.lastRunAt).toBeNull();
+  });
+});

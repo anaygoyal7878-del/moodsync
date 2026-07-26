@@ -3,7 +3,7 @@ import { Brain } from "lucide-react";
 import { LuxuryGauge } from "@/components/luxury/LuxuryGauge";
 import { LuxuryWeekBars } from "@/components/luxury/LuxuryWeekBars";
 import { metricLabel } from "@/lib/metrics";
-import type { TrendResult, AutomationEffectivenessResult, RecommendationEntry } from "@/lib/types";
+import type { TrendResult, AutomationEffectivenessResult, RecommendationEntry, SceneUsageResult } from "@/lib/types";
 import type { NormalizedBiometricReading } from "@moodsync/shared";
 
 const DIRECTION_LABEL: Record<TrendResult["direction"], string> = { up: "Rising", down: "Falling", flat: "Steady" };
@@ -25,12 +25,14 @@ export function LuxuryInsights({
   trends,
   automationEffectiveness,
   recommendations,
+  sceneUsage = [],
 }: {
   history: NormalizedBiometricReading[];
   wellnessTrends: TrendResult[];
   trends: TrendResult[];
   automationEffectiveness: AutomationEffectivenessResult[];
   recommendations: RecommendationEntry[];
+  sceneUsage?: SceneUsageResult[];
 }) {
   const overall = findTrend(wellnessTrends, "overall");
   const stress = findTrend(wellnessTrends, "stress");
@@ -113,6 +115,12 @@ export function LuxuryInsights({
                   <Brain size={18} style={{ color: "var(--lux-sage)" }} aria-hidden="true" />
                 </div>
                 <div className="flex-1">
+                  <span
+                    className="mb-1 inline-block rounded-full px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide"
+                    style={{ background: "rgba(95,184,120,0.12)", color: "var(--lux-sage)" }}
+                  >
+                    AI-generated
+                  </span>
                   <h3 className="mb-1 text-[14px] font-medium" style={{ color: "var(--lux-ink)" }}>
                     {rec.title}
                   </h3>
@@ -177,6 +185,33 @@ export function LuxuryInsights({
                 </p>
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* Most Used Scenes — real HomeSceneSnapshot.runCount data, see
+       * ai/src/insights.ts's computeSceneUsageFrequency and
+       * docs/HOME_SCENES_ARCHITECTURE.md. */}
+      {sceneUsage.some((s) => s.runCount > 0) && (
+        <section
+          className="lux-stagger-5 rounded-[24px] p-5"
+          style={{ background: "var(--lux-bg-card)", border: "1px solid var(--lux-hairline)" }}
+        >
+          <h2 className="font-luxury-display mb-4 text-[16px] font-semibold" style={{ color: "var(--lux-ink)" }}>
+            Most Used Scenes
+          </h2>
+          <div className="flex flex-col gap-3">
+            {sceneUsage
+              .filter((s) => s.runCount > 0)
+              .slice(0, 5)
+              .map((s) => (
+                <div key={s.sceneId} className="flex items-center justify-between text-[13px]">
+                  <span style={{ color: "var(--lux-muted)" }}>{s.sceneName}</span>
+                  <span className="tabular font-medium" style={{ color: "var(--lux-ink)" }}>
+                    {s.runCount} run{s.runCount === 1 ? "" : "s"}
+                  </span>
+                </div>
+              ))}
           </div>
         </section>
       )}

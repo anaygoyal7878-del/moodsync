@@ -258,3 +258,29 @@ export function computeAutomationEffectiveness(params: {
 
   return results;
 }
+
+export interface SceneUsageResult {
+  sceneId: string;
+  sceneName: string;
+  runCount: number;
+  lastRunAt: string | null;
+}
+
+/** Most-used-scenes analytics for the Home Dashboard/Scene Manager —
+ * pure and DB-free like every other function in this file, just sorting
+ * the run-counts the backend already tracks on `HomeSceneSnapshot` (see
+ * docs/HOME_SCENES_ARCHITECTURE.md). No new persistence needed here:
+ * runCount/lastRunAt are already bumped on every scene run
+ * (homeSnapshotRepository.recordSceneRun), this just presents them. */
+export function computeSceneUsageFrequency(
+  scenes: { sceneId: string; name: string; runCount: number; lastRunAt: Date | string | null }[],
+): SceneUsageResult[] {
+  return [...scenes]
+    .sort((a, b) => b.runCount - a.runCount)
+    .map((s) => ({
+      sceneId: s.sceneId,
+      sceneName: s.name,
+      runCount: s.runCount,
+      lastRunAt: s.lastRunAt ? new Date(s.lastRunAt).toISOString() : null,
+    }));
+}

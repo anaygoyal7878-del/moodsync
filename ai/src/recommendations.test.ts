@@ -106,3 +106,24 @@ describe('generateRecommendations', () => {
     expect(candidates).toHaveLength(0);
   });
 });
+
+describe('generateRecommendations — run-scene', () => {
+  it('suggests running a cached "Wind Down" scene when stress trends up and a matching scene exists', () => {
+    const candidates = generateRecommendations({
+      wellnessTrends: [trend('stress', { current: 70, direction: 'up' })],
+      existingRules: [],
+      cachedScenes: [{ sceneId: 'scene-1', name: 'Wind Down' }],
+    });
+    const runScene = candidates.find((c) => c.kind === 'run-scene');
+    expect(runScene).toMatchObject({ kind: 'run-scene', sceneId: 'scene-1', sceneName: 'Wind Down' });
+  });
+
+  it('does not suggest a scene when no cached scene name matches a relax keyword', () => {
+    const candidates = generateRecommendations({
+      wellnessTrends: [trend('stress', { current: 70, direction: 'up' })],
+      existingRules: [],
+      cachedScenes: [{ sceneId: 'scene-1', name: 'Movie Night' }],
+    });
+    expect(candidates.find((c) => c.kind === 'run-scene')).toBeUndefined();
+  });
+});

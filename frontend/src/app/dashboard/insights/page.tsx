@@ -12,7 +12,7 @@ export default async function InsightsPage() {
 
   const insights: InsightsResponse = insightsResult.ok
     ? insightsResult.data
-    : { trends: [], wellnessTrends: [], automationEffectiveness: [] };
+    : { trends: [], wellnessTrends: [], automationEffectiveness: [], sceneUsage: [] };
   const history = historyResult.ok ? historyResult.data.readings : [];
   const recommendations = recommendationsResult.ok ? recommendationsResult.data.recommendations : [];
 
@@ -23,6 +23,7 @@ export default async function InsightsPage() {
       trends={insights.trends}
       automationEffectiveness={insights.automationEffectiveness}
       recommendations={recommendations}
+      sceneUsage={insights.sceneUsage}
     />
   );
 }
