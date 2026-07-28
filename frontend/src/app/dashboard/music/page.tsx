@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useMusicKit } from "@/lib/musicKitClient";
 import { artworkUrl } from "@/lib/appleMusicArtwork";
+import { RecommendedForNow } from "@/components/dashboard/RecommendedForNow";
 
 /** Real, honest roadmap — every one of these needs either real listening
  * history (which can't exist before a working connection does) or
@@ -13,8 +14,6 @@ import { artworkUrl } from "@/lib/appleMusicArtwork";
  * roadmap, not built as dead nav links returning empty pages — see
  * docs/APPLE_MUSIC_ARCHITECTURE.md §5 for why each is deferred. */
 const ROADMAP_ITEMS = [
-  { title: "AI Recommendations", detail: "Context-aware suggestions from your biometrics + listening history." },
-  { title: "Mood Playlists", detail: "Auto-built playlists for stress, focus, sleep, and recovery." },
   { title: "Automation Music", detail: "Let automations start music client-side when a rule fires." },
   { title: "Listening Analytics", detail: "Genre/mood breakdowns and wellness correlations." },
 ];
@@ -171,6 +170,8 @@ export default function MusicHomePage() {
   return (
     <div className="flex flex-col gap-6">
       <NowPlayingCard />
+
+      <RecommendedForNow />
 
       <div className="grid grid-cols-2 gap-3">
         <Link href="/dashboard/music/search">

@@ -33,6 +33,13 @@ export { computeWeeklyInsights } from './weeklyReport.js';
 export { generateRecommendations, type RecommendationCandidate, type PlaylistSkipStat } from './recommendations.js';
 export { computeWalkingStreak, computeMeditationStreak, type HabitStreakResult } from './habits.js';
 export {
+  recommendMusicCategory,
+  MUSIC_CATEGORY_KEYWORDS,
+  type MusicCategory,
+  type MusicRecommendationInput,
+  type MusicRecommendationResult,
+} from './musicIntelligence.js';
+export {
   computeHomeWellnessScore,
   computeOverallHomeWellnessScore,
   type RoomWellnessInput,
