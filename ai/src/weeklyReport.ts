@@ -87,3 +87,45 @@ export function computeWeeklyInsights(params: {
 
   return results;
 }
+
+/** Which direction counts as "improved" per wellness score — stress and
+ * fatigue are the two where lower is better, everything else is higher-
+ * is-better. Used only to pick a single "Biggest Improvement" headline
+ * for the weekly report, not for scoring itself. */
+const IMPROVEMENT_DIRECTION: Record<string, 'up' | 'down'> = {
+  stress: 'down',
+  fatigue: 'down',
+  recovery: 'up',
+  sleep: 'up',
+  energy: 'up',
+  focus: 'up',
+  relaxation: 'up',
+  overall: 'up',
+};
+
+export interface BiggestImprovementResult {
+  metric: string;
+  label: string;
+  /** Always positive — the improvement's real magnitude (delta, or
+   * -delta for a down-is-better metric). */
+  magnitude: number;
+}
+
+/** Picks the single wellness trend that improved the most this week —
+ * "Biggest Improvement" in the weekly report. Reuses the exact
+ * `wellnessTrends` output `computeWeeklyInsights` already computes,
+ * rather than a separate pass. Returns `null` if nothing improved (every
+ * trend flat or worsening) — never picks a negative "improvement". */
+export function computeBiggestImprovement(wellnessTrends: TrendResult[]): BiggestImprovementResult | null {
+  let best: BiggestImprovementResult | null = null;
+  for (const trend of wellnessTrends) {
+    const direction = IMPROVEMENT_DIRECTION[trend.metric];
+    if (!direction) continue;
+    const magnitude = direction === 'up' ? trend.delta : -trend.delta;
+    if (magnitude <= 0) continue;
+    if (!best || magnitude > best.magnitude) {
+      best = { metric: trend.metric, label: METRIC_LABELS[`wellness.${trend.metric}`] ?? trend.metric, magnitude };
+    }
+  }
+  return best;
+}

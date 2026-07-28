@@ -23,6 +23,11 @@ export const METRIC_LABELS: Record<string, string> = {
   focus: "Focus",
   relaxation: "Relaxation",
   overall: "Overall wellness",
+  // Weekly AI Report headline rows (workers/src/weeklyReportWorker.ts) —
+  // not a trend, so these render as a single summary line, no sparkline.
+  biggestImprovement: "Biggest improvement",
+  focusSessionCount: "Focus sessions",
+  bestHabit: "Best habit",
 };
 
 export const METRIC_UNITS: Record<string, string> = {

@@ -29,7 +29,7 @@ export {
 } from './wellness.js';
 export { explainTrigger, explainConflict, explainManualPause, explainRateLimit } from './explain.js';
 export { createNotification, shouldNotify, deliverNotification, type CreateNotificationInput } from './notificationExecutor.js';
-export { computeWeeklyInsights } from './weeklyReport.js';
+export { computeWeeklyInsights, computeBiggestImprovement, type BiggestImprovementResult } from './weeklyReport.js';
 export { generateRecommendations, type RecommendationCandidate, type PlaylistSkipStat } from './recommendations.js';
 export { computeWalkingStreak, computeMeditationStreak, type HabitStreakResult } from './habits.js';
 export {

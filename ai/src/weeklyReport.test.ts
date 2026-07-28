@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { NormalizedBiometricReading } from '@moodsync/shared';
-import { computeWeeklyInsights } from './weeklyReport.js';
+import { computeWeeklyInsights, computeBiggestImprovement } from './weeklyReport.js';
+import type { TrendResult } from './insights.js';
 
 function makeReading(overrides: Partial<NormalizedBiometricReading> = {}): NormalizedBiometricReading {
   return { provider: 'whoop', userId: 'user-1', timestamp: new Date().toISOString(), ...overrides };
@@ -60,5 +61,32 @@ describe('computeWeeklyInsights', () => {
     const stressRow = rows.find((r) => r.metric === 'wellness.stress');
     expect(stressRow).toBeDefined();
     expect(stressRow?.summary).toContain('Stress');
+  });
+});
+
+describe('computeBiggestImprovement', () => {
+  function trend(metric: string, delta: number): TrendResult {
+    const direction: TrendResult['direction'] = delta === 0 ? 'flat' : delta > 0 ? 'up' : 'down';
+    return { metric, current: 70, previous: 70 - delta, delta, direction };
+  }
+
+  it('returns null when nothing improved (stress rose, recovery fell)', () => {
+    const trends = [trend('stress', 10), trend('recovery', -5)];
+    expect(computeBiggestImprovement(trends)).toBeNull();
+  });
+
+  it('picks the metric with the largest positive improvement, accounting for direction', () => {
+    const trends = [
+      trend('recovery', 5), // up is good -> magnitude 5
+      trend('stress', -12), // down is good for stress -> magnitude 12
+    ];
+    const result = computeBiggestImprovement(trends);
+    expect(result?.metric).toBe('stress');
+    expect(result?.magnitude).toBe(12);
+  });
+
+  it('ignores metrics with no known improvement direction', () => {
+    const trends = [trend('unknownMetric', 50)];
+    expect(computeBiggestImprovement(trends)).toBeNull();
   });
 });
