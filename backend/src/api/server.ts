@@ -30,6 +30,7 @@ import meditationSessionRoutes from './routes/meditationSessions.js';
 import atlasRoutes from './routes/atlas.js';
 import googleCalendarRoutes from './routes/integrations/googleCalendar.js';
 import energyRoutes from './routes/energy.js';
+import focusSessionRoutes from './routes/focusSessions.js';
 
 export async function buildServer() {
   const app = Fastify({ loggerInstance: logger, trustProxy: true });
@@ -81,6 +82,7 @@ export async function buildServer() {
   await app.register(atlasRoutes, { prefix: '/api' });
   await app.register(googleCalendarRoutes, { prefix: '/api' });
   await app.register(energyRoutes, { prefix: '/api' });
+  await app.register(focusSessionRoutes, { prefix: '/api' });
 
   return app;
 }

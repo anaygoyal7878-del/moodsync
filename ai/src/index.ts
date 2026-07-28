@@ -56,3 +56,4 @@ export {
 } from './homeWellness.js';
 export { sendAtlasMessage, AtlasNotConfiguredError, type AtlasChatMessage } from './atlasChat.js';
 export { computeLiveEnergyMeter, type CaffeineLogInput, type LiveEnergyMeter } from './energyMeter.js';
+export { computeFocusSessionScore } from './focusScore.js';

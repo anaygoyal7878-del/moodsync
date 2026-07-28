@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Wind, Brain, Sunrise, Moon, Dumbbell, Cpu, OctagonPause, Plus } from "lucide-react";
+import { Wind, Brain, Sunrise, Moon, Dumbbell, Cpu, OctagonPause, Plus, Timer } from "lucide-react";
 
 /** One-tap shortcuts on the dashboard home. The five wellness actions
  * (Relaxation/Focus/Morning/Sleep/Workout) deep-link into RuleForm.tsx
@@ -109,6 +109,7 @@ export function QuickActions({ isPaused, luxury }: { isPaused: boolean; luxury?:
             luxury={luxury}
           />
         ))}
+        <CircleButton icon={Timer} label="Start Focus" href="/dashboard/focus" luxury={luxury} />
         <CircleButton icon={Cpu} label="Devices" href="/dashboard/devices" luxury={luxury} />
         <CircleButton icon={Plus} label="New rule" href="/dashboard/automation" luxury={luxury} />
         <CircleButton

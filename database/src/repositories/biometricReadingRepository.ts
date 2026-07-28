@@ -136,6 +136,19 @@ export const biometricReadingRepository = {
     return rows.map((row) => ({ id: row.id, reading: toNormalized(row) }));
   },
 
+  /** Heart rate samples within an arbitrary [start, end) window — what
+   * Focus Sessions uses to compute a completion focus score from HR
+   * stability (see ai/src/focusScore.ts). Unlike every other read here,
+   * this isn't a trailing "since N days ago" window; it's bounded on
+   * both ends since a session has a real start and end time. */
+  async listHeartRateInWindow(userId: string, start: Date, end: Date): Promise<number[]> {
+    const rows = await prisma.biometricReading.findMany({
+      where: { userId, timestamp: { gte: start, lte: end }, heartRate: { not: null } },
+      select: { heartRate: true },
+    });
+    return rows.map((r) => r.heartRate).filter((v): v is number => v !== null);
+  },
+
   /** Which users have synced anything in the window — the scheduled
    * weekly-report worker (workers/src/weeklyReportWorker.ts) only
    * touches users with real data instead of scanning every account. */

@@ -42,6 +42,7 @@ model User {
   locationEvents       LocationEvent[]
   meditationSessions   MeditationSession[]
   caffeineLogs         CaffeineLog[]
+  focusSessions        FocusSession[]
   appleMusicConnection AppleMusicConnection?
   calendarConnection   CalendarConnection?
   preferences          UserPreferences?
@@ -775,4 +776,28 @@ model CaffeineLog {
 
   @@index([userId, loggedAt])
   @@map("caffeine_logs")
+}
+
+/// A completed Focus Session — same client-reported trust model as
+/// MeditationSession (client-side timer only, logged only on natural
+/// completion, never on early stop/reset — see that model's comment).
+/// `focusScore` is computed server-side at completion time from heart
+/// rate stability during [startedAt, completedAt] (see
+/// ai/src/focusScore.ts) — null when too few heart rate samples existed
+/// in that window to compute one, never guessed. Distraction-detection
+/// and notification-silencing were explicitly scoped out for this
+/// round (no public API exists for a third-party app to silence
+/// notifications, and no distraction signal exists) — this model only
+/// ever represents "a focus timer ran," not "focus was verified."
+model FocusSession {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  durationMinutes Int
+  startedAt       DateTime
+  completedAt     DateTime @default(now())
+  focusScore      Int?
+
+  @@index([userId, completedAt])
+  @@map("focus_sessions")
 }
