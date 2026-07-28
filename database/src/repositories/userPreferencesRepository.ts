@@ -98,4 +98,43 @@ export const userPreferencesRepository = {
       update: { securityControlEnabled: enabled },
     });
   },
+
+  /** Null fields mean "not set" — every weather-dependent feature reads
+   * this and simply doesn't fire rather than guessing a location. See
+   * docs/WEATHER_INTEGRATION.md. */
+  async getWeatherLocation(userId: string): Promise<{ name: string; lat: number; lng: number } | null> {
+    const row = await prisma.userPreferences.findUnique({
+      where: { userId },
+      select: { weatherLocationName: true, weatherLat: true, weatherLng: true },
+    });
+    if (!row?.weatherLocationName || row.weatherLat === null || row.weatherLng === null) return null;
+    return { name: row.weatherLocationName, lat: row.weatherLat, lng: row.weatherLng };
+  },
+
+  async setWeatherLocation(userId: string, location: { name: string; lat: number; lng: number }): Promise<void> {
+    await prisma.userPreferences.upsert({
+      where: { userId },
+      create: { userId, weatherLocationName: location.name, weatherLat: location.lat, weatherLng: location.lng },
+      update: { weatherLocationName: location.name, weatherLat: location.lat, weatherLng: location.lng },
+    });
+  },
+
+  async getSleepTempRangeC(userId: string): Promise<{ min: number; max: number } | null> {
+    const row = await prisma.userPreferences.findUnique({
+      where: { userId },
+      select: { sleepTempMinC: true, sleepTempMaxC: true },
+    });
+    if (row?.sleepTempMinC === null || row?.sleepTempMinC === undefined || row?.sleepTempMaxC === null || row?.sleepTempMaxC === undefined) {
+      return null;
+    }
+    return { min: row.sleepTempMinC, max: row.sleepTempMaxC };
+  },
+
+  async setSleepTempRangeC(userId: string, range: { min: number; max: number }): Promise<void> {
+    await prisma.userPreferences.upsert({
+      where: { userId },
+      create: { userId, sleepTempMinC: range.min, sleepTempMaxC: range.max },
+      update: { sleepTempMinC: range.min, sleepTempMaxC: range.max },
+    });
+  },
 };

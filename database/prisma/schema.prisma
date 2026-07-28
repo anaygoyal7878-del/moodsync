@@ -632,6 +632,21 @@ model UserPreferences {
   /// its way into the queue. Flipping this on is the only way
   /// security-accessory control (locks/garage/alarm) ever activates.
   securityControlEnabled Boolean @default(false)
+  /// User-set free-text location (e.g. "Austin, TX"), resolved once via
+  /// Open-Meteo's geocoding API into weatherLat/weatherLng below — see
+  /// docs/WEATHER_INTEGRATION.md. Null means no location set; weather
+  /// features (Music Intelligence's "Rainy Day" category, Smart
+  /// Notifications) simply don't fire rather than guessing a location.
+  weatherLocationName    String?
+  weatherLat             Float?
+  weatherLng             Float?
+  /// User's preferred bedroom temperature range for sleep, in Celsius —
+  /// backs the "bedroom is warmer than your preferred sleep range" smart
+  /// notification (compares against HomeRoomSnapshot.temperatureC for
+  /// the room named "Bedroom"/matching sleepRoomName). Both null means
+  /// the notification never fires — no fabricated default range.
+  sleepTempMinC          Float?
+  sleepTempMaxC          Float?
   updatedAt              DateTime  @updatedAt
 
   @@map("user_preferences")

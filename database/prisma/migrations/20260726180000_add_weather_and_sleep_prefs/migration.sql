@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "user_preferences" ADD COLUMN "weatherLocationName" TEXT,
+ADD COLUMN "weatherLat" DOUBLE PRECISION,
+ADD COLUMN "weatherLng" DOUBLE PRECISION,
+ADD COLUMN "sleepTempMinC" DOUBLE PRECISION,
+ADD COLUMN "sleepTempMaxC" DOUBLE PRECISION;

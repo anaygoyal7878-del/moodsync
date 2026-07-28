@@ -8,6 +8,7 @@ import { restartProductTour } from "@/components/demo/tour/ProductTour";
 import { WEARABLE_LABELS, SMART_HOME_LABELS, PROVIDER_ICONS } from "@/lib/providerDisplay";
 import { DASHBOARD_SECTIONS } from "@/lib/dashboardSections";
 import { BOTTOM_NAV_TABS } from "@/components/luxury/LuxuryBottomNav";
+import { LuxuryWeatherLocationSetting } from "@/components/luxury/LuxuryWeatherLocationSetting";
 import type { ConnectionsResponse } from "@/lib/types";
 
 /** Every dashboard page the bottom nav has no room for. Derived from the
@@ -34,7 +35,15 @@ interface MeData {
  * real pricing copy), and the Achievements grid (no gamification
  * system exists). The avatar/name, Account Settings, Connected
  * Integrations, and Log Out are all real. */
-export function LuxuryProfile({ me, connections }: { me: MeData; connections: ConnectionsResponse }) {
+export function LuxuryProfile({
+  me,
+  connections,
+  weatherLocationName,
+}: {
+  me: MeData;
+  connections: ConnectionsResponse;
+  weatherLocationName: string | null;
+}) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -137,6 +146,8 @@ export function LuxuryProfile({ me, connections }: { me: MeData; connections: Co
           })}
         </div>
       </section>
+
+      <LuxuryWeatherLocationSetting initialLocationName={weatherLocationName} />
 
       {/* Account Settings — real /api/me fields only; no profile-editing
        * feature exists yet, so rows are display-only (matching the

@@ -21,6 +21,7 @@
     "@moodsync/integration-fitbit": "*",
     "@moodsync/integration-hue": "*",
     "@moodsync/integration-spotify": "*",
+    "@moodsync/integration-weather": "*",
     "@moodsync/integration-whoop": "*",
     "@moodsync/shared": "*",
     "@node-rs/argon2": "^2.0.2",

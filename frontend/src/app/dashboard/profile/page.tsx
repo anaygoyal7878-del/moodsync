@@ -14,9 +14,10 @@ interface MeResponse {
  * vs. dropped. Same /api/me the dashboard layout's auth gate already
  * calls, plus /api/connections for the Integrations list. */
 export default async function ProfilePage() {
-  const [meResult, connectionsResult] = await Promise.all([
+  const [meResult, connectionsResult, weatherLocationResult] = await Promise.all([
     backendFetch<MeResponse>("/api/me"),
     backendFetch<ConnectionsResponse>("/api/connections"),
+    backendFetch<{ location: { name: string; lat: number; lng: number } | null }>("/api/weather/location"),
   ]);
 
   if (!meResult.ok) {
@@ -28,6 +29,7 @@ export default async function ProfilePage() {
   }
 
   const connections: ConnectionsResponse = connectionsResult.ok ? connectionsResult.data : { wearables: [], smartHome: [], appleMusic: null };
+  const weatherLocationName = weatherLocationResult.ok ? (weatherLocationResult.data.location?.name ?? null) : null;
 
-  return <LuxuryProfile me={meResult.data} connections={connections} />;
+  return <LuxuryProfile me={meResult.data} connections={connections} weatherLocationName={weatherLocationName} />;
 }
