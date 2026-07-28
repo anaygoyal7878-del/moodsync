@@ -22,6 +22,7 @@ import preferencesRoutes from './routes/preferences.js';
 import deviceRoutes from './routes/devices.js';
 import homeRoutes from './routes/home.js';
 import weatherRoutes from './routes/weather.js';
+import habitRoutes from './routes/habits.js';
 import recommendationRoutes from './routes/recommendations.js';
 import locationEventRoutes from './routes/locationEvents.js';
 import meditationSessionRoutes from './routes/meditationSessions.js';
@@ -69,6 +70,7 @@ export async function buildServer() {
   await app.register(deviceRoutes, { prefix: '/api' });
   await app.register(homeRoutes, { prefix: '/api' });
   await app.register(weatherRoutes, { prefix: '/api' });
+  await app.register(habitRoutes, { prefix: '/api' });
   await app.register(recommendationRoutes, { prefix: '/api' });
   await app.register(locationEventRoutes, { prefix: '/api' });
   await app.register(meditationSessionRoutes, { prefix: '/api' });

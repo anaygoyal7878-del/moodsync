@@ -251,3 +251,16 @@ export interface HomeSnapshotEntry {
 export interface HomeSnapshotResponse {
   snapshot: HomeSnapshotEntry | null;
 }
+
+/** Habit Engine — scoped to the two habits with a real signal (steps,
+ * MeditationSession). See docs/HABIT_ENGINE.md. */
+export interface HabitStreakEntry {
+  habit: "walking" | "meditation";
+  currentStreakDays: number;
+  consistencyPct: number | null;
+  lastMetDate: string | null;
+}
+
+export interface HabitsResponse {
+  habits: HabitStreakEntry[];
+}

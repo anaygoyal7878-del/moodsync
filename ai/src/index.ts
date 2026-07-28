@@ -31,4 +31,5 @@ export { explainTrigger, explainConflict, explainManualPause, explainRateLimit }
 export { createNotification, shouldNotify, type CreateNotificationInput } from './notificationExecutor.js';
 export { computeWeeklyInsights } from './weeklyReport.js';
 export { generateRecommendations, type RecommendationCandidate, type PlaylistSkipStat } from './recommendations.js';
+export { computeWalkingStreak, computeMeditationStreak, type HabitStreakResult } from './habits.js';
 export { sendAtlasMessage, AtlasNotConfiguredError, type AtlasChatMessage } from './atlasChat.js';

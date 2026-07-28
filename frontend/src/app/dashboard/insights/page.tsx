@@ -1,13 +1,14 @@
 import { backendFetch } from "@/lib/api";
 import { LuxuryInsights } from "@/components/luxury/LuxuryInsights";
-import type { InsightsResponse, RecommendationEntry } from "@/lib/types";
+import type { InsightsResponse, RecommendationEntry, HabitsResponse } from "@/lib/types";
 import type { NormalizedBiometricReading } from "@moodsync/shared";
 
 export default async function InsightsPage() {
-  const [insightsResult, historyResult, recommendationsResult] = await Promise.all([
+  const [insightsResult, historyResult, recommendationsResult, habitsResult] = await Promise.all([
     backendFetch<InsightsResponse>("/api/insights?days=14"),
     backendFetch<{ readings: NormalizedBiometricReading[] }>("/api/biometrics/history?days=7"),
     backendFetch<{ recommendations: RecommendationEntry[] }>("/api/recommendations"),
+    backendFetch<HabitsResponse>("/api/habits"),
   ]);
 
   const insights: InsightsResponse = insightsResult.ok
@@ -15,6 +16,7 @@ export default async function InsightsPage() {
     : { trends: [], wellnessTrends: [], automationEffectiveness: [], sceneUsage: [] };
   const history = historyResult.ok ? historyResult.data.readings : [];
   const recommendations = recommendationsResult.ok ? recommendationsResult.data.recommendations : [];
+  const habits = habitsResult.ok ? habitsResult.data.habits : [];
 
   return (
     <LuxuryInsights
@@ -24,6 +26,7 @@ export default async function InsightsPage() {
       automationEffectiveness={insights.automationEffectiveness}
       recommendations={recommendations}
       sceneUsage={insights.sceneUsage}
+      habits={habits}
     />
   );
 }

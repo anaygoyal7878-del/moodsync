@@ -3,7 +3,11 @@ import { Brain } from "lucide-react";
 import { LuxuryGauge } from "@/components/luxury/LuxuryGauge";
 import { LuxuryWeekBars } from "@/components/luxury/LuxuryWeekBars";
 import { metricLabel } from "@/lib/metrics";
-import type { TrendResult, AutomationEffectivenessResult, RecommendationEntry, SceneUsageResult } from "@/lib/types";
+import { Footprints, Sparkle } from "lucide-react";
+import type { TrendResult, AutomationEffectivenessResult, RecommendationEntry, SceneUsageResult, HabitStreakEntry } from "@/lib/types";
+
+const HABIT_LABEL: Record<HabitStreakEntry["habit"], string> = { walking: "Walking", meditation: "Meditation" };
+const HABIT_ICON: Record<HabitStreakEntry["habit"], typeof Footprints> = { walking: Footprints, meditation: Sparkle };
 import type { NormalizedBiometricReading } from "@moodsync/shared";
 
 const DIRECTION_LABEL: Record<TrendResult["direction"], string> = { up: "Rising", down: "Falling", flat: "Steady" };
@@ -26,6 +30,7 @@ export function LuxuryInsights({
   automationEffectiveness,
   recommendations,
   sceneUsage = [],
+  habits = [],
 }: {
   history: NormalizedBiometricReading[];
   wellnessTrends: TrendResult[];
@@ -33,6 +38,7 @@ export function LuxuryInsights({
   automationEffectiveness: AutomationEffectivenessResult[];
   recommendations: RecommendationEntry[];
   sceneUsage?: SceneUsageResult[];
+  habits?: HabitStreakEntry[];
 }) {
   const overall = findTrend(wellnessTrends, "overall");
   const stress = findTrend(wellnessTrends, "stress");
@@ -185,6 +191,47 @@ export function LuxuryInsights({
                 </p>
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* Habit Engine — walking (steps) + meditation (MeditationSession)
+       * streaks only, the two habits with a real signal today. See
+       * docs/HABIT_ENGINE.md for why hydration/sunlight/reading/
+       * stretching/screen-time/bedtime aren't tracked yet (no sensor,
+       * no manual-logging UI built this round). */}
+      {habits.length > 0 && (
+        <section className="lux-stagger-4 flex flex-col gap-3">
+          <h2 className="font-luxury-display px-1 text-[16px] font-semibold" style={{ color: "var(--lux-ink)" }}>
+            Habits
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            {habits.map((h) => {
+              const Icon = HABIT_ICON[h.habit];
+              return (
+                <div
+                  key={h.habit}
+                  className="flex flex-col gap-2 rounded-2xl p-4"
+                  style={{ background: "var(--lux-bg-card)", border: "1px solid var(--lux-hairline)" }}
+                >
+                  <div className="flex items-center gap-2">
+                    <Icon size={15} style={{ color: "var(--lux-sage)" }} aria-hidden="true" />
+                    <span className="text-[12px] font-medium" style={{ color: "var(--lux-ink)" }}>
+                      {HABIT_LABEL[h.habit]}
+                    </span>
+                  </div>
+                  <p className="tabular font-luxury-display text-[24px] font-semibold" style={{ color: "var(--lux-ink)" }}>
+                    {h.currentStreakDays}
+                    <span className="ml-1 text-[12px] font-normal" style={{ color: "var(--lux-muted)" }}>
+                      day{h.currentStreakDays === 1 ? "" : "s"}
+                    </span>
+                  </p>
+                  <p className="text-[11px]" style={{ color: "var(--lux-muted)" }}>
+                    {h.consistencyPct === null ? "No data yet" : `${h.consistencyPct}% of last 30 days`}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}
