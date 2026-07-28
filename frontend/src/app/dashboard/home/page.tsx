@@ -9,7 +9,16 @@ export default async function HomePage() {
   ]);
 
   const snapshot = snapshotResult.ok ? snapshotResult.data.snapshot : null;
+  const roomWellness = snapshotResult.ok ? snapshotResult.data.roomWellness : [];
+  const overallWellness = snapshotResult.ok ? snapshotResult.data.overallWellness : undefined;
   const securityControlEnabled = securityResult.ok ? securityResult.data.enabled : false;
 
-  return <LuxuryHome snapshot={snapshot} securityControlEnabled={securityControlEnabled} />;
+  return (
+    <LuxuryHome
+      snapshot={snapshot}
+      securityControlEnabled={securityControlEnabled}
+      roomWellness={roomWellness}
+      overallWellness={overallWellness}
+    />
+  );
 }

@@ -248,8 +248,26 @@ export interface HomeSnapshotEntry {
   scenes: HomeSceneEntry[];
 }
 
+/** Home Wellness (Environment) Score — see ai/src/homeWellness.ts.
+ * Noise/Lighting/Diffuser deliberately excluded, no sensor exists. */
+export interface HomeScoreEntry {
+  value: number | null;
+  basis: "evidence-informed-heuristic" | "heuristic";
+}
+
+export interface RoomWellnessEntry {
+  roomId: string;
+  name: string;
+  temperatureScore: HomeScoreEntry;
+  humidityScore: HomeScoreEntry;
+  airQualityScore: HomeScoreEntry;
+  overallScore: HomeScoreEntry;
+}
+
 export interface HomeSnapshotResponse {
   snapshot: HomeSnapshotEntry | null;
+  roomWellness: RoomWellnessEntry[];
+  overallWellness: HomeScoreEntry;
 }
 
 /** Habit Engine — scoped to the two habits with a real signal (steps,

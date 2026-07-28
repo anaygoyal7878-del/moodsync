@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, DoorOpen, ShieldAlert, Flame, Droplets, RectangleHorizontal, Bell, Plug, Lightbulb, Thermometer, HelpCircle, Star, Play } from "lucide-react";
-import type { HomeSnapshotEntry, HomeAccessoryEntry, HomeAccessoryCategory, HomeSceneEntry } from "@/lib/types";
+import type { HomeSnapshotEntry, HomeAccessoryEntry, HomeAccessoryCategory, HomeSceneEntry, RoomWellnessEntry, HomeScoreEntry } from "@/lib/types";
 
 const CATEGORY_ICON: Record<HomeAccessoryCategory, typeof Lock> = {
   LOCK: Lock,
@@ -128,7 +128,17 @@ function SceneCard({ scene, onChanged }: { scene: HomeSceneEntry; onChanged: () 
   );
 }
 
-export function LuxuryHome({ snapshot, securityControlEnabled }: { snapshot: HomeSnapshotEntry | null; securityControlEnabled: boolean }) {
+export function LuxuryHome({
+  snapshot,
+  securityControlEnabled,
+  roomWellness = [],
+  overallWellness,
+}: {
+  snapshot: HomeSnapshotEntry | null;
+  securityControlEnabled: boolean;
+  roomWellness?: RoomWellnessEntry[];
+  overallWellness?: HomeScoreEntry;
+}) {
   const router = useRouter();
   const [securityBusy, setSecurityBusy] = useState(false);
   const [securityEnabled, setSecurityEnabled] = useState(securityControlEnabled);
@@ -192,6 +202,9 @@ export function LuxuryHome({ snapshot, securityControlEnabled }: { snapshot: Hom
             { label: "Accessories", value: snapshot.accessories.length },
             { label: "Online", value: onlineCount },
             { label: "Offline", value: offlineCount },
+            ...(overallWellness?.value !== null && overallWellness?.value !== undefined
+              ? [{ label: "Home Wellness", value: overallWellness.value }]
+              : []),
           ].map((stat) => (
             <div key={stat.label} className="rounded-2xl p-3 text-center" style={{ background: "var(--lux-bg-card-2)" }}>
               <p className="tabular font-luxury-display text-[22px] font-semibold" style={{ color: "var(--lux-ink)" }}>
@@ -254,11 +267,22 @@ export function LuxuryHome({ snapshot, securityControlEnabled }: { snapshot: Hom
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {snapshot.rooms.map((room) => {
               const devicesInRoom = snapshot.accessories.filter((a) => a.roomId === room.roomId);
+              const wellness = roomWellness.find((w) => w.roomId === room.roomId);
               return (
                 <div key={room.id} className="rounded-2xl p-4" style={{ background: "var(--lux-bg-card)", border: "1px solid var(--lux-hairline)" }}>
-                  <h3 className="mb-2 text-[14px] font-semibold" style={{ color: "var(--lux-ink)" }}>
-                    {room.name}
-                  </h3>
+                  <div className="mb-2 flex items-center justify-between">
+                    <h3 className="text-[14px] font-semibold" style={{ color: "var(--lux-ink)" }}>
+                      {room.name}
+                    </h3>
+                    {wellness?.overallScore.value !== null && wellness?.overallScore.value !== undefined && (
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[11px] font-medium"
+                        style={{ background: "rgba(95,184,120,0.12)", color: "var(--lux-sage)" }}
+                      >
+                        {wellness.overallScore.value}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-3 text-[12px]" style={{ color: "var(--lux-muted)" }}>
                     <span>{room.temperatureC !== null ? `${Math.round(room.temperatureC)}°C` : "No temp sensor"}</span>
                     <span>{room.humidityPct !== null ? `${Math.round(room.humidityPct)}% humidity` : "No humidity sensor"}</span>

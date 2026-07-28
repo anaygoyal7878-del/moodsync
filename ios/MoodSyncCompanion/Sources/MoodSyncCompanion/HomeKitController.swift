@@ -300,8 +300,31 @@ public final class HomeKitController: NSObject, HomeKitControlling, HMHomeManage
             throw HomeKitError.noHomeConfigured
         }
 
-        let rooms = home.rooms.map { room in
-            HomeSnapshotDTO.Room(roomId: room.uniqueIdentifier.uuidString, name: room.name)
+        // Rooms have no sensor characteristics of their own — temperature/
+        // humidity/air-quality live on individual accessories located in
+        // the room (a room with a temperature-sensing thermostat gets a
+        // real reading; a room with no sensor accessory stays nil rather
+        // than guessed). This was previously a gap: HomeSnapshotDTO.Room
+        // had these fields but nothing populated them — see
+        // docs/HOME_HEALTH_SCORE.md.
+        var rooms: [HomeSnapshotDTO.Room] = []
+        for room in home.rooms {
+            let accessoriesInRoom = home.accessories.filter { $0.room?.uniqueIdentifier == room.uniqueIdentifier }
+            var temperatureC: Double?
+            var humidityPct: Double?
+            var airQuality: String?
+            for accessory in accessoriesInRoom {
+                if temperatureC == nil, let t = await readNumericCharacteristic(HMCharacteristicTypeCurrentTemperature, in: accessory) {
+                    temperatureC = t
+                }
+                if humidityPct == nil, let h = await readNumericCharacteristic(HMCharacteristicTypeCurrentRelativeHumidity, in: accessory) {
+                    humidityPct = h
+                }
+                if airQuality == nil, let a = await readValue(for: HMCharacteristicTypeAirQuality, in: accessory) {
+                    airQuality = "\(a)"
+                }
+            }
+            rooms.append(HomeSnapshotDTO.Room(roomId: room.uniqueIdentifier.uuidString, name: room.name, temperatureC: temperatureC, humidityPct: humidityPct, airQuality: airQuality))
         }
 
         let zones = home.zones.map { zone in
@@ -432,6 +455,27 @@ public final class HomeKitController: NSObject, HomeKitControlling, HMHomeManage
         guard let characteristic = findCharacteristic(type, in: accessory) else { return nil }
         guard let number = await readValue(characteristic) as? NSNumber else { return nil }
         return number.intValue
+    }
+
+    /// Used for `HMCharacteristicTypeCurrentTemperature` (Celsius, per
+    /// HomeKit's own unit convention — confirmed real HomeKit API
+    /// behavior, not independently re-verified against a live account
+    /// this session) and `HMCharacteristicTypeCurrentRelativeHumidity`
+    /// (percent). Returns `nil` for an accessory with no such
+    /// characteristic rather than 0 — a room with no temperature sensor
+    /// has "unknown," not "0°C."
+    private func readNumericCharacteristic(_ type: String, in accessory: HMAccessory) async -> Double? {
+        guard let characteristic = findCharacteristic(type, in: accessory) else { return nil }
+        guard let number = await readValue(characteristic) as? NSNumber else { return nil }
+        return number.doubleValue
+    }
+
+    /// Generic single-value read by characteristic type, accessory-wide
+    /// — used where the caller only needs the raw value (e.g. air
+    /// quality's enum-like value) rather than a specific numeric type.
+    private func readValue(for type: String, in accessory: HMAccessory) async -> Any? {
+        guard let characteristic = findCharacteristic(type, in: accessory) else { return nil }
+        return await readValue(characteristic)
     }
 
     /// Best-effort primary-state read for Home Safety categories

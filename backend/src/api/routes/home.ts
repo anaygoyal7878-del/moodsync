@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { homeSnapshotRepository, pendingDeviceCommandRepository } from '@moodsync/database';
+import { computeHomeWellnessScore, computeOverallHomeWellnessScore } from '@moodsync/ai';
 
 const HOME_ACCESSORY_CATEGORIES = [
   'LOCK',
@@ -78,7 +79,14 @@ export default async function homeRoutes(app: FastifyInstance) {
 
   app.get('/home', { preHandler: app.authenticate }, async (request, reply) => {
     const snapshot = await homeSnapshotRepository.getForUser(request.userId!);
-    return reply.send({ snapshot });
+    // Home Wellness (Environment) Score — computed on read, not cached,
+    // same "always fresh from raw data" convention as the personal
+    // wellness scores in ai/src/wellness.ts. Noise/Lighting/Diffuser are
+    // deliberately not included — no sensor for any of them exists in
+    // the snapshot. See docs/HOME_HEALTH_SCORE.md.
+    const roomWellness = snapshot?.rooms.map((room) => computeHomeWellnessScore(room)) ?? [];
+    const overallWellness = snapshot ? computeOverallHomeWellnessScore(snapshot.rooms) : { value: null, basis: 'evidence-informed-heuristic' as const };
+    return reply.send({ snapshot, roomWellness, overallWellness });
   });
 
   app.post<{ Params: { id: string } }>(
