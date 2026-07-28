@@ -50,10 +50,22 @@ export interface AppleMusicConnectionSummary {
   lastSyncedAt: string | null;
 }
 
+/** Not a SmartHomeConnectionSummary either — same "own domain, own row
+ * shape" rationale as AppleMusicConnectionSummary, but this one *does*
+ * use the standard OAuth connect/callback/disconnect flow (see
+ * CalendarConnection's schema doc comment), it just has no `devices`
+ * concept. */
+export interface CalendarConnectionSummary {
+  id: string;
+  status: ConnectionStatus;
+  lastSyncedAt: string | null;
+}
+
 export interface ConnectionsResponse {
   wearables: WearableConnectionSummary[];
   smartHome: SmartHomeConnectionSummary[];
   appleMusic: AppleMusicConnectionSummary | null;
+  calendar: CalendarConnectionSummary | null;
 }
 
 export type AutomationOutcome =

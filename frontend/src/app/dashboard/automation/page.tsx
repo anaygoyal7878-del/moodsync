@@ -10,7 +10,7 @@ export default async function AutomationPage() {
   ]);
   const connections: ConnectionsResponse = connectionsResult.ok
     ? connectionsResult.data
-    : { wearables: [], smartHome: [], appleMusic: null };
+    : { wearables: [], smartHome: [], appleMusic: null, calendar: null };
   const rules = rulesResult.ok ? rulesResult.data.rules : [];
   const automationHistory = automationHistoryResult.ok ? automationHistoryResult.data.entries : [];
   const devices = connections.smartHome.flatMap((c) => c.devices);

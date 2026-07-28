@@ -63,7 +63,7 @@ export default async function DashboardHomePage() {
   const wellnessTrends = insightsResult.ok ? insightsResult.data.wellnessTrends : [];
   const overallTrend = wellnessTrends.find((t) => t.metric === "overall");
   const history = historyResult.ok ? historyResult.data.readings : [];
-  const connections: ConnectionsResponse = connectionsResult.ok ? connectionsResult.data : { wearables: [], smartHome: [], appleMusic: null };
+  const connections: ConnectionsResponse = connectionsResult.ok ? connectionsResult.data : { wearables: [], smartHome: [], appleMusic: null, calendar: null };
   const deviceCount = connections.smartHome.flatMap((c) => c.devices).length;
   const rules = rulesResult.ok ? rulesResult.data.rules : [];
   const activeRuleCount = rules.filter((r) => r.enabled).length;

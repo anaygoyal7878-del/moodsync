@@ -46,6 +46,10 @@ const envSchema = z.object({
   SPOTIFY_CLIENT_SECRET: z.string().optional(),
   SPOTIFY_REDIRECT_URI: z.string().optional(),
 
+  GOOGLE_CALENDAR_CLIENT_ID: z.string().optional(),
+  GOOGLE_CALENDAR_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CALENDAR_REDIRECT_URI: z.string().optional(),
+
   // Apple's MusicKit — unlike every OAuth provider above, there's no
   // client secret and no redirect URI: MoodSync authenticates itself to
   // Apple by signing its own developer token (a JWT) with a private key

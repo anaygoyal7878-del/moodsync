@@ -42,6 +42,7 @@ model User {
   locationEvents       LocationEvent[]
   meditationSessions   MeditationSession[]
   appleMusicConnection AppleMusicConnection?
+  calendarConnection   CalendarConnection?
   preferences          UserPreferences?
   homeSnapshot         HomeSnapshot?
 
@@ -122,6 +123,7 @@ model OAuthToken {
 
   wearableConnection  WearableConnection?
   smartHomeConnection SmartHomeConnection?
+  calendarConnection  CalendarConnection?
 
   @@map("oauth_tokens")
 }
@@ -204,6 +206,26 @@ model AppleMusicConnection {
   updatedAt                DateTime         @updatedAt
 
   @@map("apple_music_connections")
+}
+
+/// Read-only Google Calendar connection — the only calendar integration
+/// in this codebase (Adaptive Study Planner, Stress Timeline, Burnout
+/// Detection, Social Battery all read from this). Standard OAuth pair,
+/// same shape as WearableConnection/SmartHomeConnection, but a distinct
+/// model since calendar is a genuinely third domain — not a wearable,
+/// not a smart-home device. See docs/GOOGLE_CALENDAR_INTEGRATION.md.
+model CalendarConnection {
+  id             String           @id @default(uuid())
+  userId         String           @unique
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status         ConnectionStatus @default(ACTIVE)
+  oauthTokenId   String?          @unique
+  oauthToken     OAuthToken?      @relation(fields: [oauthTokenId], references: [id], onDelete: SetNull)
+  lastSyncedAt   DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@map("calendar_connections")
 }
 
 model ConnectedDevice {

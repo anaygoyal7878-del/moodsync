@@ -1,4 +1,4 @@
-import { HeartPulse, Apple, Watch, Lightbulb, Music, Music2, Mic } from "lucide-react";
+import { HeartPulse, Apple, Watch, Lightbulb, Music, Music2, Mic, Calendar } from "lucide-react";
 
 /** Shared provider label/icon mappings — single source of truth so
  * ConnectionsSection.tsx (desktop connections page) and the luxury
@@ -18,6 +18,7 @@ export const SMART_HOME_LABELS: Record<string, string> = {
   ECOBEE: "Ecobee",
   ALEXA: "Amazon Alexa",
   APPLE_MUSIC: "Apple Music",
+  GOOGLE_CALENDAR: "Google Calendar",
 };
 
 /** Neutral category pictograms, not brand marks — lucide has no literal
@@ -31,4 +32,5 @@ export const PROVIDER_ICONS: Record<string, typeof HeartPulse> = {
   SPOTIFY: Music,
   ALEXA: Mic,
   APPLE_MUSIC: Music2,
+  GOOGLE_CALENDAR: Calendar,
 };

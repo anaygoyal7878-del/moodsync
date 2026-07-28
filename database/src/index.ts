@@ -38,3 +38,4 @@ export {
   type HomeSnapshotAccessoryInput,
   type HomeSnapshotSceneInput,
 } from './repositories/homeSnapshotRepository.js';
+export { calendarConnectionRepository } from './repositories/calendarConnectionRepository.js';

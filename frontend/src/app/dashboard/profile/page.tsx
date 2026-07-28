@@ -29,7 +29,7 @@ export default async function ProfilePage() {
     );
   }
 
-  const connections: ConnectionsResponse = connectionsResult.ok ? connectionsResult.data : { wearables: [], smartHome: [], appleMusic: null };
+  const connections: ConnectionsResponse = connectionsResult.ok ? connectionsResult.data : { wearables: [], smartHome: [], appleMusic: null, calendar: null };
   const weatherLocationName = weatherLocationResult.ok ? (weatherLocationResult.data.location?.name ?? null) : null;
   const sleepTempRange = sleepTempRangeResult.ok ? sleepTempRangeResult.data.range : null;
 

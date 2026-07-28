@@ -1,7 +1,7 @@
 import { BACKEND_API_URL } from "@/lib/env";
 import { getAccessToken } from "@/lib/session";
 
-const CONNECTABLE_PROVIDERS = ["whoop", "hue", "google-health", "spotify"] as const;
+const CONNECTABLE_PROVIDERS = ["whoop", "hue", "google-health", "spotify", "google-calendar"] as const;
 type ConnectableProvider = (typeof CONNECTABLE_PROVIDERS)[number];
 
 function isConnectable(value: string): value is ConnectableProvider {

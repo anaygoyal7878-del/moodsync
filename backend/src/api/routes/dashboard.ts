@@ -4,6 +4,7 @@ import {
   wearableConnectionRepository,
   smartHomeConnectionRepository,
   appleMusicConnectionRepository,
+  calendarConnectionRepository,
   biometricReadingRepository,
   automationRuleRepository,
   automationExecutionLogRepository,
@@ -21,13 +22,17 @@ const insightsHistoryQuerySchema = z.object({
 
 export default async function dashboardRoutes(app: FastifyInstance) {
   app.get('/connections', { preHandler: app.authenticate }, async (request, reply) => {
-    const [wearables, smartHome, appleMusic] = await Promise.all([
+    const [wearables, smartHome, appleMusic, calendar] = await Promise.all([
       wearableConnectionRepository.listForUser(request.userId!),
       smartHomeConnectionRepository.listForUser(request.userId!),
       // Not a SmartHomeConnection row — see AppleMusicConnection's schema
       // doc comment for why this is its own table and its own parallel
       // fetch here, rather than folding into the `smartHome` array above.
       appleMusicConnectionRepository.findByUser(request.userId!),
+      // Same rationale as appleMusic above — CalendarConnection is a
+      // third domain (not a wearable, not a smart-home device), one row
+      // per user, its own parallel fetch.
+      calendarConnectionRepository.findByUser(request.userId!),
     ]);
 
     return reply.send({
@@ -60,6 +65,13 @@ export default async function dashboardRoutes(app: FastifyInstance) {
             status: appleMusic.status,
             storefront: appleMusic.storefront,
             lastSyncedAt: appleMusic.lastSyncedAt,
+          }
+        : null,
+      calendar: calendar
+        ? {
+            id: calendar.id,
+            status: calendar.status,
+            lastSyncedAt: calendar.lastSyncedAt,
           }
         : null,
     });

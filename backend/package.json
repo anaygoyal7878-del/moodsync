@@ -19,6 +19,7 @@
     "@moodsync/database": "*",
     "@moodsync/integration-alexa": "*",
     "@moodsync/integration-fitbit": "*",
+    "@moodsync/integration-google-calendar": "*",
     "@moodsync/integration-hue": "*",
     "@moodsync/integration-spotify": "*",
     "@moodsync/integration-weather": "*",

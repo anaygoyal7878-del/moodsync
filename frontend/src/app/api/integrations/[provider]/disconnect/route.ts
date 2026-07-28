@@ -9,6 +9,7 @@ const DISCONNECTABLE_PROVIDERS = [
   "alexa",
   "amazfit",
   "apple-music",
+  "google-calendar",
 ] as const;
 type DisconnectableProvider = (typeof DISCONNECTABLE_PROVIDERS)[number];
 

@@ -5,7 +5,12 @@ import type { SmartHomeProviderId, WearableProviderId } from '@moodsync/shared';
 const stateSecret = new TextEncoder().encode(env.OAUTH_STATE_SECRET);
 const STATE_TTL = '10m'; // generous enough for a user to complete a provider's consent screen
 
-export type OAuthProviderId = WearableProviderId | SmartHomeProviderId;
+/** 'google_calendar' isn't a wearable or smart-home provider — it's a
+ * third OAuth-connected domain (see CalendarConnection in schema.prisma)
+ * — added directly to this union rather than growing
+ * WearableProviderId/SmartHomeProviderId to cover a domain neither
+ * represents. */
+export type OAuthProviderId = WearableProviderId | SmartHomeProviderId | 'google_calendar';
 
 export interface OAuthStatePayload {
   userId: string;

@@ -7,7 +7,13 @@ import { AppleMusicConnectButton } from "./AppleMusicConnectButton";
 import { ConnectionStatusBadge, needsReconnect } from "./ConnectionStatusBadge";
 import { ALEXA_VOICE_COMMANDS } from "@/lib/alexaCommands";
 import { WEARABLE_LABELS, SMART_HOME_LABELS, PROVIDER_ICONS } from "@/lib/providerDisplay";
-import type { ConnectionsResponse, WearableConnectionSummary, SmartHomeConnectionSummary, AppleMusicConnectionSummary } from "@/lib/types";
+import type {
+  ConnectionsResponse,
+  WearableConnectionSummary,
+  SmartHomeConnectionSummary,
+  AppleMusicConnectionSummary,
+  CalendarConnectionSummary,
+} from "@/lib/types";
 
 function ProviderIcon({ provider }: { provider: string }) {
   const Icon = PROVIDER_ICONS[provider];
@@ -395,6 +401,56 @@ function AppleMusicCard({ connection }: { connection: AppleMusicConnectionSummar
   );
 }
 
+/** Read-only — reads event times/titles for Adaptive Study Planner /
+ * Stress Timeline / Burnout Detection / Social Battery. Never writes to
+ * a user's calendar. */
+function CalendarCard({ connection }: { connection: CalendarConnectionSummary | null }) {
+  const isActive = connection?.status === "ACTIVE";
+
+  return (
+    <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <ProviderIcon provider="GOOGLE_CALENDAR" />
+          <p className="text-sm font-medium">{SMART_HOME_LABELS.GOOGLE_CALENDAR}</p>
+        </div>
+        {connection ? (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <ConnectionStatusBadge status={connection.status} />
+            {isActive && (
+              <span className="text-xs text-ink-muted" title={formatLastSynced(connection.lastSyncedAt)}>
+                · {formatRelativeSync(connection.lastSyncedAt)}
+              </span>
+            )}
+          </div>
+        ) : (
+          <p className="mt-1 text-xs text-ink-muted">Not connected</p>
+        )}
+        <p className="mt-1 text-xs text-ink-muted">
+          Read-only — MoodSync never writes to your calendar. Powers Adaptive Study Planner, Stress Timeline, Burnout
+          Detection, and Social Battery.
+        </p>
+      </div>
+      {isActive ? (
+        <DisconnectButton provider="google-calendar" />
+      ) : (
+        connection && needsReconnect(connection.status) ? (
+          <div className="flex shrink-0 items-center gap-2">
+            <LinkButton href="/api/integrations/google-calendar/connect" variant="primary">
+              Reconnect
+            </LinkButton>
+            <DisconnectButton provider="google-calendar" />
+          </div>
+        ) : (
+          <LinkButton href="/api/integrations/google-calendar/connect" variant="primary">
+            Connect Google Calendar
+          </LinkButton>
+        )
+      )}
+    </Card>
+  );
+}
+
 export function ConnectionsSection({ connections }: { connections: ConnectionsResponse }) {
   const whoop = connections.wearables.find((c) => c.provider === "WHOOP");
   const fitbit = connections.wearables.find((c) => c.provider === "GOOGLE_HEALTH");
@@ -416,6 +472,7 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
       <SpotifyCard connection={spotify} />
       <AlexaCard connection={alexa} />
       <AppleMusicCard connection={connections.appleMusic} />
+      <CalendarCard connection={connections.calendar} />
     </section>
   );
 }

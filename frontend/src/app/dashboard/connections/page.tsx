@@ -14,7 +14,7 @@ export default async function ConnectionsPage({
   ]);
   const connections: ConnectionsResponse = connectionsResult.ok
     ? connectionsResult.data
-    : { wearables: [], smartHome: [], appleMusic: null };
+    : { wearables: [], smartHome: [], appleMusic: null, calendar: null };
 
   return (
     <div className="flex flex-col gap-6">
