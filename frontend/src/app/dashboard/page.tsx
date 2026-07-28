@@ -4,6 +4,7 @@ import { QuickActions } from "@/components/dashboard/QuickActions";
 import { LuxuryWeekBars } from "@/components/luxury/LuxuryWeekBars";
 import { LuxuryActivityRow } from "@/components/luxury/LuxuryActivityRow";
 import { LiveEnergyMeter } from "@/components/luxury/LiveEnergyMeter";
+import { BurnoutWarningBanner } from "@/components/luxury/BurnoutWarningBanner";
 import { iconForRuleName } from "@/lib/activityDisplay";
 import { Zap, Cpu, Wand2, TrendingUp, TrendingDown, Sparkle } from "lucide-react";
 import type {
@@ -91,6 +92,8 @@ export default async function DashboardHomePage() {
 
   return (
     <div className="flex flex-col gap-5">
+      <BurnoutWarningBanner />
+
       {/* Wellness Hero Card */}
       <section
         data-tour="wellness-score"

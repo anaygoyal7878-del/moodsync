@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { checkRecoveryUnusuallyHigh, checkRoomTemperatureOutsideSleepRange, checkSceneTimeOfDayPattern } from './proactiveNotifications.js';
+import {
+  checkRecoveryUnusuallyHigh,
+  checkRoomTemperatureOutsideSleepRange,
+  checkSceneTimeOfDayPattern,
+  checkBurnoutRisk,
+} from './proactiveNotifications.js';
 
 describe('checkRecoveryUnusuallyHigh', () => {
   it('returns null with fewer than 5 history points', () => {
@@ -64,5 +69,40 @@ describe('checkSceneTimeOfDayPattern', () => {
       { sceneName: 'Focus', hourOfDay: 2 },
     ];
     expect(checkSceneTimeOfDayPattern(events, 9)).toBeNull();
+  });
+});
+
+describe('checkBurnoutRisk', () => {
+  it('returns null when sleep or recovery data is missing', () => {
+    expect(checkBurnoutRisk({ sleepScore: null, recoveryScore: 30, restingHeartRateZ: 2, calendarEventCountToday: 8 })).toBeNull();
+    expect(checkBurnoutRisk({ sleepScore: 30, recoveryScore: null, restingHeartRateZ: 2, calendarEventCountToday: 8 })).toBeNull();
+  });
+
+  it('returns null when sleep and recovery are both fine, regardless of other signals', () => {
+    const result = checkBurnoutRisk({ sleepScore: 80, recoveryScore: 80, restingHeartRateZ: 3, calendarEventCountToday: 10 });
+    expect(result).toBeNull();
+  });
+
+  it('returns null when sleep and recovery are poor but no secondary signal confirms it', () => {
+    const result = checkBurnoutRisk({ sleepScore: 30, recoveryScore: 25, restingHeartRateZ: null, calendarEventCountToday: null });
+    expect(result).toBeNull();
+  });
+
+  it('returns null when sleep/recovery are poor but secondary signals are normal', () => {
+    const result = checkBurnoutRisk({ sleepScore: 30, recoveryScore: 25, restingHeartRateZ: 0.2, calendarEventCountToday: 2 });
+    expect(result).toBeNull();
+  });
+
+  it('fires when poor sleep, low recovery, and elevated heart rate all agree', () => {
+    const result = checkBurnoutRisk({ sleepScore: 30, recoveryScore: 25, restingHeartRateZ: 1.5, calendarEventCountToday: null });
+    expect(result).not.toBeNull();
+    expect(result!.title).toContain('burnout');
+    expect(result!.body).toContain('elevated heart rate');
+  });
+
+  it('fires when poor sleep, low recovery, and an overloaded calendar all agree', () => {
+    const result = checkBurnoutRisk({ sleepScore: 30, recoveryScore: 25, restingHeartRateZ: null, calendarEventCountToday: 8 });
+    expect(result).not.toBeNull();
+    expect(result!.body).toContain('heavily-booked calendar');
   });
 });

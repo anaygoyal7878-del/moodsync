@@ -24,8 +24,31 @@ import {
   checkRecoveryUnusuallyHigh,
   checkRoomTemperatureOutsideSleepRange,
   checkSceneTimeOfDayPattern,
+  checkBurnoutRisk,
   deliverNotification,
 } from '@moodsync/ai';
+
+function mean(values: number[]): number {
+  return values.reduce((sum, v) => sum + v, 0) / values.length;
+}
+
+function stdev(values: number[], m: number): number {
+  if (values.length < 2) return 0;
+  const variance = values.reduce((sum, v) => sum + (v - m) ** 2, 0) / (values.length - 1);
+  return Math.sqrt(variance);
+}
+
+/** Same own-baseline z-score technique wellness.ts uses internally
+ * (not exported from there — this worker needs its own small copy, same
+ * as proactiveNotifications.ts's own mean/stdev duplication). Needs at
+ * least 5 historical points. */
+function restingHeartRateZ(latest: number, history: number[]): number | null {
+  if (history.length < 5) return null;
+  const m = mean(history);
+  const sd = stdev(history, m);
+  if (sd === 0) return 0;
+  return (latest - m) / sd;
+}
 
 const RECOVERY_HISTORY_DAYS = 30;
 const SCENE_HISTORY_DAYS = 30;
@@ -62,9 +85,11 @@ for (const userId of userIds) {
 
     // Check 1: Recovery unusually high today.
     const latest = await biometricReadingRepository.findLatestNormalized(userId);
+    let scores: ReturnType<typeof computeWellnessScores> | null = null;
+    let history: Awaited<ReturnType<typeof biometricReadingRepository.listRecentNormalized>> = [];
     if (latest) {
-      const history = await biometricReadingRepository.listRecentNormalized(userId, RECOVERY_HISTORY_DAYS);
-      const scores = computeWellnessScores(latest.reading, history.filter((r) => r.timestamp !== latest.reading.timestamp));
+      history = await biometricReadingRepository.listRecentNormalized(userId, RECOVERY_HISTORY_DAYS);
+      scores = computeWellnessScores(latest.reading, history.filter((r) => r.timestamp !== latest.reading.timestamp));
       if (scores.recovery.value !== null) {
         const recoveryHistoryValues = history
           .map((r) => computeWellnessScores(r, []).recovery.value)
@@ -73,6 +98,31 @@ for (const userId of userIds) {
           totalSent++;
         }
       }
+    }
+
+    // Check 4: Burnout risk (poor sleep + low recovery + at least one of
+    // elevated heart rate or an overloaded calendar). Calendar signal is
+    // not wired into this worker yet — reading it requires a live OAuth
+    // token refresh (see backend/src/services/calendarService.ts), which
+    // this background worker doesn't have access to today, so it's
+    // always passed as null here (this check still fires correctly off
+    // the heart rate signal alone; a future improvement could add
+    // calendar reads to this worker).
+    if (latest && scores && scores.sleep.value !== null && scores.recovery.value !== null) {
+      const rhrHistory = history
+        .map((r) => r.restingHeartRate)
+        .filter((v): v is number => typeof v === 'number');
+      const hrZ =
+        latest.reading.restingHeartRate !== undefined
+          ? restingHeartRateZ(latest.reading.restingHeartRate, rhrHistory)
+          : null;
+      const burnoutCandidate = checkBurnoutRisk({
+        sleepScore: scores.sleep.value,
+        recoveryScore: scores.recovery.value,
+        restingHeartRateZ: hrZ,
+        calendarEventCountToday: null,
+      });
+      if (await deliverIfNotRecentlySent(userId, burnoutCandidate)) totalSent++;
     }
 
     // Check 2: Bedroom temperature vs. sleep preference.

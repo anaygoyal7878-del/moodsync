@@ -36,9 +36,11 @@ export {
   checkRecoveryUnusuallyHigh,
   checkRoomTemperatureOutsideSleepRange,
   checkSceneTimeOfDayPattern,
+  checkBurnoutRisk,
   type ProactiveNotificationCandidate,
   type RoomTemperatureCheckInput,
   type SceneRunEvent,
+  type BurnoutRiskInput,
 } from './proactiveNotifications.js';
 export {
   recommendMusicCategory,

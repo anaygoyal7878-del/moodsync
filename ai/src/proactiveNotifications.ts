@@ -79,6 +79,54 @@ export function checkRoomTemperatureOutsideSleepRange(
   return null;
 }
 
+export interface BurnoutRiskInput {
+  sleepScore: number | null;
+  recoveryScore: number | null;
+  /** Own-baseline z-score of resting/latest heart rate, same technique
+   * as wellness.ts's stress/recovery scoring — null when there isn't
+   * enough history to compute one. */
+  restingHeartRateZ: number | null;
+  /** Count of calendar events today — null when no calendar is
+   * connected, distinct from 0 (a connected calendar with a genuinely
+   * free day). */
+  calendarEventCountToday: number | null;
+}
+
+const BURNOUT_POOR_SLEEP_THRESHOLD = 50;
+const BURNOUT_LOW_RECOVERY_THRESHOLD = 40;
+const BURNOUT_ELEVATED_HR_Z_THRESHOLD = 1;
+const BURNOUT_CALENDAR_OVERLOAD_THRESHOLD = 6;
+
+/**
+ * Burnout Detection — fires only when poor sleep AND low recovery are
+ * both present (the two strongest, most-supported wellness signals in
+ * this app) AND at least one secondary signal (elevated heart rate vs.
+ * baseline, or a heavily-booked calendar day) also confirms it. This
+ * conjunction is deliberately conservative: any single "bad" score
+ * (a rough night, one busy day) is normal and shouldn't trigger a
+ * burnout warning — this only fires when multiple independent signals
+ * agree. **Heuristic** — not a clinical burnout assessment.
+ */
+export function checkBurnoutRisk(input: BurnoutRiskInput): ProactiveNotificationCandidate | null {
+  if (input.sleepScore === null || input.recoveryScore === null) return null;
+  if (input.sleepScore >= BURNOUT_POOR_SLEEP_THRESHOLD) return null;
+  if (input.recoveryScore >= BURNOUT_LOW_RECOVERY_THRESHOLD) return null;
+
+  const hrElevated = input.restingHeartRateZ !== null && input.restingHeartRateZ >= BURNOUT_ELEVATED_HR_Z_THRESHOLD;
+  const calendarOverloaded =
+    input.calendarEventCountToday !== null && input.calendarEventCountToday >= BURNOUT_CALENDAR_OVERLOAD_THRESHOLD;
+  if (!hrElevated && !calendarOverloaded) return null;
+
+  const reasons: string[] = ['poor sleep', 'low recovery'];
+  if (hrElevated) reasons.push('an elevated heart rate');
+  if (calendarOverloaded) reasons.push('a heavily-booked calendar');
+
+  return {
+    title: "You're showing early signs of burnout",
+    body: `${reasons.slice(0, -1).join(', ')} and ${reasons[reasons.length - 1]} today. Consider a 20-minute walk or stretch, hydrating, or ending work a bit early.`,
+  };
+}
+
 export interface SceneRunEvent {
   sceneName: string;
   /** Hour the scene actually ran, 0-23, in the user's local timezone —
