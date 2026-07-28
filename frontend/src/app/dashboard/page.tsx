@@ -3,6 +3,7 @@ import { backendFetch } from "@/lib/api";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { LuxuryWeekBars } from "@/components/luxury/LuxuryWeekBars";
 import { LuxuryActivityRow } from "@/components/luxury/LuxuryActivityRow";
+import { LiveEnergyMeter } from "@/components/luxury/LiveEnergyMeter";
 import { iconForRuleName } from "@/lib/activityDisplay";
 import { Zap, Cpu, Wand2, TrendingUp, TrendingDown, Sparkle } from "lucide-react";
 import type {
@@ -135,6 +136,10 @@ export default async function DashboardHomePage() {
           </Link>
         </div>
       </section>
+
+      <div className="lux-stagger-2">
+        <LiveEnergyMeter />
+      </div>
 
       <div className="lux-stagger-2">
         <QuickActions isPaused={isPaused} luxury />

@@ -39,3 +39,4 @@ export {
   type HomeSnapshotSceneInput,
 } from './repositories/homeSnapshotRepository.js';
 export { calendarConnectionRepository } from './repositories/calendarConnectionRepository.js';
+export { caffeineLogRepository, type CreateCaffeineLogInput } from './repositories/caffeineLogRepository.js';

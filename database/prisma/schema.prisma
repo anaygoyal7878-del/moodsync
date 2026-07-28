@@ -41,6 +41,7 @@ model User {
   musicPlayLogs        MusicPlayLog[]
   locationEvents       LocationEvent[]
   meditationSessions   MeditationSession[]
+  caffeineLogs         CaffeineLog[]
   appleMusicConnection AppleMusicConnection?
   calendarConnection   CalendarConnection?
   preferences          UserPreferences?
@@ -754,4 +755,24 @@ model MeditationSession {
 
   @@index([userId, completedAt])
   @@map("meditation_sessions")
+}
+
+/// First manual wellness-event log in this codebase — no provider exposes
+/// caffeine intake, so this is user-typed, same client-reported trust
+/// model as MeditationSession's completedAt. Feeds the Live Energy
+/// Meter's temporary-boost-that-decays component (see ai/src/energyMeter.ts).
+/// `mg` is caffeine content in milligrams, not drink volume — the client
+/// converts a drink-type pick (coffee/tea/energy drink/etc.) to an
+/// approximate mg value before posting, so the server only ever stores
+/// one real, comparable unit.
+model CaffeineLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mg        Int
+  loggedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([userId, loggedAt])
+  @@map("caffeine_logs")
 }
