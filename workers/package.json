@@ -12,6 +12,7 @@
     "start:weekly-report": "node dist/weeklyReportWorker.js",
     "start:notification-digest": "node dist/notificationDigestWorker.js",
     "start:spotify-playback-check": "node dist/spotifyPlaybackCheckWorker.js",
+    "start:proactive-notifications": "node dist/proactiveNotificationsWorker.js",
     "typecheck": "tsc -b"
   },
   "dependencies": {

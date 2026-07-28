@@ -30,6 +30,30 @@ export const pendingDeviceCommandRepository = {
     return rows.map((row) => ({ ...row, action: row.action as unknown as AutomationAction }));
   },
 
+  /** Completed (`EXECUTED`) `homekit.run_scene`/`homekit.activate_scene`
+   * commands with a real completion timestamp — what the "your scene
+   * usually helps at this time of day" smart notification (§7 of
+   * docs/SMART_NOTIFICATIONS.md) reads to build a per-scene run-time
+   * history, without needing a dedicated scene-run-log table. */
+  async listCompletedSceneRunsForUser(userId: string, sinceDays: number) {
+    const since = new Date(Date.now() - sinceDays * 86_400_000);
+    const rows = await prisma.pendingDeviceCommand.findMany({
+      where: {
+        userId,
+        status: 'EXECUTED',
+        completedAt: { gte: since },
+        provider: 'HOMEKIT',
+      },
+      orderBy: { completedAt: 'desc' },
+    });
+    return rows
+      .map((row) => ({ action: row.action as unknown as AutomationAction, completedAt: row.completedAt }))
+      .filter(
+        (row): row is { action: AutomationAction; completedAt: Date } =>
+          row.completedAt !== null && (row.action.type === 'homekit.run_scene' || row.action.type === 'homekit.activate_scene'),
+      );
+  },
+
   /** `updateMany` (not `update`) so the userId ownership check is
    * enforced by the query itself — same pattern as every other
    * user-scoped repository in this codebase. */

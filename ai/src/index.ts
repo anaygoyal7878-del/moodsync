@@ -28,10 +28,18 @@ export {
   type ScoreBasis,
 } from './wellness.js';
 export { explainTrigger, explainConflict, explainManualPause, explainRateLimit } from './explain.js';
-export { createNotification, shouldNotify, type CreateNotificationInput } from './notificationExecutor.js';
+export { createNotification, shouldNotify, deliverNotification, type CreateNotificationInput } from './notificationExecutor.js';
 export { computeWeeklyInsights } from './weeklyReport.js';
 export { generateRecommendations, type RecommendationCandidate, type PlaylistSkipStat } from './recommendations.js';
 export { computeWalkingStreak, computeMeditationStreak, type HabitStreakResult } from './habits.js';
+export {
+  checkRecoveryUnusuallyHigh,
+  checkRoomTemperatureOutsideSleepRange,
+  checkSceneTimeOfDayPattern,
+  type ProactiveNotificationCandidate,
+  type RoomTemperatureCheckInput,
+  type SceneRunEvent,
+} from './proactiveNotifications.js';
 export {
   recommendMusicCategory,
   MUSIC_CATEGORY_KEYWORDS,

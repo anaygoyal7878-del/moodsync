@@ -20,6 +20,21 @@ export const notificationRepository = {
     });
   },
 
+  /** Suppresses a repeat proactive/smart notification (e.g. "Recovery is
+   * unusually high today") from firing again within `sinceHours` if the
+   * exact same title already went out — a simple, real dedupe without a
+   * dedicated notification-type/log table, matching the title-based
+   * dedupe `recommendationRepository.hasBeenSuggested` already uses for
+   * a similar problem. */
+  async hasRecentTitle(userId: string, title: string, sinceHours: number): Promise<boolean> {
+    const since = new Date(Date.now() - sinceHours * 60 * 60 * 1000);
+    const existing = await prisma.notification.findFirst({
+      where: { userId, title, createdAt: { gte: since } },
+      select: { id: true },
+    });
+    return existing !== null;
+  },
+
   /** `updateMany` (not `update`) so the userId ownership check is
    * enforced by the database query itself — same pattern as
    * automationRuleRepository.update. */
