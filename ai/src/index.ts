@@ -60,6 +60,33 @@ export { sendAtlasMessage, AtlasNotConfiguredError, type AtlasChatMessage } from
 export { computeLiveEnergyMeter, type CaffeineLogInput, type LiveEnergyMeter } from './energyMeter.js';
 export { computeFocusSessionScore } from './focusScore.js';
 export {
+  computeMusicOutcome,
+  computeNextNightOutcome,
+  confidenceLabel,
+  modeWantsLowerHeartRate,
+  musicModeLabel,
+  type HeartRateSample as MusicHeartRateSample,
+  type MusicExplanation,
+  type MusicMode,
+  type MusicOutcome,
+  type MusicOutcomeConfidence,
+  type MusicSessionWindow,
+  type NextNightInput,
+} from './musicFeedback.js';
+export {
+  rankPlaylistsByEffect,
+  rankGenresByEffect,
+  bestHoursForMode,
+  buildMusicRecommendations,
+  compareFocusDuration,
+  describeFocusDuration,
+  type CompletedMusicSession,
+  type FocusDurationComparison,
+  type HourPattern,
+  type MusicEffectiveness,
+  type MusicRecommendation,
+} from './musicMemory.js';
+export {
   computeFreeBlocks,
   computeStudyWindowSuggestion,
   type BusyBlock,

@@ -43,6 +43,7 @@ model User {
   meditationSessions   MeditationSession[]
   caffeineLogs         CaffeineLog[]
   focusSessions        FocusSession[]
+  musicSessions        MusicSession[]
   appleMusicConnection AppleMusicConnection?
   calendarConnection   CalendarConnection?
   preferences          UserPreferences?
@@ -614,6 +615,96 @@ model Recommendation {
 /// on = false), not a certain "did the user like this" signal — see the
 /// worker's doc comment. Feeds ai/src/recommendations.ts's third
 /// heuristic (suggest changing a playlist that gets skipped often).
+/// What a music session was *for* — the mode decides which biometric
+/// outcome model applies (see ai/src/musicFeedback.ts). A Relax session
+/// is judged on heart rate coming down; a Workout session is not.
+enum MusicMode {
+  FOCUS
+  RELAX
+  SLEEP
+  RECOVERY
+  MORNING
+  WORKOUT
+}
+
+/// Which service actually played it. Kept separate from
+/// `SmartHomeProvider` (where Spotify lives as a *control target* for
+/// automation rules) because a music session is a wellness record, not
+/// a device command — the same distinction that keeps AppleMusicConnection
+/// out of SmartHomeConnection.
+enum MusicProviderKind {
+  APPLE_MUSIC
+  SPOTIFY
+  OTHER
+}
+
+/// One user-initiated listening session, and what happened to their
+/// biometrics during it.
+///
+/// Distinct from `MusicPlayLog` below, which records playback an
+/// *automation rule* triggered (hence its required `ruleId`) purely to
+/// detect skips. This model is the opposite direction: the user chose
+/// to listen, and MoodSync measures the effect.
+///
+/// The outcome fields are computed once at session end and stored
+/// rather than derived on read. Two reasons: the summary a user sees
+/// immediately after a session must not silently change later when a
+/// wearable back-fills readings for that window, and the analytics page
+/// aggregates hundreds of sessions without re-reading raw biometrics
+/// each time. `outcomeConfidence` records which kind of answer it was
+/// (see MusicOutcomeConfidence in ai/src/musicFeedback.ts) so a summary
+/// generated from thin data can never later be mistaken for a measured
+/// one.
+model MusicSession {
+  id       String            @id @default(uuid())
+  userId   String
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode     MusicMode
+  provider MusicProviderKind
+
+  /// Normalized across providers — Apple Music and Spotify describe
+  /// their catalogs differently, so the session stores what MoodSync
+  /// needs (a display name, what kind of thing it was, the provider's
+  /// own id for it) rather than either provider's native shape.
+  itemName       String
+  /// "playlist" | "track" | "album" | "station"
+  itemKind       String
+  itemExternalId String?
+  /// Best-effort genre, matched from the item name against a keyword
+  /// list — null when nothing matched. Never guessed from the provider's
+  /// own genre taxonomy, which neither service exposes consistently for
+  /// library playlists.
+  genre          String?
+
+  startedAt DateTime
+  endedAt   DateTime?
+
+  /// Captured at session start, denormalized for the same
+  /// stability reason as the outcome fields above.
+  baselineHeartRate     Int?
+  baselineStressScore   Int?
+  baselineRecoveryScore Int?
+
+  /// Signed deltas: negative heart rate delta means it came down.
+  outcomeHeartRateDelta Int?
+  outcomeStressDelta    Int?
+  /// "measured" | "interpretation" | "insufficient"
+  outcomeConfidence     String?
+  outcomeSummary        String?
+
+  /// True when the user stopped well before the session's natural end —
+  /// a real engagement signal the learning loop weighs against a
+  /// playlist, distinct from a session that simply hasn't ended yet
+  /// (`endedAt` null).
+  endedEarly Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, startedAt])
+  @@index([userId, mode])
+  @@map("music_sessions")
+}
+
 model MusicPlayLog {
   id           String   @id @default(uuid())
   userId       String

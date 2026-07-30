@@ -192,6 +192,14 @@ export default function MusicHomePage() {
             <p className="mt-0.5 text-xs text-ink-muted">Your saved playlists</p>
           </Card>
         </Link>
+        <Link href="/dashboard/music/analytics" className="col-span-2">
+          <Card className="transition-colors hover:bg-surface-hover">
+            <p className="text-sm font-medium">What works for you</p>
+            <p className="mt-0.5 text-xs text-ink-muted">
+              Heart rate change by playlist, best genres per mode, and what to reach for next
+            </p>
+          </Card>
+        </Link>
       </div>
 
       <section className="flex flex-col gap-3">

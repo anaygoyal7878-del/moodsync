@@ -214,6 +214,95 @@ export interface BreakSuggestionResponse {
   suggestion: { kind: "walk" | "stretch" | "water" | "breathing"; label: string; reason: string } | null;
 }
 
+/** Music + biometrics feedback loop — see docs/MUSIC_FEEDBACK_LOOP.md. */
+
+export type MusicMode = "FOCUS" | "RELAX" | "SLEEP" | "RECOVERY" | "MORNING" | "WORKOUT";
+export type MusicProviderKind = "APPLE_MUSIC" | "SPOTIFY" | "OTHER";
+/** `measured` = a real before/after comparison. `interpretation` =
+ * MoodSync joined the dots. `insufficient` = not enough data, and no
+ * conclusion is drawn. */
+export type MusicOutcomeConfidence = "measured" | "interpretation" | "insufficient";
+
+export interface MusicSessionEntry {
+  id: string;
+  mode: MusicMode;
+  provider: MusicProviderKind;
+  itemName: string;
+  itemKind: string;
+  itemExternalId: string | null;
+  genre: string | null;
+  startedAt: string;
+  endedAt: string | null;
+  baselineHeartRate: number | null;
+  outcomeHeartRateDelta: number | null;
+  outcomeStressDelta: number | null;
+  outcomeConfidence: MusicOutcomeConfidence | null;
+  outcomeSummary: string | null;
+  endedEarly: boolean;
+}
+
+export interface MusicExplanation {
+  itemName: string;
+  mode: MusicMode;
+  metric: string | null;
+  comparedWindows: string | null;
+  confidence: MusicOutcomeConfidence;
+  caveat: string;
+}
+
+export interface MusicOutcome {
+  confidence: MusicOutcomeConfidence;
+  summary: string;
+  heartRateDelta: number | null;
+  explanation: MusicExplanation;
+}
+
+export interface MusicRecommendationEntry {
+  text: string;
+  mode: MusicMode;
+  sessions: number;
+}
+
+export interface MusicSessionSummaryResponse {
+  session: MusicSessionEntry;
+  /** The next-morning follow-up, for sleep/recovery sessions only. */
+  nextNight: MusicOutcome | null;
+  nextTime: MusicRecommendationEntry | null;
+}
+
+export interface MusicEffectivenessEntry {
+  label: string;
+  mode: MusicMode;
+  sessions: number;
+  meanHeartRateDelta: number;
+  helped: boolean;
+  earlyStopRate: number;
+}
+
+export interface MusicAnalyticsResponse {
+  windowDays: number;
+  totalSessions: number;
+  playlists: MusicEffectivenessEntry[];
+  genres: MusicEffectivenessEntry[];
+  bestHours: Array<{
+    mode: MusicMode;
+    label: string;
+    hours: Array<{ mode: MusicMode; hourOfDay: number; sessions: number; meanHeartRateDelta: number }>;
+  }>;
+  recommendations: MusicRecommendationEntry[];
+  focusDuration:
+    | {
+        label: string;
+        withMusicMinutes: number;
+        withoutMusicMinutes: number;
+        differenceMinutes: number;
+        sessionsWithMusic: number;
+        sessionsWithoutMusic: number;
+        sentence: string | null;
+      }
+    | null;
+}
+
 export type { AutomationRuleDefinition };
 
 export interface TrendResult {

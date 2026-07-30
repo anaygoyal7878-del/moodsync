@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Play, Music2, Loader2 } from "lucide-react";
+import { Play, Music2, Loader2, Square } from "lucide-react";
 import { useMusicKit } from "@/lib/musicKitClient";
+import { useMusicSession } from "@/lib/useMusicSession";
 import { Section, EmptyState } from "./CompanionPrimitives";
+import { MusicSessionSummary } from "./MusicSessionSummary";
+import type { MusicMode } from "@/lib/types";
 
 interface RecommendedCategory {
   category: string;
@@ -18,14 +21,21 @@ interface RecommendedCategory {
  * actually has. MoodSync ships no music catalog, so a tap either finds
  * one of *your* playlists or says it couldn't; it never invents one.
  */
-const MOODS = [
-  { label: "Deep Focus", keywords: ["focus", "deep work", "concentration", "study"] },
-  { label: "Lo-fi", keywords: ["lo-fi", "lofi", "chillhop"] },
-  { label: "Ambient", keywords: ["ambient", "atmospheric", "drone"] },
-  { label: "Jazz", keywords: ["jazz", "bossa"] },
-  { label: "Nature", keywords: ["nature", "rain", "forest", "ocean"] },
-  { label: "Recovery", keywords: ["recovery", "rest", "calm", "relax", "unwind"] },
-] as const;
+/** Each mood carries the `MusicMode` its sessions are recorded under —
+ * the mode decides which biometric outcome model applies (a Workout
+ * session is judged on heart rate going *up*), so getting this mapping
+ * right is what makes the feedback feel intelligent rather than
+ * mechanical. See ai/src/musicFeedback.ts. */
+const MOODS: ReadonlyArray<{ label: string; keywords: readonly string[]; mode: MusicMode }> = [
+  { label: "Deep Focus", keywords: ["focus", "deep work", "concentration", "study"], mode: "FOCUS" },
+  { label: "Lo-fi", keywords: ["lo-fi", "lofi", "chillhop"], mode: "FOCUS" },
+  { label: "Ambient", keywords: ["ambient", "atmospheric", "drone"], mode: "RELAX" },
+  { label: "Jazz", keywords: ["jazz", "bossa"], mode: "RELAX" },
+  { label: "Nature", keywords: ["nature", "rain", "forest", "ocean"], mode: "SLEEP" },
+  { label: "Recovery", keywords: ["recovery", "rest", "calm", "relax", "unwind"], mode: "RECOVERY" },
+  { label: "Morning", keywords: ["morning", "wake", "sunrise"], mode: "MORNING" },
+  { label: "Workout", keywords: ["workout", "gym", "run", "training", "hype"], mode: "WORKOUT" },
+];
 
 type PlayState = { mood: string; status: "loading" | "not-found" | "playing" } | null;
 
@@ -41,6 +51,7 @@ type PlayState = { mood: string; status: "loading" | "not-found" | "playing" } |
  */
 export function AdaptiveMusic() {
   const { status, instance, playPlaylist } = useMusicKit();
+  const { session, completedSessionId, start, end, dismissSummary } = useMusicSession();
   const [recommendation, setRecommendation] = useState<RecommendedCategory | null>(null);
   const [playState, setPlayState] = useState<PlayState>(null);
 
@@ -59,7 +70,7 @@ export function AdaptiveMusic() {
 
   const authorized = status.kind === "ready" && status.authorized && instance !== null;
 
-  async function handleMood(mood: string, keywords: readonly string[]) {
+  async function handleMood(mood: string, keywords: readonly string[], mode: MusicMode) {
     if (!instance) return;
     setPlayState({ mood, status: "loading" });
     try {
@@ -76,17 +87,30 @@ export function AdaptiveMusic() {
       }
       await playPlaylist(match.id);
       setPlayState({ mood, status: "playing" });
+      // Only opens a measured session once playback actually started —
+      // a session with no music behind it would poison the learning
+      // loop with a baseline and no intervention.
+      await start({
+        mode,
+        provider: "APPLE_MUSIC",
+        itemName: match.attributes?.name ?? mood,
+        itemKind: "playlist",
+        itemExternalId: match.id,
+      });
     } catch {
       setPlayState({ mood, status: "not-found" });
     }
   }
 
   return (
-    <Section
-      title="What to put on"
-      subtitle={recommendation ? recommendation.reason : "One tap, matched against your own library."}
-      icon={Music2}
-    >
+    <div className="flex flex-col gap-4">
+      {completedSessionId && <MusicSessionSummary sessionId={completedSessionId} onDismiss={dismissSummary} />}
+
+      <Section
+        title="What to put on"
+        subtitle={recommendation ? recommendation.reason : "One tap, matched against your own library."}
+        icon={Music2}
+      >
       {!authorized ? (
         <EmptyState
           icon={Music2}
@@ -106,7 +130,7 @@ export function AdaptiveMusic() {
                   key={mood.label}
                   type="button"
                   disabled={loading}
-                  onClick={() => void handleMood(mood.label, mood.keywords)}
+                  onClick={() => void handleMood(mood.label, mood.keywords, mood.mode)}
                   className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-medium transition-colors disabled:opacity-60"
                   style={
                     recommended
@@ -137,13 +161,57 @@ export function AdaptiveMusic() {
               have — make one with that word in the name and it&apos;ll find it.
             </p>
           )}
-          {playState?.status === "playing" && (
+          {playState?.status === "playing" && !session && (
             <p className="mt-3 text-[12.5px]" style={{ color: "var(--lux-sage)" }}>
               Playing your {playState.mood} playlist.
             </p>
           )}
+
+          {/* An open session means MoodSync is measuring. "Finish" ends
+              the *measurement* and produces the summary — it deliberately
+              does not stop playback, so nothing is ever cut off mid-song. */}
+          {session && (
+            <div
+              className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[16px] p-3.5"
+              style={{ background: "var(--lux-bg-card-2)" }}
+            >
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "var(--lux-ink)" }}>
+                  <span
+                    className="inline-block h-1.5 w-1.5 animate-pulse rounded-full"
+                    style={{ background: "var(--lux-sage)" }}
+                    aria-hidden="true"
+                  />
+                  Measuring &ldquo;{session.itemName}&rdquo;
+                </p>
+                <p className="mt-0.5 text-[11.5px]" style={{ color: "var(--lux-muted)" }}>
+                  Finishing keeps the music playing — it just closes the measurement.
+                </p>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={() => void end(false)}
+                  className="rounded-full px-3.5 py-2 text-[12.5px] font-medium"
+                  style={{ background: "var(--lux-sage)", color: "#1a241e" }}
+                >
+                  Finish
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void end(true)}
+                  className="flex items-center gap-1.5 rounded-full px-3 py-2 text-[12.5px] font-medium"
+                  style={{ background: "transparent", color: "var(--lux-muted)", border: "1px solid var(--lux-hairline)" }}
+                >
+                  <Square size={11} aria-hidden="true" />
+                  Not for me
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
-    </Section>
+      </Section>
+    </div>
   );
 }
