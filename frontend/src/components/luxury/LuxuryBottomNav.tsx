@@ -1,22 +1,34 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { Home, BarChart2, Zap, User, Sparkle, Bot } from "lucide-react";
+import { Home, BatteryMedium, Timer, Moon, User, Bot } from "lucide-react";
 import { MagnificationDock, type DockItemData } from "./MagnificationDock";
 import { useViewMode } from "@/components/shell/ViewModeContext";
 
-/** Exported so LuxuryProfile.tsx can list *everything this bar doesn't*
- * without the two drifting apart — a fixed bottom bar only fits ~6
- * items, but every page in DASHBOARD_SECTIONS still has to be reachable
- * on mobile, and the Sidebar that covers the rest on desktop is
- * `hidden` below the `sm:` breakpoint. */
+/**
+ * The mobile companion's six tabs — deliberately *not* the same shape as
+ * the desktop sidebar. Phone use is daily and one-handed, so these are
+ * the five things a person actually opens the app to do plus the
+ * overflow: how am I doing (Today), how much have I got (Energy), get
+ * to work (Focus), close the day (Sleep), ask something (Atlas).
+ *
+ * Automations, Devices and Scenes deliberately do NOT appear here —
+ * configuring a smart home is control-center work that belongs on the
+ * web app, and they stay reachable on mobile through Settings'
+ * overflow list below.
+ *
+ * Exported so LuxuryProfile.tsx can list *everything this bar doesn't*
+ * without the two drifting apart — every page in DASHBOARD_SECTIONS has
+ * to stay reachable on mobile, and the Sidebar that covers the rest on
+ * desktop is `hidden` below the `sm:` breakpoint.
+ */
 export const BOTTOM_NAV_TABS = [
-  { href: "/dashboard", label: "Home", icon: Home, exact: true },
+  { href: "/dashboard", label: "Today", icon: Home, exact: true },
+  { href: "/dashboard/energy", label: "Energy", icon: BatteryMedium, exact: false },
+  { href: "/dashboard/focus", label: "Focus", icon: Timer, exact: false },
+  { href: "/dashboard/sleep", label: "Sleep", icon: Moon, exact: false },
   { href: "/dashboard/atlas", label: "Atlas", icon: Bot, exact: false },
-  { href: "/dashboard/meditation", label: "Meditate", icon: Sparkle, exact: false },
-  { href: "/dashboard/insights", label: "Insights", icon: BarChart2, exact: false },
-  { href: "/dashboard/automation", label: "Automations", icon: Zap, exact: false },
-  { href: "/dashboard/profile", label: "Profile", icon: User, exact: false },
+  { href: "/dashboard/profile", label: "More", icon: User, exact: false },
 ] as const;
 
 const TABS = BOTTOM_NAV_TABS;

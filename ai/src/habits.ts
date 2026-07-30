@@ -14,7 +14,7 @@ const WALKING_STEPS_THRESHOLD = 8_000;
 const STREAK_WINDOW_DAYS = 30;
 
 export interface HabitStreakResult {
-  habit: 'walking' | 'meditation';
+  habit: 'walking' | 'meditation' | 'focus';
   /** Consecutive days (ending at `asOf`, or the most recent day with
    * data if `asOf` itself has none yet) where the habit was met. 0 if
    * not met yesterday/today, even with a long streak further back —
@@ -99,4 +99,13 @@ export function computeWalkingStreak(readings: NormalizedBiometricReading[], asO
 export function computeMeditationStreak(sessions: { completedAt: Date }[], asOf: Date = new Date()): HabitStreakResult {
   const metDays = new Set(sessions.map((s) => utcDayKey(s.completedAt)));
   return computeFromMetDays(metDays, 'meditation', asOf);
+}
+
+/** A day is "met" if at least one Focus Session was completed on it —
+ * the third habit with a real signal behind it, added once Focus
+ * Sessions started being logged. Same "did you do it" framing as
+ * meditation: no minimum duration, since the session already has one. */
+export function computeFocusStreak(sessions: { completedAt: Date }[], asOf: Date = new Date()): HabitStreakResult {
+  const metDays = new Set(sessions.map((s) => utcDayKey(s.completedAt)));
+  return computeFromMetDays(metDays, 'focus', asOf);
 }

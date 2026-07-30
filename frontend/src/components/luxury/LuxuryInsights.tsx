@@ -3,11 +3,19 @@ import { Brain } from "lucide-react";
 import { LuxuryGauge } from "@/components/luxury/LuxuryGauge";
 import { LuxuryWeekBars } from "@/components/luxury/LuxuryWeekBars";
 import { metricLabel } from "@/lib/metrics";
-import { Footprints, Sparkle } from "lucide-react";
+import { Footprints, Sparkle, Timer } from "lucide-react";
 import type { TrendResult, AutomationEffectivenessResult, RecommendationEntry, SceneUsageResult, HabitStreakEntry } from "@/lib/types";
 
-const HABIT_LABEL: Record<HabitStreakEntry["habit"], string> = { walking: "Walking", meditation: "Meditation" };
-const HABIT_ICON: Record<HabitStreakEntry["habit"], typeof Footprints> = { walking: Footprints, meditation: Sparkle };
+const HABIT_LABEL: Record<HabitStreakEntry["habit"], string> = {
+  walking: "Walking",
+  meditation: "Meditation",
+  focus: "Focus",
+};
+const HABIT_ICON: Record<HabitStreakEntry["habit"], typeof Footprints> = {
+  walking: Footprints,
+  meditation: Sparkle,
+  focus: Timer,
+};
 import type { NormalizedBiometricReading } from "@moodsync/shared";
 
 const DIRECTION_LABEL: Record<TrendResult["direction"], string> = { up: "Rising", down: "Falling", flat: "Steady" };

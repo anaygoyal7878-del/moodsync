@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import { LogoutButton } from "@/components/marketing/LogoutButton";
-import { DASHBOARD_SECTIONS as SECTIONS } from "@/lib/dashboardSections";
+import { NAV_GROUPS } from "@/lib/dashboardSections";
 import { useViewMode } from "@/components/shell/ViewModeContext";
 
 /** Persistent left-rail navigation for wide viewports — desktop-only
@@ -35,24 +35,34 @@ export function Sidebar({ email }: { email: string }) {
         <span className="text-[15px] font-semibold tracking-tight">MoodSync</span>
       </Link>
 
-      <div className="flex flex-1 flex-col gap-0.5">
-        {SECTIONS.map((section) => {
-          const isActive = "exact" in section && section.exact ? pathname === section.href : pathname.startsWith(section.href);
-          const Icon = section.icon;
-          return (
-            <Link
-              key={section.href}
-              href={section.href}
-              aria-current={isActive ? "page" : undefined}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                isActive ? "bg-surface-raised text-ink" : "text-ink-secondary hover:bg-surface-hover hover:text-ink"
-              }`}
-            >
-              <Icon size={17} aria-hidden="true" className={isActive ? "text-brand" : ""} />
-              <span>{section.label}</span>
-            </Link>
-          );
-        })}
+      {/* Grouped rather than one flat 18-item list — the groups are the
+          companion flow (Today / Routines / Understand / Environment /
+          Account), which is what makes a control center scannable
+          instead of a menu. */}
+      <div className="flex flex-1 flex-col gap-5">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label} className="flex flex-col gap-0.5">
+            <h2 className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-muted">{group.label}</h2>
+            {group.items.map((section) => {
+              const isActive =
+                "exact" in section && section.exact ? pathname === section.href : pathname.startsWith(section.href);
+              const Icon = section.icon;
+              return (
+                <Link
+                  key={section.href}
+                  href={section.href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                    isActive ? "bg-surface-raised text-ink" : "text-ink-secondary hover:bg-surface-hover hover:text-ink"
+                  }`}
+                >
+                  <Icon size={17} aria-hidden="true" className={isActive ? "text-brand" : ""} />
+                  <span>{section.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
       <div className="mt-4 flex flex-col gap-2 border-t border-line px-2 pt-4">

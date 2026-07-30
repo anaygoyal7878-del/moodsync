@@ -123,6 +123,97 @@ export interface WellnessScores {
   overall: WellnessScore;
 }
 
+/** Payloads for the companion surfaces — everything under
+ * `backend/src/api/routes/companion.ts`. Kept together so the shapes the
+ * Today/Energy/Sleep/Recovery pages consume are visible in one place. */
+
+export type CompanionTimeOfDay = "morning" | "afternoon" | "evening" | "night";
+
+export interface OvernightChange {
+  metric: "sleep" | "recovery";
+  delta: number;
+  sentence: string;
+}
+
+export interface BriefAction {
+  kind: string;
+  label: string;
+  reason: string;
+  href: string;
+}
+
+export interface DailyBriefResponse {
+  greeting: string;
+  timeOfDay: CompanionTimeOfDay;
+  /** False when no wearable has ever synced — the UI shows a connect
+   * prompt rather than a page of dashes. */
+  hasData: boolean;
+  readiness: WellnessScore;
+  energy: number | null;
+  scores?: WellnessScores;
+  overnightChanges: OvernightChange[];
+  burnout?: { title: string; body: string } | null;
+  bookedHoursToday?: number | null;
+  eventCountToday?: number | null;
+  brief: { focusToday: string; avoidToday: string | null; actions: BriefAction[] } | null;
+}
+
+export type SocialBatteryLevel = "high" | "medium" | "low";
+
+export interface SocialBatteryResponse {
+  battery: { level: SocialBatteryLevel; value: number; reasons: string[]; disclaimer: string } | null;
+  guidance: string | null;
+}
+
+export interface StressTimelineEntry {
+  at: string;
+  direction: "spike" | "drop";
+  magnitudeZ: number;
+  heartRate: number;
+  context: string | null;
+}
+
+export interface StressTimelineResponse {
+  timeline: StressTimelineEntry[];
+  calendarConnected: boolean;
+}
+
+export interface WindDownStep {
+  kind: "temperature" | "light" | "breathing" | "screens" | "scene";
+  label: string;
+  reason: string;
+}
+
+export interface SleepCoachResponse {
+  bedtimeTarget: { asleepBy: string; windDownAt: string; reason: string; anchoredToCalendar: boolean } | null;
+  windDown: WindDownStep[];
+  quality: {
+    averageScore: number | null;
+    averageTotalMinutes: number | null;
+    nightsMeasured: number;
+    lastNightVsAverage: number | null;
+  };
+  bedroomTemperatureC: number | null;
+}
+
+export interface MemoryFinding {
+  label: string;
+  meanDelta: number;
+  sampleSize: number;
+  sentence: string;
+}
+
+export interface WellnessMemoryResponse {
+  findings: MemoryFinding[];
+  bestFocusHours: Array<{ hourOfDay: number; meanScore: number; sampleSize: number }>;
+  windowDays: number;
+  historyDays: number;
+}
+
+export interface BreakSuggestionResponse {
+  suggestion: { kind: "walk" | "stretch" | "water" | "breathing"; label: string; reason: string } | null;
+}
+
 export type { AutomationRuleDefinition };
 
 export interface TrendResult {
@@ -188,6 +279,17 @@ export interface PersistedInsight {
 }
 
 export type MeditationAmbience = "rain" | "forest" | "ocean" | "noise";
+
+export interface FocusSessionEntry {
+  id: string;
+  userId: string;
+  durationMinutes: number;
+  startedAt: string;
+  completedAt: string;
+  /** Null when too few heart rate samples existed during the session to
+   * compute one — see FocusSession's schema comment. */
+  focusScore: number | null;
+}
 
 export interface MeditationSessionEntry {
   id: string;
@@ -285,7 +387,7 @@ export interface HomeSnapshotResponse {
 /** Habit Engine — scoped to the two habits with a real signal (steps,
  * MeditationSession). See docs/HABIT_ENGINE.md. */
 export interface HabitStreakEntry {
-  habit: "walking" | "meditation";
+  habit: "walking" | "meditation" | "focus";
   currentStreakDays: number;
   consistencyPct: number | null;
   lastMetDate: string | null;

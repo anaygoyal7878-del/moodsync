@@ -31,7 +31,7 @@ export { explainTrigger, explainConflict, explainManualPause, explainRateLimit }
 export { createNotification, shouldNotify, deliverNotification, type CreateNotificationInput } from './notificationExecutor.js';
 export { computeWeeklyInsights, computeBiggestImprovement, type BiggestImprovementResult } from './weeklyReport.js';
 export { generateRecommendations, type RecommendationCandidate, type PlaylistSkipStat } from './recommendations.js';
-export { computeWalkingStreak, computeMeditationStreak, type HabitStreakResult } from './habits.js';
+export { computeWalkingStreak, computeMeditationStreak, computeFocusStreak, type HabitStreakResult } from './habits.js';
 export {
   checkRecoveryUnusuallyHigh,
   checkRoomTemperatureOutsideSleepRange,
@@ -65,3 +65,55 @@ export {
   type BusyBlock,
   type StudyWindowSuggestion,
 } from './studyPlanner.js';
+export {
+  computeSocialBattery,
+  socialBatteryGuidance,
+  type SocialBatteryInput,
+  type SocialBatteryLevel,
+  type SocialBatteryResult,
+} from './socialBattery.js';
+export {
+  computeStressTimeline,
+  describeTimelineEntry,
+  type HeartRateSample,
+  type StressShiftDirection,
+  type StressTimelineEntry,
+  type TimelineContextEvent,
+} from './stressTimeline.js';
+export { suggestSmartBreak, type BreakKind, type BreakSuggestion, type SmartBreakInput } from './smartBreaks.js';
+export {
+  computeBedtimeTarget,
+  buildWindDownRoutine,
+  summarizeSleepQuality,
+  type BedtimeTarget,
+  type SleepNight,
+  type SleepQualitySummary,
+  type WindDownInput,
+  type WindDownStep,
+  type WindDownStepKind,
+} from './sleepCoach.js';
+export {
+  correlateOccurrences,
+  computeBestFocusHours,
+  describeFinding,
+  type HourlyPerformance,
+  type MemoryFinding,
+  type MetricPoint,
+  type ScoredSession,
+  type TimedOccurrence,
+} from './wellnessMemory.js';
+export {
+  composeDailyBrief,
+  computeOvernightChanges,
+  computeReadiness,
+  greetingFor,
+  readinessBand,
+  timeOfDayFor,
+  type BriefAction,
+  type BriefActionKind,
+  type DailyBrief,
+  type DailyBriefInput,
+  type OvernightChange,
+  type ReadinessBand,
+  type TimeOfDay,
+} from './dailyBrief.js';
