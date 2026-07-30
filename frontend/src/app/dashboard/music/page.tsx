@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { useMusicKit } from "@/lib/musicKitClient";
 import { artworkUrl } from "@/lib/appleMusicArtwork";
 import { RecommendedForNow } from "@/components/dashboard/RecommendedForNow";
+import { AdaptiveMusic } from "@/components/companion/AdaptiveMusic";
 
 /** Real, honest roadmap — every one of these needs either real listening
  * history (which can't exist before a working connection does) or
@@ -170,6 +171,11 @@ export default function MusicHomePage() {
   return (
     <div className="flex flex-col gap-6">
       <NowPlayingCard />
+
+      {/* One-tap mood picker sits above the single "recommended right
+          now" card — the picker is what you use when you already know
+          what you want; the card is what you read when you don't. */}
+      <AdaptiveMusic />
 
       <RecommendedForNow />
 

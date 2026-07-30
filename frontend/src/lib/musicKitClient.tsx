@@ -34,6 +34,10 @@ interface MusicKitContextValue {
   nowPlayingItem: MusicKit.MediaItem | null;
   playbackState: MusicKit.PlaybackStates | null;
   play: () => Promise<void>;
+  /** Queue a specific playlist from the user's library and start it —
+   * what makes the Adaptive Music "one tap" actually one tap. `play()`
+   * alone only resumes whatever was already queued. */
+  playPlaylist: (playlistId: string) => Promise<void>;
   pause: () => void;
   skipNext: () => Promise<void>;
   skipPrevious: () => Promise<void>;
@@ -134,6 +138,16 @@ export function MusicKitProvider({ children }: { children: ReactNode }) {
   async function play() {
     await instanceRef.current?.play();
   }
+  /** MusicKit's documented two-step: `setQueue` replaces the queue, then
+   * `play` starts it. Library playlists use the `library-playlists`
+   * queue key rather than the catalog `playlist` one — these ids come
+   * from the user's own `/v1/me/library/playlists`. */
+  async function playPlaylist(playlistId: string) {
+    const instance = instanceRef.current;
+    if (!instance) return;
+    await instance.setQueue({ playlist: playlistId });
+    await instance.play();
+  }
   function pause() {
     instanceRef.current?.pause();
   }
@@ -154,7 +168,19 @@ export function MusicKitProvider({ children }: { children: ReactNode }) {
         }}
       />
       <MusicKitContext.Provider
-        value={{ status, authorize, unauthorize, instance, nowPlayingItem, playbackState, play, pause, skipNext, skipPrevious }}
+        value={{
+          status,
+          authorize,
+          unauthorize,
+          instance,
+          nowPlayingItem,
+          playbackState,
+          play,
+          playPlaylist,
+          pause,
+          skipNext,
+          skipPrevious,
+        }}
       >
         {children}
       </MusicKitContext.Provider>

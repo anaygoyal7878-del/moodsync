@@ -2,10 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Play, Pause, RotateCcw, HeartPulse, ExternalLink } from "lucide-react";
+import { Play, Pause, RotateCcw, HeartPulse, ExternalLink, Footprints, Droplets, Wind, StretchHorizontal, X } from "lucide-react";
+import type { BreakSuggestionResponse } from "@/lib/types";
 
 const DURATIONS = [15, 25, 45, 60, 90] as const;
 const HR_POLL_INTERVAL_MS = 30_000;
+/** How often to *ask* whether a break is due. The answer is almost
+ * always no — the pacing lives server-side in ai/src/smartBreaks.ts, not
+ * in this interval. */
+const BREAK_CHECK_INTERVAL_MS = 5 * 60_000;
+
+const BREAK_ICON = {
+  walk: Footprints,
+  stretch: StretchHorizontal,
+  water: Droplets,
+  breathing: Wind,
+} as const;
 
 function formatTime(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
@@ -32,17 +44,24 @@ export function LuxuryFocusSession() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [focusScore, setFocusScore] = useState<number | null | undefined>(undefined);
   const [liveHeartRate, setLiveHeartRate] = useState<number | null>(null);
+  const [breakSuggestion, setBreakSuggestion] = useState<BreakSuggestionResponse["suggestion"]>(null);
 
   const startedAtRef = useRef<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hrIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const breakIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** When the last suggestion was shown, so the server can space the
+   * next one out — the spacing rule lives in smartBreaks.ts, this just
+   * reports what it needs to apply it. */
+  const lastSuggestionAtRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (hrIntervalRef.current) clearInterval(hrIntervalRef.current);
-    };
-  }, []);
+  function clearTimers() {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (hrIntervalRef.current) clearInterval(hrIntervalRef.current);
+    if (breakIntervalRef.current) clearInterval(breakIntervalRef.current);
+  }
+
+  useEffect(() => clearTimers, []);
 
   function pollHeartRate() {
     fetch("/api/biometrics/latest", { cache: "no-store" })
@@ -53,9 +72,25 @@ export function LuxuryFocusSession() {
       .catch(() => {});
   }
 
+  function checkForBreak() {
+    if (!startedAtRef.current) return;
+    const params = new URLSearchParams({ startedAt: startedAtRef.current });
+    if (lastSuggestionAtRef.current !== null) {
+      params.set("minutesSinceLastSuggestion", String((Date.now() - lastSuggestionAtRef.current) / 60_000));
+    }
+    fetch(`/api/focus-sessions/break-suggestion?${params}`, { cache: "no-store" })
+      .then((res) => (res.ok ? (res.json() as Promise<BreakSuggestionResponse>) : null))
+      .then((data) => {
+        if (!data?.suggestion) return;
+        setBreakSuggestion(data.suggestion);
+        lastSuggestionAtRef.current = Date.now();
+      })
+      .catch(() => {});
+  }
+
   function completeSession() {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    if (hrIntervalRef.current) clearInterval(hrIntervalRef.current);
+    clearTimers();
+    setBreakSuggestion(null);
     setStatus("completed");
 
     if (!startedAtRef.current) return;
@@ -91,22 +126,23 @@ export function LuxuryFocusSession() {
     intervalRef.current = setInterval(tick, 1000);
     pollHeartRate();
     hrIntervalRef.current = setInterval(pollHeartRate, HR_POLL_INTERVAL_MS);
+    breakIntervalRef.current = setInterval(checkForBreak, BREAK_CHECK_INTERVAL_MS);
   }
 
   function handlePause() {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    if (hrIntervalRef.current) clearInterval(hrIntervalRef.current);
+    clearTimers();
     setStatus("paused");
   }
 
   function handleReset() {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    if (hrIntervalRef.current) clearInterval(hrIntervalRef.current);
+    clearTimers();
     startedAtRef.current = null;
+    lastSuggestionAtRef.current = null;
     setStatus("idle");
     setRemaining(duration * 60);
     setSaveError(null);
     setLiveHeartRate(null);
+    setBreakSuggestion(null);
   }
 
   const totalSeconds = duration * 60;
@@ -158,6 +194,48 @@ export function LuxuryFocusSession() {
           </div>
         </div>
       </section>
+
+      {/* Smart Break — adaptive, not a fixed interval. The decision of
+          whether and what to suggest is made server-side from the
+          session's heart-rate trend (see ai/src/smartBreaks.ts); this
+          only renders the answer when there is one. Dismissible, and
+          never interrupts the timer itself. */}
+      {breakSuggestion && status === "running" && (
+        <section
+          className="flex items-start gap-3 rounded-[20px] p-4"
+          style={{ background: "rgba(212,175,120,0.10)", border: "1px solid var(--lux-hairline-gold)" }}
+          role="status"
+        >
+          {(() => {
+            const Icon = BREAK_ICON[breakSuggestion.kind];
+            return (
+              <span
+                className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                style={{ background: "var(--lux-bg-card-2)", color: "var(--lux-gold)" }}
+              >
+                <Icon size={15} aria-hidden="true" />
+              </span>
+            );
+          })()}
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-medium" style={{ color: "var(--lux-ink)" }}>
+              {breakSuggestion.label}
+            </p>
+            <p className="mt-0.5 text-[12.5px] leading-snug" style={{ color: "var(--lux-muted)" }}>
+              {breakSuggestion.reason}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setBreakSuggestion(null)}
+            aria-label="Dismiss break suggestion"
+            className="shrink-0 rounded-full p-1"
+            style={{ color: "var(--lux-muted)" }}
+          >
+            <X size={15} aria-hidden="true" />
+          </button>
+        </section>
+      )}
 
       {status === "idle" && (
         <section className="lux-stagger-2">
