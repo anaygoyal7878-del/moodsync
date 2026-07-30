@@ -32,6 +32,7 @@ import googleCalendarRoutes from './routes/integrations/googleCalendar.js';
 import energyRoutes from './routes/energy.js';
 import focusSessionRoutes from './routes/focusSessions.js';
 import burnoutRoutes from './routes/burnout.js';
+import studyPlanRoutes from './routes/studyPlan.js';
 
 export async function buildServer() {
   const app = Fastify({ loggerInstance: logger, trustProxy: true });
@@ -85,6 +86,7 @@ export async function buildServer() {
   await app.register(energyRoutes, { prefix: '/api' });
   await app.register(focusSessionRoutes, { prefix: '/api' });
   await app.register(burnoutRoutes, { prefix: '/api' });
+  await app.register(studyPlanRoutes, { prefix: '/api' });
 
   return app;
 }

@@ -59,3 +59,9 @@ export {
 export { sendAtlasMessage, AtlasNotConfiguredError, type AtlasChatMessage } from './atlasChat.js';
 export { computeLiveEnergyMeter, type CaffeineLogInput, type LiveEnergyMeter } from './energyMeter.js';
 export { computeFocusSessionScore } from './focusScore.js';
+export {
+  computeFreeBlocks,
+  computeStudyWindowSuggestion,
+  type BusyBlock,
+  type StudyWindowSuggestion,
+} from './studyPlanner.js';

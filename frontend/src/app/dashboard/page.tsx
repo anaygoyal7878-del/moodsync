@@ -5,6 +5,7 @@ import { LuxuryWeekBars } from "@/components/luxury/LuxuryWeekBars";
 import { LuxuryActivityRow } from "@/components/luxury/LuxuryActivityRow";
 import { LiveEnergyMeter } from "@/components/luxury/LiveEnergyMeter";
 import { BurnoutWarningBanner } from "@/components/luxury/BurnoutWarningBanner";
+import { StudyPlannerCard } from "@/components/luxury/StudyPlannerCard";
 import { iconForRuleName } from "@/lib/activityDisplay";
 import { Zap, Cpu, Wand2, TrendingUp, TrendingDown, Sparkle } from "lucide-react";
 import type {
@@ -143,6 +144,8 @@ export default async function DashboardHomePage() {
       <div className="lux-stagger-2">
         <LiveEnergyMeter />
       </div>
+
+      <StudyPlannerCard />
 
       <div className="lux-stagger-2">
         <QuickActions isPaused={isPaused} luxury />
