@@ -230,7 +230,7 @@ export function ScoreStrip({ brief }: { brief: DailyBriefResponse }) {
             <p className="font-luxury-display tabular text-[19px] font-semibold" style={{ color }}>
               {entry.score ?? "—"}
             </p>
-            <p className="mt-0.5 text-[10.5px] uppercase tracking-[0.05em]" style={{ color: "var(--lux-muted)" }}>
+            <p className="mt-0.5 text-[11px] uppercase tracking-[0.05em]" style={{ color: "var(--lux-muted)" }}>
               {entry.label}
             </p>
           </div>

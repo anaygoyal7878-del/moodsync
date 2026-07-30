@@ -97,7 +97,10 @@ export function Meter({
 
   return (
     <div>
-      <div className="flex items-baseline justify-between">
+      {/* Wraps rather than overflowing: in the home hero these sit two to
+          a row, which is ~150px each at 375px — not enough for a 34px
+          number and a status word side by side. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
         <span className="font-luxury-display tabular text-[34px] font-semibold leading-none" style={{ color: "var(--lux-ink)" }}>
           {value === null ? "—" : value}
           {value !== null && (
