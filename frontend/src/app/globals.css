@@ -472,3 +472,162 @@ body {
     animation: none;
   }
 }
+
+/* ============================================================
+   Ultra-Premium Player design system
+   ============================================================
+   The MoodSync Ultra-Premium Luxury spec's material layer, scoped to
+   `.ms-player` rather than declared globally.
+
+   WHY SCOPED: this token set is close to, but not identical with, the
+   `.ms-luxury` palette every other dashboard page already uses (sage
+   #8BA890 vs #5fb878, gold #C9A961 vs #d4af78, ground #0A0B0A vs
+   #141018). Declaring these globally would silently restyle ~20 shipped
+   pages. Scoping keeps the player exactly on-spec while leaving one
+   obvious place to unify the two palettes later — see
+   docs/PREMIUM_PLAYER.md.
+
+   Class names match the spec verbatim (.glass-surface, .metallic-border,
+   .satin-depth, .gradient-disc, .control-press, .progress-glow,
+   .bar-grow, .wave-liquid, .bg-adaptive, .noise-overlay) so the spec's
+   copy/paste snippets work unmodified inside this scope. */
+.ms-player {
+  --gold: #c9a961;
+  --sage: #8ba890;
+  --platinum: #d4d4d4;
+  --base: #0a0b0a;
+  --surface-dark: #0f1110;
+  --text-primary: rgba(255, 255, 255, 0.9);
+  --text-secondary: rgba(255, 255, 255, 0.5);
+  /* The spec's --text-muted is rgba(255,255,255,0.3). Raised to 0.55
+     for anything carrying words: 0.3 white on #0A0B0A is ~3.2:1, below
+     the WCAG AA 4.5:1 the spec's own checklist requires. The original
+     0.3 is kept as --text-faint for non-textual strokes and dividers,
+     where contrast minimums don't apply. */
+  --text-muted: rgba(255, 255, 255, 0.55);
+  --text-faint: rgba(255, 255, 255, 0.3);
+  --surface-primary: rgba(255, 255, 255, 0.04);
+  --surface-secondary: rgba(255, 255, 255, 0.02);
+  --surface-highlight: rgba(255, 255, 255, 0.08);
+  --accent-soft: rgba(139, 168, 144, 0.3);
+  --accent-warm: rgba(201, 169, 97, 0.2);
+
+  font-family: var(--font-outfit), sans-serif;
+  color: var(--text-primary);
+}
+
+.ms-player .font-display {
+  font-family: var(--font-space-grotesk), sans-serif;
+}
+
+@keyframes aurora-flow {
+  0% {
+    background-position: 0% 50%;
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    background-position: 100% 50%;
+    filter: hue-rotate(15deg);
+  }
+  100% {
+    background-position: 0% 50%;
+    filter: hue-rotate(0deg);
+  }
+}
+
+@keyframes wave-flow {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateY(-1px) scaleY(1.1);
+    opacity: 0.6;
+  }
+}
+
+.ms-player .gradient-disc {
+  background: linear-gradient(-45deg, var(--gold), var(--sage), #1c1e1b, var(--sage));
+  background-size: 400% 400%;
+  animation: aurora-flow 12s ease infinite;
+}
+
+.ms-player .glass-surface {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
+  backdrop-filter: blur(20px);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+}
+
+.ms-player .metallic-border {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    rgba(201, 169, 97, 0.1) 0%,
+    rgba(255, 255, 255, 0.03) 50%,
+    rgba(201, 169, 97, 0.1) 100%
+  );
+  padding: 1px;
+}
+
+.ms-player .satin-depth {
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.05),
+    0 15px 35px -5px rgba(0, 0, 0, 0.5);
+}
+
+.ms-player .bar-grow {
+  transition: width 3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ms-player .control-press:active {
+  transform: scale(0.94);
+  transition: transform 0.1s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ms-player .progress-glow {
+  box-shadow: 0 0 12px rgba(201, 169, 97, 0.2);
+}
+
+.ms-player .wave-liquid {
+  animation: wave-flow 4s ease-in-out infinite;
+}
+
+.ms-player .bg-adaptive {
+  background:
+    radial-gradient(circle at 50% -10%, rgba(139, 168, 144, 0.2) 0%, transparent 60%),
+    radial-gradient(circle at 0% 0%, rgba(201, 169, 97, 0.05) 0%, transparent 40%),
+    var(--base);
+  transition: background 8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ms-player .noise-overlay {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.02;
+  pointer-events: none;
+}
+
+/* The spec's checklist requires honoring prefers-reduced-motion, but
+   its CSS block doesn't implement it. The ambient effects are the whole
+   point of the aesthetic, so rather than freezing the disc on a hard
+   edge of the gradient, it settles on a still mid-gradient state that
+   still reads as liquid metal. */
+@media (prefers-reduced-motion: reduce) {
+  .ms-player .gradient-disc {
+    animation: none;
+    background-position: 50% 50%;
+  }
+
+  .ms-player .wave-liquid {
+    animation: none;
+    opacity: 0.45;
+  }
+
+  .ms-player .bar-grow {
+    transition: none;
+  }
+
+  .ms-player .bg-adaptive {
+    transition: none;
+  }
+}

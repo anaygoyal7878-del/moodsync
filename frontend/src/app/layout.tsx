@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Inter, Space_Grotesk, Outfit } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -19,6 +19,19 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["500", "600", "700"],
 });
 
+// Body face for the premium player (.ms-player). The design system also
+// calls for Satoshi as the headline face — Satoshi is a Fontshare
+// release, not a Google Font, so `next/font/google` cannot load it and
+// the spec's own `<link href="...family=Satoshi...">` silently fails
+// too. Space Grotesk (already self-hosted above) carries the headlines
+// until a licensed Satoshi file is added to the repo; see
+// docs/PREMIUM_PLAYER.md.
+const outfit = Outfit({
+  variable: "--font-outfit",
+  subsets: ["latin"],
+  weight: ["300", "400", "500"],
+});
+
 export const metadata: Metadata = {
   title: "MoodSync — The intelligence layer for your smart home",
   description:
@@ -33,7 +46,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${spaceGrotesk.variable} h-full antialiased`}
+      className={`${inter.variable} ${spaceGrotesk.variable} ${outfit.variable} h-full antialiased`}
       data-scroll-behavior="smooth"
     >
       <body className="min-h-full flex flex-col bg-canvas text-ink">{children}</body>

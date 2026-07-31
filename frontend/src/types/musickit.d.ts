@@ -52,6 +52,10 @@ declare namespace MusicKit {
     stop(): void;
     skipToNextItem(): Promise<void>;
     skipToPreviousItem(): Promise<void>;
+    /** Moves the playhead. Real MusicKit JS v3 API, declared here when
+     * the premium player's seek bar started using it — this file only
+     * declares the surface this app actually calls, not all of MusicKit. */
+    seekToTime(time: number): Promise<void>;
     setQueue(options: { songs?: string[]; song?: string; playlist?: string; album?: string }): Promise<unknown>;
 
     api: {

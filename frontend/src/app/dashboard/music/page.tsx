@@ -192,6 +192,14 @@ export default function MusicHomePage() {
             <p className="mt-0.5 text-xs text-ink-muted">Your saved playlists</p>
           </Card>
         </Link>
+        <Link href="/dashboard/music/player" className="col-span-2">
+          <Card className="transition-colors hover:bg-surface-hover">
+            <p className="text-sm font-medium">Listening Journey</p>
+            <p className="mt-0.5 text-xs text-ink-muted">
+              Full-screen player with your live baseline-to-now reading
+            </p>
+          </Card>
+        </Link>
         <Link href="/dashboard/music/analytics" className="col-span-2">
           <Card className="transition-colors hover:bg-surface-hover">
             <p className="text-sm font-medium">What works for you</p>

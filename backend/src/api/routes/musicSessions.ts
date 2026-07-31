@@ -12,6 +12,8 @@ import {
   compareFocusDuration,
   describeFocusDuration,
   musicModeLabel,
+  describeActiveState,
+  journeyLabel,
   type MusicMode,
   type CompletedMusicSession,
 } from '@moodsync/ai';
@@ -123,6 +125,57 @@ export default async function musicSessionRoutes(app: FastifyInstance) {
    * reattaches rather than starting a duplicate. */
   app.get('/music-sessions/open', { preHandler: app.authenticate }, async (request, reply) => {
     return reply.send({ session: await musicSessionRepository.findOpenSession(request.userId!) });
+  });
+
+  /**
+   * Live state for the player's emotional progress panel: the open
+   * session with its stored baseline, alongside the *current* scores,
+   * plus the supportive-language description of where things are
+   * heading.
+   *
+   * One round trip rather than the player fetching the session and the
+   * scores separately — the two have to describe the same instant or
+   * the before/after panel compares a baseline against a snapshot taken
+   * a second later, which is how a "calmer" reading appears out of
+   * rounding noise.
+   */
+  app.get('/music-sessions/live', { preHandler: app.authenticate }, async (request, reply) => {
+    const userId = request.userId!;
+    const [session, context] = await Promise.all([
+      musicSessionRepository.findOpenSession(userId),
+      loadCompanionContext(userId),
+    ]);
+
+    const current = {
+      stress: context.scores?.stress.value ?? null,
+      focus: context.scores?.focus.value ?? null,
+      heartRate: context.latest?.heartRate ?? null,
+    };
+
+    if (!session) return reply.send({ session: null, current, activeState: null });
+
+    const elapsedMinutes = (Date.now() - session.startedAt.getTime()) / 60_000;
+    const heartRateDelta =
+      session.baselineHeartRate !== null && current.heartRate !== null
+        ? current.heartRate - session.baselineHeartRate
+        : null;
+
+    const activeState = describeActiveState({
+      mode: session.mode as MusicMode,
+      baselineStress: session.baselineStressScore,
+      currentStress: current.stress,
+      heartRateDelta,
+      elapsedMinutes,
+    });
+
+    return reply.send({
+      session,
+      current,
+      heartRateDelta,
+      elapsedMinutes: Math.round(elapsedMinutes),
+      activeState,
+      journeyLabel: journeyLabel(activeState),
+    });
   });
 
   /**

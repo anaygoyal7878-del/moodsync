@@ -73,6 +73,7 @@ export {
   type MusicSessionWindow,
   type NextNightInput,
 } from './musicFeedback.js';
+export { describeActiveState, journeyLabel, type ActiveState, type ActiveStateInput } from './moodLanguage.js';
 export {
   rankPlaylistsByEffect,
   rankGenresByEffect,
