@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ChevronRight } from "lucide-react";
 import { useMusicKit } from "@/lib/musicKitClient";
 import { artworkUrl } from "@/lib/appleMusicArtwork";
 import { RecommendedForNow } from "@/components/dashboard/RecommendedForNow";
@@ -170,6 +171,40 @@ export default function MusicHomePage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* The player is the headline of this section, so it leads rather
+          than sitting in the link grid below. */}
+      <Link href="/dashboard/music/player" className="block">
+        <div className="metallic-border overflow-hidden rounded-[28px] transition-transform active:scale-[0.99]">
+          <div className="glass-surface flex items-center gap-4 rounded-[27px] p-5">
+            <span
+              className="gradient-disc satin-depth relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full"
+              aria-hidden="true"
+            >
+              <span
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background:
+                    "radial-gradient(circle at 50% 42%, rgba(10,11,10,0.15) 0%, rgba(10,11,10,0.6) 60%, rgba(10,11,10,0.8) 100%)",
+                }}
+              />
+              <span className="relative h-4 w-4 rounded-full" style={{ background: "var(--base)" }} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[8px] font-bold uppercase tracking-[0.3em]" style={{ color: "var(--text-muted)" }}>
+                Listening Journey
+              </span>
+              <span className="font-display mt-1.5 block text-[15px] font-medium" style={{ color: "var(--text-primary)" }}>
+                Open the player
+              </span>
+              <span className="mt-0.5 block text-[11px] leading-snug" style={{ color: "var(--text-muted)" }}>
+                Watch your baseline move while the music plays.
+              </span>
+            </span>
+            <ChevronRight size={18} className="shrink-0" style={{ color: "var(--sage)" }} aria-hidden="true" />
+          </div>
+        </div>
+      </Link>
+
       <NowPlayingCard />
 
       {/* One-tap mood picker sits above the single "recommended right
@@ -190,14 +225,6 @@ export default function MusicHomePage() {
           <Card className="transition-colors hover:bg-surface-hover">
             <p className="text-sm font-medium">Library</p>
             <p className="mt-0.5 text-xs text-ink-muted">Your saved playlists</p>
-          </Card>
-        </Link>
-        <Link href="/dashboard/music/player" className="col-span-2">
-          <Card className="transition-colors hover:bg-surface-hover">
-            <p className="text-sm font-medium">Listening Journey</p>
-            <p className="mt-0.5 text-xs text-ink-muted">
-              Full-screen player with your live baseline-to-now reading
-            </p>
           </Card>
         </Link>
         <Link href="/dashboard/music/analytics" className="col-span-2">

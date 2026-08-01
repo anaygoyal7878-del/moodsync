@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { Home, BatteryMedium, Timer, Moon, User, Bot } from "lucide-react";
+import { Home, Disc3, Timer, Moon, User, Bot } from "lucide-react";
 import { MagnificationDock, type DockItemData } from "./MagnificationDock";
 import { useViewMode } from "@/components/shell/ViewModeContext";
 
@@ -9,8 +9,19 @@ import { useViewMode } from "@/components/shell/ViewModeContext";
  * The mobile companion's six tabs — deliberately *not* the same shape as
  * the desktop sidebar. Phone use is daily and one-handed, so these are
  * the five things a person actually opens the app to do plus the
- * overflow: how am I doing (Today), how much have I got (Energy), get
- * to work (Focus), close the day (Sleep), ask something (Atlas).
+ * overflow: how am I doing (Today), put something on (Music), get to
+ * work (Focus), close the day (Sleep), ask something (Atlas).
+ *
+ * Music is a primary tab because the listening journey — press play,
+ * watch your body respond, learn what works — is a flagship feature,
+ * not a utility. It routes to the Music hub rather than straight to the
+ * player: the hub is where you *start* something, and the player is one
+ * tap from there. Landing on a player with nothing playing would be a
+ * dead end.
+ *
+ * Energy lost its slot to Music. It stays one tap away — the Today
+ * hero shows the live energy meter and links straight through — and is
+ * listed in Settings' overflow below.
  *
  * Automations, Devices and Scenes deliberately do NOT appear here —
  * configuring a smart home is control-center work that belongs on the
@@ -24,7 +35,7 @@ import { useViewMode } from "@/components/shell/ViewModeContext";
  */
 export const BOTTOM_NAV_TABS = [
   { href: "/dashboard", label: "Today", icon: Home, exact: true },
-  { href: "/dashboard/energy", label: "Energy", icon: BatteryMedium, exact: false },
+  { href: "/dashboard/music", label: "Music", icon: Disc3, exact: false },
   { href: "/dashboard/focus", label: "Focus", icon: Timer, exact: false },
   { href: "/dashboard/sleep", label: "Sleep", icon: Moon, exact: false },
   { href: "/dashboard/atlas", label: "Atlas", icon: Bot, exact: false },

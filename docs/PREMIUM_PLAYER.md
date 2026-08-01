@@ -55,14 +55,12 @@ the "human, never clinical" rule is testable and consistent everywhere:
 
 ## Deviations from the spec, and why
 
-**1. Scoped tokens, not global.** The spec's palette (sage `#8BA890`,
-gold `#C9A961`, base `#0A0B0A`) is close to but not the same as the
-`.ms-luxury` palette ~20 shipped pages already use (`#5fb878`,
-`#d4af78`, `#141018`). Declaring the spec's values globally would
-silently restyle all of them. Everything is scoped to `.ms-player`, with
-class names matching the spec verbatim so its copy/paste snippets work
-unmodified inside that scope. **Unifying the two palettes is a real
-open decision** — see "Open question" below.
+**1. Tokens are global, not scoped.** *(Revised — the first cut scoped
+them to `.ms-player` to avoid restyling the rest of the app. That was
+then adopted app-wide on purpose; see "The palette question" below.)*
+The spec's palette now lives in `.ms-luxury` and drives the whole
+product. Class names match the spec verbatim, so its copy/paste
+snippets work anywhere in the app.
 
 **2. `--text-muted` raised from 0.3 to 0.55.** The spec's checklist
 requires WCAG AA (4.5:1). Its own `--text-muted: rgba(255,255,255,0.3)`
@@ -124,12 +122,49 @@ exists it *is* the record label and carries the centre alone.
   `aria-hidden`.
 - Verified no horizontal overflow at 375px.
 
-## Open question for the next round
+## The palette question — now resolved
 
-The app now has two adjacent luxury palettes: `.ms-luxury` (every
-dashboard page) and `.ms-player` (this screen). They are close enough to
-look like a bug and far enough apart to look inconsistent side by side.
-Worth deciding deliberately: migrate `.ms-luxury` onto the spec's values
-(restyles ~20 pages, needs a visual pass on each), or keep the player as
-a deliberately distinct "full-bleed media" surface. Not decided here
-because it's a product call, not an implementation detail.
+An earlier revision of this doc flagged that the app had two adjacent
+luxury palettes (`.ms-luxury` for the dashboard, `.ms-player` for this
+screen) and asked whether to unify them.
+
+**Resolved: unified onto the player's palette, app-wide.** `.ms-luxury`
+now carries sage `#8BA890`, champagne gold `#C9A961` and near-black
+`#0A0B0A`, replacing the Superdesign draft's aubergine set. `.ms-player`
+no longer redefines any tokens — it inherits, so there is exactly one
+source of truth.
+
+Two things made this a token edit rather than a 20-page rewrite:
+
+1. `.ms-luxury` already repointed every semantic token
+   (`--surface`, `--brand`, `--ink`, …), and every component was already
+   written against those rather than raw hexes.
+2. The material classes (`.glass-surface`, `.metallic-border`,
+   `.satin-depth`, `.gradient-disc`, …) were un-scoped from `.ms-player`
+   so any surface in the app can use them. The Music page's Listening
+   Journey card is the first to adopt them outside the player.
+
+Status hues were retuned alongside — the previous `#ff916e` / `#ff7a7a`
+/ `#93b4e0` were saturated enough to read as a different design language
+against a near-black ground. All four replacements clear WCAG AA:
+
+| Token | On `--surface` |
+|---|---|
+| `--ink` `#e8e9e7` | 15.56:1 |
+| `--ink-secondary` `#c2c4c1` | 10.79:1 |
+| `--ink-muted` `#9a9c99` | 6.85:1 |
+| `--brand` (sage) | 7.31:1 |
+| `--gold` | 8.42:1 |
+| `--warning` `#d9a86a` | 8.81:1 |
+| `--danger` `#cf8b8b` | 6.97:1 |
+| `--info` `#93aab5` | 7.81:1 |
+
+### Not visually verified
+
+The retheme propagates to roughly 20 authenticated dashboard pages that
+could not be opened in this environment (no Postgres, so no login). Each
+token pair was checked numerically and a representative set of surfaces
+— Daily Brief hero, score strip, guidance card, glass/metallic card,
+status chips, buttons, bottom nav — was rendered standalone and looked
+correct. **Individual pages have not been seen.** Worth a pass through
+the dashboard once a database is available.

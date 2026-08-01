@@ -280,22 +280,56 @@ body {
   }
 }
 
-/* Ported from the MoodSync Superdesign project (project 4f734257-…).
- * Scoped under .ms-luxury rather than merged into :root — only the
- * mobile-app-style Home/Insights/Profile pages use this palette; every
- * other route keeps the earthy --brand/--surface system above. Values
- * are copied verbatim from the design draft's :root block. */
+/* The MoodSync Ultra-Premium Luxury palette, applied app-wide.
+ *
+ * This block previously carried the Superdesign draft's aubergine
+ * palette (#141018 ground, #5fb878 sage, #d4af78 gold). It now carries
+ * the values from the Ultra-Premium Player spec — near-black ground,
+ * sage #8BA890, champagne gold #C9A961 — so the whole product reads as
+ * one surface instead of the player looking like a different app.
+ *
+ * This is deliberately the ONLY place the change had to happen: the
+ * semantic repoint below (--surface, --brand, --ink, …) means every
+ * component already built against bg-surface/text-ink/text-brand
+ * re-themes with no per-component edits. That indirection is what made
+ * an app-wide retheme a token edit rather than a 20-page rewrite.
+ *
+ * The player's own token names (--gold, --sage, --text-primary, …) are
+ * aliased here too, so components written against the player's
+ * vocabulary work anywhere in the app, not just inside .ms-player. */
 .ms-luxury {
-  --lux-bg-ground: #141018;
-  --lux-bg-card: #211b28;
-  --lux-bg-card-2: #2a2332;
+  --lux-bg-ground: #0a0b0a;
+  --lux-bg-card: #0f1110;
+  --lux-bg-card-2: #161816;
   --lux-hairline: rgba(255, 255, 255, 0.07);
-  --lux-hairline-gold: rgba(212, 175, 120, 0.18);
-  --lux-sage: #5fb878;
-  --lux-gold: #d4af78;
-  --lux-rose: #d9a8c8;
-  --lux-ink: #f6f3f8;
-  --lux-muted: #9d94a8;
+  --lux-hairline-gold: rgba(201, 169, 97, 0.18);
+  --lux-sage: #8ba890;
+  --lux-gold: #c9a961;
+  /* Retuned from the old #d9a8c8 pink, which read as a different
+   * palette next to sage/gold. Carries the same job: the critical /
+   * "went the wrong way" accent. */
+  --lux-rose: #cf8b8b;
+  --lux-ink: #e8e9e7;
+  --lux-muted: #9a9c99;
+
+  /* Player vocabulary, available app-wide. */
+  --gold-raw: #c9a961;
+  --sage: var(--lux-sage);
+  --platinum: #d4d4d4;
+  --base: var(--lux-bg-ground);
+  --surface-dark: var(--lux-bg-card);
+  --text-primary: rgba(255, 255, 255, 0.9);
+  --text-secondary: rgba(255, 255, 255, 0.5);
+  /* 0.55, not the spec's 0.3 — 0.3 white on this ground measures
+   * 2.60:1 and fails the WCAG AA the spec's own checklist requires.
+   * --text-faint keeps 0.3 for non-textual strokes only. */
+  --text-muted: rgba(255, 255, 255, 0.55);
+  --text-faint: rgba(255, 255, 255, 0.3);
+  --surface-primary: rgba(255, 255, 255, 0.04);
+  --surface-secondary: rgba(255, 255, 255, 0.02);
+  --surface-highlight: rgba(255, 255, 255, 0.08);
+  --accent-soft: rgba(139, 168, 144, 0.3);
+  --accent-warm: rgba(201, 169, 97, 0.2);
 
   /* Repoints the app's existing semantic tokens (defined at :root
    * above) to the dark-luxury palette. Every component built before
@@ -312,33 +346,39 @@ body {
   --canvas: var(--lux-bg-ground);
   --surface: var(--lux-bg-card);
   --surface-raised: var(--lux-bg-card-2);
-  --surface-hover: #332b3d;
+  --surface-hover: #1c1f1c;
   --line: var(--lux-hairline);
   --line-strong: rgba(255, 255, 255, 0.14);
   --ink: var(--lux-ink);
-  --ink-secondary: #b8b0c2;
+  --ink-secondary: #c2c4c1;
   --ink-muted: var(--lux-muted);
   --brand: var(--lux-sage);
-  --brand-hover: #72c589;
+  --brand-hover: #9dbaa2;
   --gold: var(--lux-gold);
-  --gold-bg: rgba(212, 175, 120, 0.14);
+  --gold-bg: rgba(201, 169, 97, 0.14);
   --terracotta: var(--lux-rose);
-  --terracotta-bg: rgba(217, 168, 200, 0.14);
+  --terracotta-bg: rgba(207, 139, 139, 0.14);
   --success: var(--lux-sage);
-  --success-bg: rgba(95, 184, 120, 0.14);
-  --warning: #ff916e;
-  --warning-bg: rgba(255, 145, 110, 0.14);
-  --danger: #ff7a7a;
-  --danger-bg: rgba(255, 122, 122, 0.14);
-  --info: #93b4e0;
-  --info-bg: rgba(147, 180, 224, 0.14);
+  --success-bg: rgba(139, 168, 144, 0.14);
+  /* Status hues muted toward the sage/gold palette — the previous set
+   * (#ff916e / #ff7a7a / #93b4e0) were saturated enough to read as a
+   * different design language on this ground. All four still clear
+   * WCAG AA against #0a0b0a. */
+  --warning: #d9a86a;
+  --warning-bg: rgba(217, 168, 106, 0.14);
+  --danger: #cf8b8b;
+  --danger-bg: rgba(207, 139, 139, 0.14);
+  --info: #93aab5;
+  --info-bg: rgba(147, 170, 181, 0.14);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 12px 28px -10px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 28px 56px -20px rgba(0, 0, 0, 0.6);
 
   background: var(--lux-bg-ground);
   color: var(--lux-ink);
-  font-family: var(--font-inter), sans-serif;
+  /* Outfit, matching the player. Space Grotesk still carries display
+   * type via .font-luxury-display / .font-display. */
+  font-family: var(--font-outfit), sans-serif;
 }
 
 .ms-luxury .font-luxury-display {
@@ -492,31 +532,15 @@ body {
    .bar-grow, .wave-liquid, .bg-adaptive, .noise-overlay) so the spec's
    copy/paste snippets work unmodified inside this scope. */
 .ms-player {
-  --gold: #c9a961;
-  --sage: #8ba890;
-  --platinum: #d4d4d4;
-  --base: #0a0b0a;
-  --surface-dark: #0f1110;
-  --text-primary: rgba(255, 255, 255, 0.9);
-  --text-secondary: rgba(255, 255, 255, 0.5);
-  /* The spec's --text-muted is rgba(255,255,255,0.3). Raised to 0.55
-     for anything carrying words: 0.3 white on #0A0B0A is ~3.2:1, below
-     the WCAG AA 4.5:1 the spec's own checklist requires. The original
-     0.3 is kept as --text-faint for non-textual strokes and dividers,
-     where contrast minimums don't apply. */
-  --text-muted: rgba(255, 255, 255, 0.55);
-  --text-faint: rgba(255, 255, 255, 0.3);
-  --surface-primary: rgba(255, 255, 255, 0.04);
-  --surface-secondary: rgba(255, 255, 255, 0.02);
-  --surface-highlight: rgba(255, 255, 255, 0.08);
-  --accent-soft: rgba(139, 168, 144, 0.3);
-  --accent-warm: rgba(201, 169, 97, 0.2);
-
-  font-family: var(--font-outfit), sans-serif;
+  /* Tokens are NOT redefined here any more — they live once in
+   * .ms-luxury above, which now carries the Ultra-Premium palette
+   * app-wide. The player page renders inside the dashboard shell, so
+   * it inherits them. This block only keeps what is genuinely
+   * player-specific. */
   color: var(--text-primary);
 }
 
-.ms-player .font-display {
+.font-display {
   font-family: var(--font-space-grotesk), sans-serif;
 }
 
@@ -547,19 +571,19 @@ body {
   }
 }
 
-.ms-player .gradient-disc {
+.gradient-disc {
   background: linear-gradient(-45deg, var(--gold), var(--sage), #1c1e1b, var(--sage));
   background-size: 400% 400%;
   animation: aurora-flow 12s ease infinite;
 }
 
-.ms-player .glass-surface {
+.glass-surface {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
   backdrop-filter: blur(20px);
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
 }
 
-.ms-player .metallic-border {
+.metallic-border {
   position: relative;
   background: linear-gradient(
     135deg,
@@ -570,30 +594,30 @@ body {
   padding: 1px;
 }
 
-.ms-player .satin-depth {
+.satin-depth {
   box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.05),
     0 15px 35px -5px rgba(0, 0, 0, 0.5);
 }
 
-.ms-player .bar-grow {
+.bar-grow {
   transition: width 3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.ms-player .control-press:active {
+.control-press:active {
   transform: scale(0.94);
   transition: transform 0.1s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.ms-player .progress-glow {
+.progress-glow {
   box-shadow: 0 0 12px rgba(201, 169, 97, 0.2);
 }
 
-.ms-player .wave-liquid {
+.wave-liquid {
   animation: wave-flow 4s ease-in-out infinite;
 }
 
-.ms-player .bg-adaptive {
+.bg-adaptive {
   background:
     radial-gradient(circle at 50% -10%, rgba(139, 168, 144, 0.2) 0%, transparent 60%),
     radial-gradient(circle at 0% 0%, rgba(201, 169, 97, 0.05) 0%, transparent 40%),
@@ -601,7 +625,7 @@ body {
   transition: background 8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.ms-player .noise-overlay {
+.noise-overlay {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
   opacity: 0.02;
   pointer-events: none;
@@ -613,21 +637,21 @@ body {
    edge of the gradient, it settles on a still mid-gradient state that
    still reads as liquid metal. */
 @media (prefers-reduced-motion: reduce) {
-  .ms-player .gradient-disc {
+  .gradient-disc {
     animation: none;
     background-position: 50% 50%;
   }
 
-  .ms-player .wave-liquid {
+  .wave-liquid {
     animation: none;
     opacity: 0.45;
   }
 
-  .ms-player .bar-grow {
+  .bar-grow {
     transition: none;
   }
 
-  .ms-player .bg-adaptive {
+  .bg-adaptive {
     transition: none;
   }
 }
