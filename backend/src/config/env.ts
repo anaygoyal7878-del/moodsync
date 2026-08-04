@@ -46,6 +46,17 @@ const envSchema = z.object({
   SPOTIFY_CLIENT_SECRET: z.string().optional(),
   SPOTIFY_REDIRECT_URI: z.string().optional(),
 
+  /* Shared secret the messaging provider signs inbound webhooks with.
+   * Unset means the webhook rejects everything — see
+   * messagingService.verifyWebhookSignature. */
+  MESSAGING_WEBHOOK_SECRET: z.string().optional(),
+  /* Outbound send endpoint + key for whichever bridge provider is in
+   * use. Provider-agnostic on purpose (see docs/MESSAGING_BOT.md):
+   * Apple publishes no iMessage API, so the transport is expected to
+   * change. */
+  MESSAGING_SEND_URL: z.string().optional(),
+  MESSAGING_API_KEY: z.string().optional(),
+
   GOOGLE_CALENDAR_CLIENT_ID: z.string().optional(),
   GOOGLE_CALENDAR_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALENDAR_REDIRECT_URI: z.string().optional(),

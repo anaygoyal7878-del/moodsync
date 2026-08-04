@@ -145,3 +145,21 @@ export {
   type ReadinessBand,
   type TimeOfDay,
 } from './dailyBrief.js';
+export {
+  classifyInbound,
+  deterministicReply,
+  buildStatusReply,
+  shapeReply,
+  CRISIS_REPLY,
+  STOP_REPLY,
+  START_REPLY,
+  HELP_REPLY,
+  UNVERIFIED_REPLY,
+  OPTED_OUT_REPLY,
+  MESSAGING_STYLE_PROMPT,
+  MAX_REPLY_CHARS,
+  type InboundClassification,
+  type InboundIntent,
+  type StatusSnapshot,
+} from './messagingAgent.js';
+export { buildCaffeineLogReply, buildProactiveNudge } from './messagingAgent.js';

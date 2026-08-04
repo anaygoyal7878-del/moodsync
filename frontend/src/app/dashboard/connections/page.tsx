@@ -1,6 +1,7 @@
 import { backendFetch } from "@/lib/api";
 import { ConnectErrorBanner } from "@/components/dashboard/ConnectErrorBanner";
 import { ConnectionsSection } from "@/components/dashboard/ConnectionsSection";
+import { MessagingConnectCard } from "@/components/companion/MessagingConnectCard";
 import type { ConnectionsResponse } from "@/lib/types";
 
 export default async function ConnectionsPage({
@@ -20,6 +21,7 @@ export default async function ConnectionsPage({
     <div className="flex flex-col gap-6">
       {error && <ConnectErrorBanner error={error} />}
       <ConnectionsSection connections={connections} />
+      <MessagingConnectCard />
     </div>
   );
 }

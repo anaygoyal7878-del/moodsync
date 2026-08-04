@@ -44,6 +44,8 @@ model User {
   caffeineLogs         CaffeineLog[]
   focusSessions        FocusSession[]
   musicSessions        MusicSession[]
+  messagingConnections MessagingConnection[]
+  messagingMessages    MessagingMessage[]
   appleMusicConnection AppleMusicConnection?
   calendarConnection   CalendarConnection?
   preferences          UserPreferences?
@@ -615,6 +617,98 @@ model Recommendation {
 /// on = false), not a certain "did the user like this" signal — see the
 /// worker's doc comment. Feeds ai/src/recommendations.ts's third
 /// heuristic (suggest changing a playlist that gets skipped often).
+/// Which messaging surface a conversation happens on.
+///
+/// IMESSAGE is listed because it is the product intent, but note that
+/// Apple publishes no iMessage API — reaching it requires either Apple
+/// Messages for Business (business registration + an approved Messaging
+/// Service Provider) or a third-party bridge. See docs/MESSAGING_BOT.md.
+/// The enum is transport-agnostic on purpose: the conversational layer
+/// never branches on it.
+enum MessagingChannel {
+  IMESSAGE
+  SMS
+  WHATSAPP
+}
+
+enum MessagingDirection {
+  INBOUND
+  OUTBOUND
+}
+
+/// Binds one external handle (a phone number / Apple ID) to one
+/// MoodSync account.
+///
+/// SECURITY: this is the whole authentication story for the bot. Anyone
+/// who can text the service number can claim to be anyone, so a
+/// connection is worthless until `verifiedAt` is set — which only
+/// happens when the user texts back a code that was shown to them
+/// inside an authenticated app session. Until then the bot answers with
+/// UNVERIFIED_REPLY and reveals nothing about the account.
+///
+/// `@@unique([channel, handle])` is the load-bearing constraint: one
+/// handle can never resolve to two users, so an inbound webhook lookup
+/// is unambiguous.
+model MessagingConnection {
+  id      String           @id @default(uuid())
+  userId  String
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel MessagingChannel
+  /// Normalized at write time (E.164 for phone numbers) so lookup from
+  /// a webhook can't miss on formatting.
+  handle  String
+
+  /// Six digits, valid until `verificationExpiresAt`. Cleared once used.
+  verificationCode      String?
+  verificationExpiresAt DateTime?
+  verifiedAt            DateTime?
+
+  /// Set when the user texts STOP. Kept as a row rather than deleted so
+  /// a later START restores the same binding, and so we never re-message
+  /// someone who opted out just because they text again.
+  optedOutAt DateTime?
+
+  lastInboundAt  DateTime?
+  lastOutboundAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages MessagingMessage[]
+
+  @@unique([channel, handle])
+  @@index([userId])
+  @@map("messaging_connections")
+}
+
+/// Conversation log.
+///
+/// Unlike the in-app Atlas chat — which is stateless and relies on the
+/// client replaying history each turn — a messaging channel has no
+/// client to hold state, so history lives here. It is also the audit
+/// trail for what the bot actually said, which for a wellness product
+/// sending unsolicited messages is not optional.
+model MessagingMessage {
+  id           String              @id @default(uuid())
+  connectionId String
+  connection   MessagingConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  direction    MessagingDirection
+  body         String
+  /// The classified intent for inbound messages (see
+  /// ai/src/messagingAgent.ts). Null for outbound. Stored so the crisis
+  /// path is auditable after the fact.
+  intent       String?
+  /// Provider's own message id, when it returns one — for reconciling
+  /// delivery failures.
+  externalId   String?
+  createdAt    DateTime            @default(now())
+
+  @@index([connectionId, createdAt])
+  @@map("messaging_messages")
+}
+
 /// What a music session was *for* — the mode decides which biometric
 /// outcome model applies (see ai/src/musicFeedback.ts). A Relax session
 /// is judged on heart rate coming down; a Workout session is not.
