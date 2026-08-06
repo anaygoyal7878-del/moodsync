@@ -100,6 +100,24 @@ Before any of that, `POST /api/messaging/simulate` (dev-only,
 authenticated) runs the whole inbound pipeline with no provider at all,
 so the conversation logic can be exercised immediately.
 
+### Outbound sending
+
+`backend/src/services/messagingProviders/blueBubbles.ts` wraps
+BlueBubbles' `POST /api/v1/message/text`. It constructs the chat GUID
+directly as `iMessage;-;<handle>` (BlueBubbles' documented direct-message
+addressing convention) rather than resolving it via a `/api/v1/chat/query`
+lookup first — one request instead of two.
+
+`messagingService.handleInbound` calls this after computing every reply,
+whenever `MESSAGING_SEND_URL`/`MESSAGING_API_KEY` are set and the
+connection's channel isn't WhatsApp. A send failure never drops the
+reply from the conversation log — it's recorded with `externalId: null`
+either way, so "we computed a reply but never sent it" stays visible in
+the audit trail rather than silently disappearing. This has not been
+round-tripped against a real BlueBubbles server (none was available in
+this environment) — the request shape follows BlueBubbles' published
+docs but hasn't been confirmed by an actual send.
+
 ## Security: the order of checks is the design
 
 `handleInbound` evaluates in this order, and the order matters:
@@ -167,11 +185,6 @@ caught by a test, not by inspection.
 
 ## Known gaps
 
-- **Outbound sending is not wired to a live provider.** The service
-  computes replies and records them; `MESSAGING_SEND_URL` is read but no
-  provider-specific client ships, because which provider is a decision
-  that hasn't been made. The webhook returns the reply in its response,
-  which BlueBubbles-style setups can use directly.
 - **Proactive nudges are built but not scheduled.** `buildProactiveNudge`
   exists and burnout detection already runs in
   `workers/src/proactiveNotificationsWorker.ts`; hooking that worker to

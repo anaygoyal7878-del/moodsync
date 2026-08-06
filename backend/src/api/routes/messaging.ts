@@ -105,10 +105,11 @@ export default async function messagingRoutes(app: FastifyInstance) {
       body,
     });
 
-    // The reply is returned in the response so a provider that supports
-    // synchronous replies can use it directly; providers that don't will
-    // have had it sent via the outbound path already. Which of the two
-    // applies is a provider detail — see docs/MESSAGING_BOT.md.
+    // handleInbound already pushed this through the configured provider
+    // (BlueBubbles today) before returning. It's also included in the
+    // response so a provider whose webhook contract expects a
+    // synchronous reply body can use that path instead — see
+    // docs/MESSAGING_BOT.md.
     return reply.send({ reply: result.text, intent: result.intent });
   });
 

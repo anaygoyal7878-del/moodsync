@@ -20,6 +20,9 @@ import {
 } from '@moodsync/ai';
 import { env } from '../config/env.js';
 import { loadCompanionContext, bookedHoursFrom } from './companionContext.js';
+import { sendBlueBubblesMessage, MessagingProviderNotConfiguredError } from './messagingProviders/blueBubbles.js';
+
+type MessagingConnectionRecord = NonNullable<Awaited<ReturnType<typeof messagingRepository.findByHandle>>>;
 
 /**
  * Turns an inbound message into an outbound reply.
@@ -98,15 +101,20 @@ export const messagingService = {
   },
 
   /**
-   * The whole inbound pipeline. Returns what to send back; the caller
-   * is responsible for actually dispatching it through the provider.
+   * The whole inbound pipeline. Computes the reply, actually dispatches
+   * it through the configured provider (best-effort — a send failure
+   * doesn't lose the reply, see `deliverAndRecord`), and returns it so
+   * a provider that supports a synchronous webhook response can also
+   * use it directly.
    */
   async handleInbound(message: InboundMessage): Promise<OutboundReply> {
     const classification = classifyInbound(message.body);
     const connection = await messagingRepository.findByHandle(message.channel, message.from);
 
     // 1 + 2. Unknown handle. Crisis still answers; nothing else leaks
-    // whether this number is associated with an account.
+    // whether this number is associated with an account. There's no
+    // connection to log against or send through here, so this is the
+    // one path that returns directly rather than through the epilogue.
     if (!connection) {
       if (classification.intent === 'crisis') {
         return { text: deterministicReply(classification), intent: 'crisis' };
@@ -123,92 +131,9 @@ export const messagingService = {
     });
     await messagingRepository.touch(connection.id, 'INBOUND');
 
-    if (classification.intent === 'crisis') {
-      return { text: deterministicReply(classification), intent: 'crisis' };
-    }
-
-    // 3. Verification. A pending connection can only do one thing.
-    if (!connection.verifiedAt) {
-      if (classification.intent === 'verify' && classification.code) {
-        const confirmed = await messagingRepository.confirmVerification(connection.id, classification.code);
-        return confirmed
-          ? { text: "You're all set. Text HELP to see what I can do, or just ask me something.", intent: 'verified' }
-          : { text: "That code didn't work. Codes expire after 15 minutes — generate a new one in the app.", intent: 'verify_failed' };
-      }
-      return { text: UNVERIFIED_REPLY, intent: 'unverified' };
-    }
-
-    // 4. Opt-out. STOP is always honored; only START comes back.
-    if (classification.intent === 'stop') {
-      await messagingRepository.setOptedOut(connection.id, true);
-      return { text: deterministicReply(classification), intent: 'stop' };
-    }
-    if (connection.optedOutAt) {
-      if (classification.intent === 'start') {
-        await messagingRepository.setOptedOut(connection.id, false);
-        return { text: deterministicReply(classification), intent: 'start' };
-      }
-      return { text: OPTED_OUT_REPLY, intent: 'opted_out' };
-    }
-
-    // 5. Rate limit, before any model call.
-    const since = new Date(Date.now() - RATE_WINDOW_MINUTES * 60_000);
-    if ((await messagingRepository.countInboundSince(connection.id, since)) > RATE_MAX_INBOUND) {
-      return { text: "That's a lot of messages — give me a few minutes to catch up.", intent: 'rate_limited' };
-    }
-
-    // 6a. Deterministic commands.
-    const canned = deterministicReply(classification);
-    if (canned) return { text: canned, intent: classification.intent };
-
-    // 6b. Status — real numbers, no model.
-    if (classification.intent === 'status') {
-      return { text: await buildStatus(connection.userId), intent: 'status' };
-    }
-
-    // 6c. Health logging by text. Writes to the same CaffeineLog the
-    // in-app logger uses, so a drink logged from Messages shows up in
-    // the energy meter identically.
-    if (classification.intent === 'log_caffeine' && classification.mg) {
-      await caffeineLogRepository.create({
-        userId: connection.userId,
-        mg: classification.mg,
-        loggedAt: new Date(),
-      });
-      const context = await loadCompanionContext(connection.userId);
-      const energy = context.scores
-        ? computeLiveEnergyMeter(
-            context.scores,
-            (await caffeineLogRepository.listRecentForUser(connection.userId, 5)).map((log) => ({
-              mg: log.mg,
-              loggedAt: log.loggedAt,
-            })),
-          ).value
-        : null;
-      return { text: buildCaffeineLogReply(classification.mg, energy), intent: 'log_caffeine' };
-    }
-
-    // 6d. Open question — the grounded Atlas path, with conversation
-    // history replayed since the channel has no client holding it.
-    try {
-      const history = await messagingRepository.recentHistory(connection.id, HISTORY_TURNS);
-      const messages: AtlasChatMessage[] = history.map((row) => ({
-        role: row.direction === 'INBOUND' ? 'user' : 'assistant',
-        content: row.body,
-      }));
-      // The style instruction rides as a final user turn rather than
-      // being baked into atlasChat's system prompt — the in-app chat
-      // should keep its richer formatting.
-      messages.push({ role: 'user', content: `${MESSAGING_STYLE_PROMPT}\n\nMessage: ${message.body}` });
-
-      const reply = await sendAtlasMessage(connection.userId, messages);
-      return { text: shapeReply(reply), intent: 'question' };
-    } catch (error) {
-      if (error instanceof AtlasNotConfiguredError) {
-        return { text: "I can't answer questions right now — my AI isn't configured yet.", intent: 'not_configured' };
-      }
-      return { text: "I couldn't work that out just now. Try again in a moment.", intent: 'error' };
-    }
+    const reply = await resolveReply(message, connection, classification);
+    await deliverAndRecord(connection, reply);
+    return reply;
   },
 
   /** Records what was actually sent, so the thread and the audit trail
@@ -224,6 +149,140 @@ export const messagingService = {
     await messagingRepository.touch(connectionId, 'OUTBOUND');
   },
 };
+
+/** Everything after the connection is known and the inbound message is
+ * logged — split out purely so `handleInbound` has one epilogue instead
+ * of a send+log call duplicated at every return point. */
+async function resolveReply(
+  message: InboundMessage,
+  connection: MessagingConnectionRecord,
+  classification: ReturnType<typeof classifyInbound>,
+): Promise<OutboundReply> {
+  if (classification.intent === 'crisis') {
+    return { text: deterministicReply(classification), intent: 'crisis' };
+  }
+
+  // 3. Verification. A pending connection can only do one thing.
+  if (!connection.verifiedAt) {
+    if (classification.intent === 'verify' && classification.code) {
+      const confirmed = await messagingRepository.confirmVerification(connection.id, classification.code);
+      return confirmed
+        ? { text: "You're all set. Text HELP to see what I can do, or just ask me something.", intent: 'verified' }
+        : { text: "That code didn't work. Codes expire after 15 minutes — generate a new one in the app.", intent: 'verify_failed' };
+    }
+    return { text: UNVERIFIED_REPLY, intent: 'unverified' };
+  }
+
+  // 4. Opt-out. STOP is always honored; only START comes back.
+  if (classification.intent === 'stop') {
+    await messagingRepository.setOptedOut(connection.id, true);
+    return { text: deterministicReply(classification), intent: 'stop' };
+  }
+  if (connection.optedOutAt) {
+    if (classification.intent === 'start') {
+      await messagingRepository.setOptedOut(connection.id, false);
+      return { text: deterministicReply(classification), intent: 'start' };
+    }
+    return { text: OPTED_OUT_REPLY, intent: 'opted_out' };
+  }
+
+  // 5. Rate limit, before any model call.
+  const since = new Date(Date.now() - RATE_WINDOW_MINUTES * 60_000);
+  if ((await messagingRepository.countInboundSince(connection.id, since)) > RATE_MAX_INBOUND) {
+    return { text: "That's a lot of messages — give me a few minutes to catch up.", intent: 'rate_limited' };
+  }
+
+  // 6a. Deterministic commands.
+  const canned = deterministicReply(classification);
+  if (canned) return { text: canned, intent: classification.intent };
+
+  // 6b. Status — real numbers, no model.
+  if (classification.intent === 'status') {
+    return { text: await buildStatus(connection.userId), intent: 'status' };
+  }
+
+  // 6c. Health logging by text. Writes to the same CaffeineLog the
+  // in-app logger uses, so a drink logged from Messages shows up in
+  // the energy meter identically.
+  if (classification.intent === 'log_caffeine' && classification.mg) {
+    await caffeineLogRepository.create({
+      userId: connection.userId,
+      mg: classification.mg,
+      loggedAt: new Date(),
+    });
+    const context = await loadCompanionContext(connection.userId);
+    const energy = context.scores
+      ? computeLiveEnergyMeter(
+          context.scores,
+          (await caffeineLogRepository.listRecentForUser(connection.userId, 5)).map((log) => ({
+            mg: log.mg,
+            loggedAt: log.loggedAt,
+          })),
+        ).value
+      : null;
+    return { text: buildCaffeineLogReply(classification.mg, energy), intent: 'log_caffeine' };
+  }
+
+  // 6d. Open question — the grounded Atlas path, with conversation
+  // history replayed since the channel has no client holding it.
+  try {
+    const history = await messagingRepository.recentHistory(connection.id, HISTORY_TURNS);
+    const messages: AtlasChatMessage[] = history.map((row) => ({
+      role: row.direction === 'INBOUND' ? 'user' : 'assistant',
+      content: row.body,
+    }));
+    // The style instruction rides as a final user turn rather than
+    // being baked into atlasChat's system prompt — the in-app chat
+    // should keep its richer formatting.
+    messages.push({ role: 'user', content: `${MESSAGING_STYLE_PROMPT}\n\nMessage: ${message.body}` });
+
+    const reply = await sendAtlasMessage(connection.userId, messages);
+    return { text: shapeReply(reply), intent: 'question' };
+  } catch (error) {
+    if (error instanceof AtlasNotConfiguredError) {
+      return { text: "I can't answer questions right now — my AI isn't configured yet.", intent: 'not_configured' };
+    }
+    return { text: "I couldn't work that out just now. Try again in a moment.", intent: 'error' };
+  }
+}
+
+/**
+ * Actually pushes the reply through the configured provider, then logs
+ * whatever happened either way.
+ *
+ * A provider failure must never lose the reply from the audit trail —
+ * the message a user *should* have received is still recorded, with no
+ * externalId, so support can tell "we never sent this" apart from
+ * "nothing to send." BlueBubbles is the only provider wired today (see
+ * docs/MESSAGING_BOT.md); a webhook that supports a synchronous reply
+ * in its own response still gets one from the route regardless of
+ * whether this push also fires, so a provider switch never means a
+ * silent regression to no replies at all.
+ */
+async function deliverAndRecord(connection: MessagingConnectionRecord, reply: OutboundReply): Promise<void> {
+  if (!reply.text) return;
+
+  let externalId: string | null = null;
+  if (env.MESSAGING_SEND_URL && env.MESSAGING_API_KEY && connection.channel !== 'WHATSAPP') {
+    try {
+      const result = await sendBlueBubblesMessage(connection.handle, reply.text);
+      externalId = result.externalId;
+    } catch (error) {
+      if (!(error instanceof MessagingProviderNotConfiguredError)) {
+        console.error('messaging: outbound send failed', { connectionId: connection.id, error });
+      }
+    }
+  }
+
+  await messagingRepository.logMessage({
+    connectionId: connection.id,
+    userId: connection.userId,
+    direction: 'OUTBOUND',
+    body: reply.text,
+    externalId,
+  });
+  await messagingRepository.touch(connection.id, 'OUTBOUND');
+}
 
 /** The deterministic "how am I doing" payload, from the same context
  * loader the dashboard uses — so a text and the app never disagree. */
