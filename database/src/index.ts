@@ -47,3 +47,4 @@ export {
   type CompleteMusicSessionInput,
 } from './repositories/musicSessionRepository.js';
 export { messagingRepository, normalizeHandle } from './repositories/messagingRepository.js';
+export { messagingPendingActionRepository } from './repositories/messagingPendingActionRepository.js';

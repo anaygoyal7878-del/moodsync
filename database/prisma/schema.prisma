@@ -46,6 +46,7 @@ model User {
   musicSessions        MusicSession[]
   messagingConnections MessagingConnection[]
   messagingMessages    MessagingMessage[]
+  messagingPendingActions MessagingPendingAction[]
   appleMusicConnection AppleMusicConnection?
   calendarConnection   CalendarConnection?
   preferences          UserPreferences?
@@ -675,6 +676,7 @@ model MessagingConnection {
   updatedAt DateTime @updatedAt
 
   messages MessagingMessage[]
+  pendingAction MessagingPendingAction?
 
   @@unique([channel, handle])
   @@index([userId])
@@ -707,6 +709,35 @@ model MessagingMessage {
 
   @@index([connectionId, createdAt])
   @@map("messaging_messages")
+}
+
+/// A task-completing tool call (e.g. "turn off the bedroom lights")
+/// the agentic messaging layer wants to run but hasn't yet — see
+/// docs/MESSAGING_AGENTIC_ARCHITECTURE.md. A text channel has no client
+/// state to hold "are you sure?" the way a UI button does, so the ask
+/// has to survive to the *next* inbound message; this row is that
+/// survival. One connection can only have one pending action at a time
+/// (a second tool call before the first is confirmed replaces it,
+/// rather than queuing — stacked unconfirmed actions from one thread
+/// would be confusing to reason about and easy to mis-confirm).
+model MessagingPendingAction {
+  id           String              @id @default(uuid())
+  connectionId String              @unique
+  connection   MessagingConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  toolName     String
+  /// Already-validated tool args, serialized — re-validated again at
+  /// execution time regardless, since a Prisma round trip is not a
+  /// trust boundary.
+  argsJson     String
+  /// The confirmation question actually sent to the user, kept for the
+  /// audit trail (what were they agreeing to, in their own words).
+  promptText   String
+  createdAt    DateTime            @default(now())
+  expiresAt    DateTime
+
+  @@map("messaging_pending_actions")
 }
 
 /// What a music session was *for* — the mode decides which biometric

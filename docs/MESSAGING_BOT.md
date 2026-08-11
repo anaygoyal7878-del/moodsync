@@ -174,6 +174,10 @@ model call, so neither a loop nor a stranger can drive model spend.
 |---|---|
 | "how am I doing" | Readiness / energy / sleep from the same context loader the dashboard uses — no model, so a text and the app can't disagree |
 | "just had a coffee" | Writes a real `CaffeineLog` (~95mg) and replies with the resulting energy |
+| "what's my heart rate / recovery / sleep score" | Agentic Atlas calls `get_wearable_snapshot` — same wearable data as above, model-composed |
+| "turn off the bedroom light" / "set living room to 40%" | Agentic Atlas resolves the real light via `list_smart_home_devices`, then asks to confirm before anything changes — see docs/MESSAGING_AGENTIC_ARCHITECTURE.md |
+| "activate the relax scene" | Same confirm-then-execute path, for Hue scenes |
+| "what should I eat before a workout" | General nutrition guidance, grounded in real caffeine/energy data where relevant — not a personalized meal plan (MoodSync has no food-logging feature) |
 | "why am I so tired?" | Atlas, grounded in this account's real data |
 | HELP / STOP / START | Deterministic |
 

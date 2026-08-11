@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual, randomInt } from 'node:crypto';
-import { messagingRepository, caffeineLogRepository } from '@moodsync/database';
+import { messagingRepository, messagingPendingActionRepository, caffeineLogRepository } from '@moodsync/database';
 import type { MessagingChannel } from '@moodsync/database';
 import {
   classifyInbound,
@@ -7,7 +7,8 @@ import {
   buildStatusReply,
   buildCaffeineLogReply,
   shapeReply,
-  sendAtlasMessage,
+  sendAgenticMessage,
+  executeConfirmedAction,
   AtlasNotConfiguredError,
   computeReadiness,
   computeLiveEnergyMeter,
@@ -186,6 +187,34 @@ async function resolveReply(
     return { text: OPTED_OUT_REPLY, intent: 'opted_out' };
   }
 
+  // 4b. A pending confirmable action from a previous turn — see
+  // docs/MESSAGING_AGENTIC_ARCHITECTURE.md. Checked ahead of normal
+  // classification because "yes" here means "do the thing I proposed
+  // last turn," not the START opt-in word classifyInbound would
+  // otherwise read it as. A reply that's neither yes nor no falls
+  // through to normal handling and leaves the pending action in place
+  // to expire on its own TTL, rather than being force-cleared by an
+  // unrelated message.
+  const pending = await messagingPendingActionRepository.findActive(connection.id);
+  if (pending) {
+    const body = message.body.trim().toLowerCase();
+    if (AFFIRMATIVE.test(body)) {
+      await messagingPendingActionRepository.clear(connection.id);
+      try {
+        const args = JSON.parse(pending.argsJson) as Record<string, unknown>;
+        const resultText = await executeConfirmedAction(connection.userId, pending.toolName, args);
+        return { text: resultText, intent: 'action_confirmed' };
+      } catch (error) {
+        const text = error instanceof Error ? error.message : 'That failed — try again.';
+        return { text, intent: 'action_failed' };
+      }
+    }
+    if (NEGATIVE.test(body)) {
+      await messagingPendingActionRepository.clear(connection.id);
+      return { text: 'Okay, cancelled.', intent: 'action_cancelled' };
+    }
+  }
+
   // 5. Rate limit, before any model call.
   const since = new Date(Date.now() - RATE_WINDOW_MINUTES * 60_000);
   if ((await messagingRepository.countInboundSince(connection.id, since)) > RATE_MAX_INBOUND) {
@@ -223,8 +252,10 @@ async function resolveReply(
     return { text: buildCaffeineLogReply(classification.mg, energy), intent: 'log_caffeine' };
   }
 
-  // 6d. Open question — the grounded Atlas path, with conversation
-  // history replayed since the channel has no client holding it.
+  // 6d. Open question — the agentic Atlas path (real tool calls for
+  // wearable data, smart home, and nutrition guidance — see
+  // docs/MESSAGING_AGENTIC_ARCHITECTURE.md), with conversation history
+  // replayed since the channel has no client holding it.
   try {
     const history = await messagingRepository.recentHistory(connection.id, HISTORY_TURNS);
     const messages: AtlasChatMessage[] = history.map((row) => ({
@@ -232,12 +263,22 @@ async function resolveReply(
       content: row.body,
     }));
     // The style instruction rides as a final user turn rather than
-    // being baked into atlasChat's system prompt — the in-app chat
-    // should keep its richer formatting.
+    // being baked into the system prompt — the in-app chat should keep
+    // its richer formatting.
     messages.push({ role: 'user', content: `${MESSAGING_STYLE_PROMPT}\n\nMessage: ${message.body}` });
 
-    const reply = await sendAtlasMessage(connection.userId, messages);
-    return { text: shapeReply(reply), intent: 'question' };
+    const reply = await sendAgenticMessage(connection.userId, messages);
+    if (reply.pendingAction) {
+      await messagingPendingActionRepository.set({
+        connectionId: connection.id,
+        userId: connection.userId,
+        toolName: reply.pendingAction.toolName,
+        args: reply.pendingAction.args,
+        promptText: reply.pendingAction.confirmPrompt,
+      });
+      return { text: reply.pendingAction.confirmPrompt, intent: 'action_proposed' };
+    }
+    return { text: shapeReply(reply.text), intent: 'question' };
   } catch (error) {
     if (error instanceof AtlasNotConfiguredError) {
       return { text: "I can't answer questions right now — my AI isn't configured yet.", intent: 'not_configured' };
@@ -245,6 +286,13 @@ async function resolveReply(
     return { text: "I couldn't work that out just now. Try again in a moment.", intent: 'error' };
   }
 }
+
+/** Casual confirm/cancel wording — deliberately looser than
+ * classifyInbound's carrier-standard START/STOP word lists, since these
+ * only ever apply when a specific pending action is already on the
+ * table (checked by the caller before either regex runs). */
+const AFFIRMATIVE = /^(yes|y|yeah|yep|yup|confirm|do it|go ahead|sure|ok|okay)\b/i;
+const NEGATIVE = /^(no|n|nope|nah|cancel|never ?mind)\b/i;
 
 /**
  * Actually pushes the reply through the configured provider, then logs

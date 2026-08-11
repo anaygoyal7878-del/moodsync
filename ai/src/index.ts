@@ -1,7 +1,14 @@
 export { evaluateRule, evaluateRules, withinTimeWindow } from './ruleEngine.js';
 export { isWithinCooldown } from './cooldown.js';
 export { dispatchForReading, dispatchForLocationEvent, type DispatchResult } from './dispatch.js';
-export { executeHueAction, setAllHueLights } from './hueActionExecutor.js';
+export {
+  executeHueAction,
+  setAllHueLights,
+  listHueLightsForUser,
+  listHueScenesForUser,
+  setHueLightByName,
+  activateHueSceneByName,
+} from './hueActionExecutor.js';
 // executeSpotifyAction wasn't previously exported publicly (only used
 // internally by dispatch.ts) — the Alexa integration's named-rule voice
 // intents (see docs/ALEXA_ARCHITECTURE.md §9) need to run a rule's full
@@ -56,7 +63,7 @@ export {
   type RoomWellnessResult,
   type HomeScore,
 } from './homeWellness.js';
-export { sendAtlasMessage, AtlasNotConfiguredError, type AtlasChatMessage } from './atlasChat.js';
+export { sendAtlasMessage, buildAtlasSystemPrompt, AtlasNotConfiguredError, type AtlasChatMessage } from './atlasChat.js';
 export { computeLiveEnergyMeter, type CaffeineLogInput, type LiveEnergyMeter } from './energyMeter.js';
 export { computeFocusSessionScore } from './focusScore.js';
 export {
@@ -163,3 +170,5 @@ export {
   type StatusSnapshot,
 } from './messagingAgent.js';
 export { buildCaffeineLogReply, buildProactiveNudge } from './messagingAgent.js';
+export { sendAgenticMessage, type AgenticReply, type AgenticReplyAction } from './agenticMessaging.js';
+export { executeConfirmedAction } from './messagingTools.js';

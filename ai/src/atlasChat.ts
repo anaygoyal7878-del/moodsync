@@ -44,7 +44,7 @@ function formatScore(score: WellnessScores[keyof WellnessScores]): string {
  * answers are grounded in what's actually true for this account rather
  * than a plausible-sounding guess.
  */
-async function buildSystemPrompt(userId: string): Promise<string> {
+export async function buildAtlasSystemPrompt(userId: string): Promise<string> {
   const [latest, rules, wearables, smartHome, sessions] = await Promise.all([
     biometricReadingRepository.findLatestNormalized(userId),
     automationRuleRepository.listForUser(userId),
@@ -127,7 +127,7 @@ export async function sendAtlasMessage(userId: string, messages: AtlasChatMessag
   if (!apiKey) throw new AtlasNotConfiguredError();
 
   const client = new GoogleGenAI({ apiKey });
-  const systemInstruction = await buildSystemPrompt(userId);
+  const systemInstruction = await buildAtlasSystemPrompt(userId);
 
   const response = await client.models.generateContent({
     model: MODEL,

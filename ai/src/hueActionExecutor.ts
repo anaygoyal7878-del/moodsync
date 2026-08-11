@@ -1,5 +1,5 @@
 import { smartHomeConnectionRepository, oauthTokenRepository } from '@moodsync/database';
-import { HueClient, refreshHueToken, type HueOAuthConfig } from '@moodsync/integration-hue';
+import { HueClient, refreshHueToken, type HueLight, type HueScene, type HueOAuthConfig } from '@moodsync/integration-hue';
 import type { AutomationAction } from '@moodsync/shared';
 
 function requireHueConfig(): HueOAuthConfig {
@@ -102,4 +102,45 @@ export async function setAllHueLights(userId: string, on: boolean): Promise<numb
   const lights = await client.listLights();
   await Promise.all(lights.map((light) => client.setLightState(light.id, { on })));
   return lights.length;
+}
+
+/** Read-only listing, shared by the dashboard's device pickers and the
+ * messaging bot's `list_smart_home_devices` tool (see
+ * docs/MESSAGING_AGENTIC_ARCHITECTURE.md) — both need "what can I
+ * control" without a Hue connection already resolved to a client. */
+export async function listHueLightsForUser(userId: string): Promise<HueLight[]> {
+  const client = await getHueClientForUser(userId);
+  return client.listLights();
+}
+
+export async function listHueScenesForUser(userId: string): Promise<HueScene[]> {
+  const client = await getHueClientForUser(userId);
+  return client.listScenes();
+}
+
+/** Named-light control for the messaging bot: the model has a light's
+ * *name* from `list_smart_home_devices`, not its Hue id, and asking it
+ * to invent an id would risk it hallucinating one — so this resolves
+ * the name itself (case-insensitive, first match) and throws a message
+ * meant to be relayed back to the user verbatim when nothing matches. */
+export async function setHueLightByName(userId: string, name: string, state: { on?: boolean; brightness?: number }): Promise<void> {
+  const client = await getHueClientForUser(userId);
+  const lights = await client.listLights();
+  const match = lights.find((light) => light.metadata.name.toLowerCase() === name.toLowerCase());
+  if (!match) {
+    const available = lights.map((light) => light.metadata.name).join(', ') || 'none connected';
+    throw new Error(`No light named "${name}" — available lights: ${available}`);
+  }
+  await client.setLightState(match.id, state);
+}
+
+export async function activateHueSceneByName(userId: string, name: string): Promise<void> {
+  const client = await getHueClientForUser(userId);
+  const scenes = await client.listScenes();
+  const match = scenes.find((scene) => scene.metadata.name.toLowerCase() === name.toLowerCase());
+  if (!match) {
+    const available = scenes.map((scene) => scene.metadata.name).join(', ') || 'none configured';
+    throw new Error(`No scene named "${name}" — available scenes: ${available}`);
+  }
+  await client.activateScene(match.id);
 }
