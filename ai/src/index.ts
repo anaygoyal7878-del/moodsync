@@ -179,7 +179,7 @@ export {
 } from './messagingAgent.js';
 export { buildCaffeineLogReply, buildProactiveNudge } from './messagingAgent.js';
 export { sendProactiveInsight } from './messagingDelivery.js';
-export { getTodayCalendarLoad, type TodayCalendarLoad } from './calendarSignal.js';
+export { getTodayCalendarLoad, isInMeetingNow, type TodayCalendarLoad } from './calendarSignal.js';
 
 // --- Adaptive Environment Intelligence Engine ---
 // See docs/ADAPTIVE_ENVIRONMENT_ARCHITECTURE.md.
@@ -228,6 +228,11 @@ export {
   type GuardInput,
   type GuardBlockReason,
 } from './environmentGuards.js';
+export {
+  computeStateHeldMinutes,
+  MAX_OBSERVATION_GAP_MINUTES,
+  type StateObservationRecord,
+} from './stateHistory.js';
 export {
   computeAcceptance,
   computeEnvironmentEffects,

@@ -27,7 +27,7 @@ vi.mock('@moodsync/integration-google-calendar', () => ({
   refreshGoogleCalendarToken: refreshTokenMock,
 }));
 
-const { getTodayCalendarLoad } = await import('./calendarSignal.js');
+const { getTodayCalendarLoad, isInMeetingNow } = await import('./calendarSignal.js');
 
 const REQUIRED_ENV = {
   GOOGLE_CALENDAR_CLIENT_ID: 'client-id',
@@ -86,5 +86,56 @@ describe('getTodayCalendarLoad', () => {
     findByUserMock.mockResolvedValue({ id: 'conn-1', oauthTokenId: 'token-1' });
 
     await expect(getTodayCalendarLoad('u1', new Date(), new Date())).rejects.toThrow('GOOGLE_CALENDAR_CLIENT_ID');
+  });
+});
+
+describe('isInMeetingNow', () => {
+  const NOW = new Date('2026-08-15T15:00:00Z');
+
+  it('returns false when no calendar is connected — no calendar means no known meeting', async () => {
+    findByUserMock.mockResolvedValue(null);
+    expect(await isInMeetingNow('u1', NOW)).toBe(false);
+  });
+
+  it('returns true for a timed event in progress right now', async () => {
+    Object.assign(process.env, REQUIRED_ENV);
+    findByUserMock.mockResolvedValue({ id: 'c1', oauthTokenId: 't1' });
+    getDecryptedMock.mockResolvedValue({
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: new Date(Date.now() + 3600_000),
+    });
+    listEventsMock.mockResolvedValue([
+      { id: 'e1', title: 'Standup', start: new Date('2026-08-15T14:30:00Z'), end: new Date('2026-08-15T15:30:00Z'), isAllDay: false },
+    ]);
+    expect(await isInMeetingNow('u1', NOW)).toBe(true);
+  });
+
+  it('returns false for an event that already ended', async () => {
+    Object.assign(process.env, REQUIRED_ENV);
+    findByUserMock.mockResolvedValue({ id: 'c1', oauthTokenId: 't1' });
+    getDecryptedMock.mockResolvedValue({
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: new Date(Date.now() + 3600_000),
+    });
+    listEventsMock.mockResolvedValue([
+      { id: 'e1', title: 'Standup', start: new Date('2026-08-15T13:00:00Z'), end: new Date('2026-08-15T14:00:00Z'), isAllDay: false },
+    ]);
+    expect(await isInMeetingNow('u1', NOW)).toBe(false);
+  });
+
+  it('ignores all-day events — a company holiday is not a meeting', async () => {
+    Object.assign(process.env, REQUIRED_ENV);
+    findByUserMock.mockResolvedValue({ id: 'c1', oauthTokenId: 't1' });
+    getDecryptedMock.mockResolvedValue({
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: new Date(Date.now() + 3600_000),
+    });
+    listEventsMock.mockResolvedValue([
+      { id: 'e1', title: 'Company Holiday', start: new Date('2026-08-15T00:00:00Z'), end: new Date('2026-08-16T00:00:00Z'), isAllDay: true },
+    ]);
+    expect(await isInMeetingNow('u1', NOW)).toBe(false);
   });
 });

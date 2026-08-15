@@ -80,3 +80,30 @@ export async function getTodayCalendarLoad(userId: string, windowStart: Date, wi
 
   return { eventCount: events.length, bookedHours };
 }
+
+/**
+ * Is a timed calendar event happening right now?
+ *
+ * Backs the Adaptive Environment's `inMeeting` guard — MoodSync must
+ * not dim someone's lights mid-call. Until this existed the service
+ * passed a hardcoded `false`, so that guard could never actually fire.
+ *
+ * All-day events are excluded deliberately: "Company Holiday" spans
+ * the whole day but is not a meeting, and treating it as one would
+ * silence MoodSync for 24 hours. Returns `false` (not null) when no
+ * calendar is connected — no calendar means no known meeting, and the
+ * other guards still apply.
+ */
+export async function isInMeetingNow(userId: string, now: Date = new Date()): Promise<boolean> {
+  const connection = await calendarConnectionRepository.findByUser(userId);
+  if (!connection || !connection.oauthTokenId) return false;
+
+  const config = requireGoogleCalendarConfig();
+  const accessToken = await getFreshAccessToken(connection.oauthTokenId, config);
+  const client = new GoogleCalendarClient(accessToken);
+  // A narrow window around now — enough to catch an event in progress
+  // without pulling the whole day again.
+  const events = await client.listEvents(new Date(now.getTime() - 4 * 60 * 60_000), new Date(now.getTime() + 60_000));
+
+  return events.some((event) => !event.isAllDay && event.start <= now && event.end > now);
+}

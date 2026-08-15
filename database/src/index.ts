@@ -50,6 +50,8 @@ export { messagingRepository, normalizeHandle } from './repositories/messagingRe
 export { messagingPendingActionRepository } from './repositories/messagingPendingActionRepository.js';
 export {
   environmentRepository,
+  stateObservationRepository,
+  listAllAwaitingOutcome,
   DEFAULT_ENVIRONMENT_SETTINGS,
   PROPOSAL_TTL_MINUTES,
   type EnvironmentSettings,

@@ -174,3 +174,53 @@ export const environmentRepository = {
     });
   },
 };
+
+/** How far back to load observations when measuring held-duration.
+ * Comfortably longer than any plausible continuous stretch, so the
+ * gap-detection in ai/src/stateHistory.ts is what bounds the answer
+ * rather than an arbitrary query limit. */
+const OBSERVATION_LOOKBACK_HOURS = 12;
+
+export const stateObservationRepository = {
+  /** Records one assessment. Called on every state evaluation — the
+   * series' irregularity is expected and handled by
+   * `computeStateHeldMinutes`. */
+  async record(userId: string, state: string, confidence: number) {
+    return prisma.stateObservation.create({ data: { userId, state, confidence } });
+  },
+
+  /** Newest-first, which is the order `computeStateHeldMinutes` walks. */
+  async listRecent(userId: string, now: Date = new Date()) {
+    return prisma.stateObservation.findMany({
+      where: { userId, observedAt: { gte: new Date(now.getTime() - OBSERVATION_LOOKBACK_HOURS * 60 * 60_000) } },
+      orderBy: { observedAt: 'desc' },
+      take: 200,
+    });
+  },
+
+  /** Retention: this table grows on every dashboard load, and nothing
+   * reads past the lookback window. Called by the outcome worker so
+   * pruning rides along with an existing scheduled job rather than
+   * needing its own. */
+  async pruneOlderThan(days: number) {
+    const result = await prisma.stateObservation.deleteMany({
+      where: { observedAt: { lt: new Date(Date.now() - days * 24 * 60 * 60_000) } },
+    });
+    return result.count;
+  },
+};
+
+/** Cross-user sweep for the outcome worker — the per-user
+ * `listAwaitingOutcome` above can't drive a scheduled job that doesn't
+ * know which users to look at. */
+export async function listAllAwaitingOutcome(olderThanMinutes: number, limit = 200) {
+  return prisma.environmentSession.findMany({
+    where: {
+      status: { in: ['ACCEPTED', 'AUTO_APPLIED'] },
+      endedAt: null,
+      createdAt: { lte: new Date(Date.now() - olderThanMinutes * 60_000) },
+    },
+    orderBy: { createdAt: 'asc' },
+    take: limit,
+  });
+}

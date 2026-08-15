@@ -48,6 +48,7 @@ model User {
   messagingMessages    MessagingMessage[]
   messagingPendingActions MessagingPendingAction[]
   environmentSessions  EnvironmentSession[]
+  stateObservations    StateObservation[]
   environmentAutomationSettings EnvironmentAutomationSettings?
   appleMusicConnection AppleMusicConnection?
   calendarConnection   CalendarConnection?
@@ -1142,4 +1143,32 @@ model EnvironmentSession {
   @@index([userId, createdAt])
   @@index([userId, state, status])
   @@map("environment_sessions")
+}
+
+/// A single State Engine assessment, recorded so "how long has this
+/// state been held" is a *measurement* rather than a guess.
+///
+/// This exists because the automation cooldown's sibling guard —
+/// `MIN_STATE_DURATION_MINUTES`, which stops MoodSync acting on a state
+/// that flickered for thirty seconds — is only as good as its input.
+/// Without this table the service had to approximate held-duration from
+/// confidence, which is a different quantity entirely.
+///
+/// Rows are written on every assessment (dashboard load, worker tick),
+/// so the series is irregular by nature. `computeStateHeldMinutes`
+/// treats a gap longer than MAX_OBSERVATION_GAP_MINUTES as a break in
+/// the chain rather than continuous holding — six hours of silence
+/// between two "stressed" readings is not six hours of stress.
+model StateObservation {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// MoodState string (see ai/src/stateEngine.ts), same
+  /// no-migration-lockstep rationale as EnvironmentSession.state.
+  state      String
+  confidence Float
+  observedAt DateTime @default(now())
+
+  @@index([userId, observedAt])
+  @@map("state_observations")
 }

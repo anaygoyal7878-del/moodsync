@@ -1,5 +1,6 @@
 import {
   environmentRepository,
+  stateObservationRepository,
   biometricReadingRepository,
   homeSnapshotRepository,
   smartHomeConnectionRepository,
@@ -19,6 +20,8 @@ import {
   computeEnvironmentEffects,
   describeEffect,
   shouldProposeForState,
+  computeStateHeldMinutes,
+  isInMeetingNow,
   executeAction,
   computeWellnessScores,
   listHueLightsForUser,
@@ -122,6 +125,14 @@ async function gatherContext(userId: string, now: Date) {
     focusSessionRepository.listForUser(userId, 1).catch(() => []),
   ]);
 
+  // Both are best-effort: a calendar outage must not stop MoodSync
+  // assessing state, and no observation history simply means the
+  // held-duration guard blocks rather than permits (see stateHistory.ts).
+  const [observations, inMeeting] = await Promise.all([
+    stateObservationRepository.listRecent(userId, now).catch(() => []),
+    isInMeetingNow(userId, now).catch(() => false),
+  ]);
+
   const history = latestRow
     ? (await biometricReadingRepository.listRecentNormalized(userId, BASELINE_WINDOW_DAYS)).filter(
         (r) => r.timestamp !== latestRow.reading.timestamp,
@@ -185,6 +196,8 @@ async function gatherContext(userId: string, now: Date) {
     musicAvailable: spotify?.status === 'ACTIVE',
     userAway,
     inFocusSession,
+    inMeeting,
+    observations,
     bedroom,
   };
 }
@@ -210,6 +223,16 @@ export const environmentService = {
       },
       now,
     );
+
+    // Record every assessment so held-duration is measurable next time.
+    // Best-effort: failing to write history must not fail the read, and
+    // `unknown` is skipped — "we couldn't tell" isn't a state anyone
+    // holds, and recording it would break otherwise-continuous runs.
+    if (assessment.currentState !== 'unknown') {
+      void stateObservationRepository
+        .record(userId, assessment.currentState, assessment.confidence)
+        .catch(() => undefined);
+    }
 
     const currentEnvironment = {
       lights: ctx.lights.map((l) => ({ name: l.name, brightnessPct: l.brightnessPct })),
@@ -418,16 +441,16 @@ function buildGuardInput(
     quietHoursStart: ctx.settings.blockedHoursStart ?? parseHourString(ctx.quietHoursStart),
     quietHoursEnd: ctx.settings.blockedHoursEnd ?? parseHourString(ctx.quietHoursEnd),
     lastAutomationAt: ctx.settings.lastAutomationAt,
-    // Held-duration tracking needs a state-history table this round
-    // doesn't add; assessed states are treated as newly observed only
-    // when confidence is low. Documented as a real gap.
-    stateHeldMinutes: assessment.confidence >= 0.6 ? 15 : 0,
+    // Measured, not inferred: how long this exact state has actually
+    // been observed, with silences treated as breaks rather than
+    // continuity (ai/src/stateHistory.ts).
+    stateHeldMinutes: computeStateHeldMinutes(ctx.observations, assessment.currentState, now),
     confidence: assessment.confidence,
     lastManualOverrideAt: ctx.settings.lastManualOverrideAt,
     userAway: ctx.userAway,
     userAsleep: false,
     inFocusSession: ctx.inFocusSession,
-    inMeeting: false,
+    inMeeting: ctx.inMeeting,
     now,
   };
 }

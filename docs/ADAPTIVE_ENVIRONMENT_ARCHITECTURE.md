@@ -160,32 +160,57 @@ averaged in as zero. Only downward heart-rate moves are surfaced, and
 always as association ("has consistently been associated with"), never
 causation.
 
+## State duration and meeting detection
+
+Two of the guards were originally fed approximations. Both are now
+measured:
+
+**`stateHeldMinutes`** — `StateObservation` rows are written on every
+assessment, and `ai/src/stateHistory.ts` walks them backward to find
+how long the current state has actually been continuously observed.
+The subtlety is that the series is irregular (rows appear on dashboard
+loads and worker ticks, not on a fixed clock), so a gap longer than
+`MAX_OBSERVATION_GAP_MINUTES` (75) breaks the chain rather than
+counting as continuity — two "stressed" readings twelve hours apart
+are two observations, not twelve hours of stress. Unknown history
+returns 0, which *blocks* automation: an absent history is never a
+licence to act.
+
+**`inMeeting`** — `isInMeetingNow` reads the live calendar for a timed
+event spanning this moment. All-day events are excluded deliberately:
+"Company Holiday" spans the day but is not a meeting, and treating it
+as one would silence MoodSync for 24 hours.
+
+`workers/src/environmentOutcomeWorker.ts` closes the MEASURE step —
+until it existed, `EnvironmentSession.outcome*` stayed null forever and
+the learning engine's biometric half never received a single data
+point. Run it every 15-30 minutes; it also prunes state observations,
+so retention rides along with an existing job rather than needing its
+own.
+
 ## Known gaps
 
 - **Not live-verified.** No Postgres, Hue bridge, or connected wearable
   was available in this environment. Everything is unit-tested and
   type-checked; the authenticated dashboard pages have not been opened
   in a browser.
-- **`stateHeldMinutes` is approximated, not tracked.** Properly
-  enforcing "this state has persisted 10 minutes" needs a state-history
-  table this round doesn't add. `environmentService.ts` currently
-  derives it from confidence, which is a proxy — the guard logic and
-  its tests are correct, but the input feeding it in production is
-  weaker than the guard deserves. This is the most important follow-up.
 - **Manual override detection is limited to what MoodSync can observe.**
   It sees a declined proposal; it cannot see a light changed directly
   in the Hue app without polling. So "respect the user's manual change"
   holds for in-app countermands only.
-- **`inMeeting` and `userAsleep` are always false** in the service.
-  Calendar-derived meeting detection exists elsewhere
-  (`calendarSignal.ts`) and could feed this; sleep state would need a
-  live sleep-session signal no provider currently pushes.
+- **`userAsleep` is always false** in the service. It would need a live
+  sleep-session signal that no connected provider currently pushes —
+  sleep arrives as a next-morning summary, not a "they're asleep right
+  now" event. (`inMeeting` was in this list and is now real — see
+  "State duration and meeting detection" above.)
 - **Music proposals use a category string**, not a resolved playlist
   URI — the existing `musicIntelligence.ts` recommender should be wired
   in so proposals name the actual playlist the user responds best to.
-- **Outcome measurement is manual.** `POST /environment/proposals/:id/outcome`
-  exists and works, but nothing schedules it — a worker should sweep
-  `listAwaitingOutcome` on a cadence.
+- **Outcome measurement compares heart rate only.** The worker records
+  a real before/after delta, but `outcomeStressDelta` is still always
+  null — stress is a per-reading computed score and comparing two of
+  them needs the same windowing care `musicFeedback.ts` applies, which
+  isn't wired here yet.
 - **No analytics charts yet.** The spec's section 21 asked for a
   charting surface; the data model supports it (every session stores
   state, confidence, response, and outcome) but the page isn't built.

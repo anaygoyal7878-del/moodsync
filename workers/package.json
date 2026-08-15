@@ -13,6 +13,7 @@
     "start:notification-digest": "node dist/notificationDigestWorker.js",
     "start:spotify-playback-check": "node dist/spotifyPlaybackCheckWorker.js",
     "start:proactive-notifications": "node dist/proactiveNotificationsWorker.js",
+    "start:environment-outcome": "node dist/environmentOutcomeWorker.js",
     "typecheck": "tsc -b"
   },
   "dependencies": {
