@@ -26,6 +26,7 @@ import {
   checkSceneTimeOfDayPattern,
   checkBurnoutRisk,
   deliverNotification,
+  sendProactiveInsight,
 } from '@moodsync/ai';
 
 function mean(values: number[]): number {
@@ -65,10 +66,25 @@ function zonedHourOfDay(now: Date, timezone: string): number {
   return Number.isFinite(hour) ? hour % 24 : now.getUTCHours();
 }
 
+/**
+ * Delivers in-app, then best-effort also texts the same insight — this
+ * is the whole "Poke, but health-focused" behavior: a real insight this
+ * worker already generates now also reaches iMessage/SMS unprompted,
+ * for any account with a verified, non-opted-out MessagingConnection.
+ * See docs/HEALTH_INSIGHTS_TEXTING_ARCHITECTURE.md. A texting failure
+ * (no provider configured, BlueBubbles down) must never block or
+ * un-send the in-app notification, which is why it's a separate
+ * try/catch after the notification has already been created.
+ */
 async function deliverIfNotRecentlySent(userId: string, candidate: { title: string; body: string } | null): Promise<boolean> {
   if (!candidate) return false;
   if (await notificationRepository.hasRecentTitle(userId, candidate.title, DEDUPE_WINDOW_HOURS)) return false;
   await deliverNotification({ userId, title: candidate.title, body: candidate.body });
+  try {
+    await sendProactiveInsight(userId, candidate.title, candidate.body);
+  } catch (error) {
+    console.error(`[proactive-notifications] texting insight failed for user=${userId}:`, error instanceof Error ? error.message : error);
+  }
   return true;
 }
 

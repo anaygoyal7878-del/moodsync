@@ -170,5 +170,6 @@ export {
   type StatusSnapshot,
 } from './messagingAgent.js';
 export { buildCaffeineLogReply, buildProactiveNudge } from './messagingAgent.js';
+export { sendProactiveInsight } from './messagingDelivery.js';
 export { sendAgenticMessage, type AgenticReply, type AgenticReplyAction } from './agenticMessaging.js';
 export { executeConfirmedAction } from './messagingTools.js';

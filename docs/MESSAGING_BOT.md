@@ -1,8 +1,12 @@
 # MoodSync over Messaging (the "iMessage bot")
 
 Text MoodSync a question and get an answer grounded in your real data.
-Text it "just had a coffee" and it logs. It texts you when burnout
-signals stack up.
+Text it "just had a coffee" and it logs. It texts *you* when a real
+signal fires — unusually high recovery, burnout risk stacking up — the
+same "Poke, but health-focused" proactive behavior described in full in
+docs/HEALTH_INSIGHTS_TEXTING_ARCHITECTURE.md. It can also read wearable
+data, control a connected Hue light (with confirmation), and give
+general nutrition guidance — see docs/MESSAGING_AGENTIC_ARCHITECTURE.md.
 
 ## The platform reality, researched before building
 
