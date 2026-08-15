@@ -46,6 +46,7 @@ export {
   checkBurnoutRisk,
   checkHabitStreakMilestone,
   checkSocialBatteryLow,
+  checkRecentStressSpike,
   type ProactiveNotificationCandidate,
   type RoomTemperatureCheckInput,
   type SceneRunEvent,

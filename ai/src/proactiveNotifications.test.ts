@@ -6,6 +6,7 @@ import {
   checkBurnoutRisk,
   checkHabitStreakMilestone,
   checkSocialBatteryLow,
+  checkRecentStressSpike,
 } from './proactiveNotifications.js';
 
 describe('checkRecoveryUnusuallyHigh', () => {
@@ -151,5 +152,44 @@ describe('checkSocialBatteryLow', () => {
   it('still fires for a low level with no stated reason', () => {
     const result = checkSocialBatteryLow({ level: 'low', reasons: [] });
     expect(result).not.toBeNull();
+  });
+});
+
+describe('checkRecentStressSpike', () => {
+  const now = new Date('2026-08-15T18:00:00.000Z');
+
+  it('returns null with no entries', () => {
+    expect(checkRecentStressSpike([], now, '2:00 PM')).toBeNull();
+  });
+
+  it('does not fire when the most recent entry is a drop, not a spike', () => {
+    const entries = [{ at: new Date(now.getTime() - 10 * 60_000), direction: 'drop' as const, context: null }];
+    expect(checkRecentStressSpike(entries, now, '2:00 PM')).toBeNull();
+  });
+
+  it('fires when the most recent entry is a spike within the recency window', () => {
+    const entries = [{ at: new Date(now.getTime() - 10 * 60_000), direction: 'spike' as const, context: null }];
+    const result = checkRecentStressSpike(entries, now, '5:50 PM');
+    expect(result).not.toBeNull();
+    expect(result!.title).toContain('5:50 PM');
+  });
+
+  it('includes the context event when one overlaps', () => {
+    const entries = [{ at: new Date(now.getTime() - 5 * 60_000), direction: 'spike' as const, context: 'Team Standup' }];
+    const result = checkRecentStressSpike(entries, now, '5:55 PM');
+    expect(result!.body).toContain('Team Standup');
+  });
+
+  it('does not fire for a spike that is too old to still be "recent"', () => {
+    const entries = [{ at: new Date(now.getTime() - 3 * 60 * 60_000), direction: 'spike' as const, context: null }];
+    expect(checkRecentStressSpike(entries, now, '3:00 PM')).toBeNull();
+  });
+
+  it('only looks at the most recent entry, ignoring an older spike earlier in the list', () => {
+    const entries = [
+      { at: new Date(now.getTime() - 4 * 60 * 60_000), direction: 'spike' as const, context: null },
+      { at: new Date(now.getTime() - 10 * 60_000), direction: 'drop' as const, context: null },
+    ];
+    expect(checkRecentStressSpike(entries, now, '5:50 PM')).toBeNull();
   });
 });

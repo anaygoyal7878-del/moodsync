@@ -149,6 +149,24 @@ export const biometricReadingRepository = {
     return rows.map((r) => r.heartRate).filter((v): v is number => v !== null);
   },
 
+  /** Same window query as `listHeartRateInWindow`, but keeps the
+   * timestamp on each sample — needed for `computeStressTimeline`
+   * (ai/src/stressTimeline.ts), which buckets samples by time of day
+   * rather than just averaging them. A separate method rather than
+   * changing `listHeartRateInWindow`'s return shape, since that one's
+   * only consumer (Focus Session scoring) has no use for timestamps and
+   * this keeps that call site untouched. */
+  async listHeartRateSamplesInWindow(userId: string, start: Date, end: Date): Promise<Array<{ timestamp: Date; heartRate: number }>> {
+    const rows = await prisma.biometricReading.findMany({
+      where: { userId, timestamp: { gte: start, lte: end }, heartRate: { not: null } },
+      select: { timestamp: true, heartRate: true },
+      orderBy: { timestamp: 'asc' },
+    });
+    return rows
+      .filter((r): r is typeof r & { heartRate: number } => r.heartRate !== null)
+      .map((r) => ({ timestamp: r.timestamp, heartRate: r.heartRate }));
+  },
+
   /** Which users have synced anything in the window — the scheduled
    * weekly-report worker (workers/src/weeklyReportWorker.ts) only
    * touches users with real data instead of scanning every account. */

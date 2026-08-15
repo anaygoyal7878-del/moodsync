@@ -218,3 +218,36 @@ export function checkSocialBatteryLow(
     body: `Based on your recent data${reason}, today might be a good day to protect some quiet time if you can.`,
   };
 }
+
+/** How stale a spike bucket can be and still be worth a text — recent
+ * enough that "you seem stressed right now" is still true when the
+ * message arrives, not a report about two hours ago. */
+const RECENT_SPIKE_MAX_AGE_MINUTES = 45;
+
+/**
+ * Fires on the most recent entry of a Stress Timeline
+ * (`ai/src/stressTimeline.ts`'s `computeStressTimeline`, entries always
+ * chronological) only when it's a genuine spike (not a drop — a lower
+ * heart rate isn't something to interrupt someone about) and recent
+ * enough to still be current. The title includes the bucket's own time,
+ * so a later, genuinely new spike gets a fresh title and can still fire
+ * even while the existing `DEDUPE_WINDOW_HOURS` suppresses a repeat of
+ * this *exact* bucket on the next tick.
+ */
+export function checkRecentStressSpike(
+  entries: Array<{ at: Date; direction: 'spike' | 'drop'; context: string | null }>,
+  now: Date,
+  timeLabel: string,
+): ProactiveNotificationCandidate | null {
+  if (entries.length === 0) return null;
+  const mostRecent = entries[entries.length - 1]!;
+  if (mostRecent.direction !== 'spike') return null;
+  const ageMinutes = (now.getTime() - mostRecent.at.getTime()) / 60_000;
+  if (ageMinutes < 0 || ageMinutes > RECENT_SPIKE_MAX_AGE_MINUTES) return null;
+
+  const contextPart = mostRecent.context ? ` around "${mostRecent.context}"` : '';
+  return {
+    title: `Stress spike around ${timeLabel}`,
+    body: `Your heart rate moved noticeably above today's baseline${contextPart}. A short break, some water, or a few slow breaths might help.`,
+  };
+}

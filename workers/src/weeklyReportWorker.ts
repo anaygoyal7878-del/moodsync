@@ -21,6 +21,9 @@ import {
   computeBiggestImprovement,
   computeWalkingStreak,
   computeMeditationStreak,
+  computeWellnessScores,
+  correlateOccurrences,
+  describeFinding,
   deliverNotification,
   sendProactiveInsight,
 } from '@moodsync/ai';
@@ -106,6 +109,42 @@ for (const userId of userIds) {
       });
     }
 
+    // "Wellness Memory" — what actually correlates with lower stress for
+    // *this* user, from real before/after comparisons around meditation
+    // sessions and scene runs (ai/src/wellnessMemory.ts). Stress is
+    // scored per-reading the same way computeWellnessTrends does above
+    // (each reading's own prior history as its baseline), not
+    // recomputed from scratch. Surfaced only when correlateOccurrences
+    // found at least MIN_SAMPLE_SIZE usable before/after pairs — no
+    // finding from one or two coincidences.
+    const stressPoints = readingsOldestFirst
+      .map((reading, i) => ({
+        at: new Date(reading.timestamp),
+        value: computeWellnessScores(reading, readingsOldestFirst.slice(0, i)).stress.value,
+      }))
+      .filter((p): p is { at: Date; value: number } => p.value !== null);
+    const occurrences = [
+      ...meditationSessions.map((s) => ({ at: s.completedAt, label: 'Meditation' })),
+      ...sceneRuns
+        .map((run) => (typeof run.action.params.sceneName === 'string' ? { at: run.completedAt, label: run.action.params.sceneName } : null))
+        .filter((o): o is { at: Date; label: string } => o !== null),
+    ];
+    const stressFindings = correlateOccurrences(occurrences, stressPoints)
+      .filter((f) => f.meanDelta < 0) // only real stress *reductions* are worth surfacing here
+      .sort((a, b) => a.meanDelta - b.meanDelta);
+    const bestStressFinding = stressFindings[0];
+    if (bestStressFinding) {
+      rows.push({
+        userId,
+        period: 'WEEKLY',
+        metric: 'wellnessMemoryFinding',
+        periodStart,
+        periodEnd,
+        value: bestStressFinding.meanDelta,
+        summary: describeFinding(bestStressFinding, 'stress', false),
+      });
+    }
+
     const inserted = await insightRepository.createMany(rows);
     totalRows += inserted;
     if (inserted > 0) console.log(`[weekly-report] user=${userId} rows=${inserted}`);
@@ -123,6 +162,7 @@ for (const userId of userIds) {
       const label = bestHabit.habit === 'walking' ? 'Morning Walks' : 'Meditation';
       headlineParts.push(`${label} was your most consistent habit (${bestHabit.consistencyPct}% of the last 30 days).`);
     }
+    if (bestStressFinding) headlineParts.push(describeFinding(bestStressFinding, 'stress', false));
     if (headlineParts.length > 0) {
       const title = 'Your Weekly Check-In';
       const body = headlineParts.join(' ');

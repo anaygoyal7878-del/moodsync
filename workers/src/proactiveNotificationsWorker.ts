@@ -29,12 +29,14 @@ import {
   computeMeditationStreak,
   computeFocusStreak,
   computeSocialBattery,
+  computeStressTimeline,
   checkRecoveryUnusuallyHigh,
   checkRoomTemperatureOutsideSleepRange,
   checkSceneTimeOfDayPattern,
   checkBurnoutRisk,
   checkHabitStreakMilestone,
   checkSocialBatteryLow,
+  checkRecentStressSpike,
   deliverNotification,
   sendProactiveInsight,
 } from '@moodsync/ai';
@@ -64,6 +66,12 @@ function ownBaselineZ(latest: number, history: number[]): number | null {
 
 const RECOVERY_HISTORY_DAYS = 30;
 const SCENE_HISTORY_DAYS = 30;
+/** How far back to pull heart rate samples for the Stress Timeline
+ * check. Not an exact "since local midnight" window — that needs
+ * per-timezone date math this worker doesn't otherwise do — but wide
+ * enough to reliably cover the current day's activity and short enough
+ * that a spike bucket from yesterday can't still read as "recent." */
+const STRESS_TIMELINE_LOOKBACK_HOURS = 16;
 /** Suppresses a repeat of the exact same title within this window —
  * long enough that a persistent condition (bedroom stays warm all
  * night) doesn't re-notify every worker tick, short enough that a real
@@ -75,6 +83,12 @@ function zonedHourOfDay(now: Date, timezone: string): number {
   const formatted = new Intl.DateTimeFormat('en-US', { timeZone: timezone, hour: 'numeric', hour12: false }).format(now);
   const hour = Number(formatted);
   return Number.isFinite(hour) ? hour % 24 : now.getUTCHours();
+}
+
+/** "2:45 PM"-style label in the user's own timezone, for the Stress
+ * Timeline check's title. */
+function zonedTimeLabel(at: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('en-US', { timeZone: timezone, hour: 'numeric', minute: '2-digit' }).format(at);
 }
 
 /**
@@ -172,6 +186,23 @@ for (const userId of userIds) {
         bookedHoursToday: null,
       });
       if (await deliverIfNotRecentlySent(userId, checkSocialBatteryLow(socialBattery))) totalSent++;
+    }
+
+    // Check 7: Recent Stress Timeline spike — the one same-day check in
+    // this worker. Needs raw, timestamped heart rate samples rather
+    // than the daily-rollup `history` used above, since
+    // computeStressTimeline buckets by time of day, not by day.
+    const now = new Date();
+    const samples = await biometricReadingRepository.listHeartRateSamplesInWindow(
+      userId,
+      new Date(now.getTime() - STRESS_TIMELINE_LOOKBACK_HOURS * 60 * 60_000),
+      now,
+    );
+    if (samples.length > 0) {
+      const timeline = computeStressTimeline(samples.map((s) => ({ timestamp: s.timestamp, heartRate: s.heartRate })));
+      const mostRecent = timeline[timeline.length - 1];
+      const spikeCandidate = checkRecentStressSpike(timeline, now, mostRecent ? zonedTimeLabel(mostRecent.at, timezone) : '');
+      if (await deliverIfNotRecentlySent(userId, spikeCandidate)) totalSent++;
     }
 
     // Check 6: Habit streak milestones (walking, meditation, focus) —

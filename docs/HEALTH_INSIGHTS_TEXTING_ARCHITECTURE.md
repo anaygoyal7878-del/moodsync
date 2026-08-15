@@ -148,17 +148,19 @@ this environment, same disclosed gap as docs/MESSAGING_BOT.md.
   inside this worker (pre-existing gap, documented in the worker's own
   comment — unrelated to texting, but it caps how good those two texts
   can be until it's fixed).
-- **Stress Timeline isn't wired to a proactive check.**
-  `ai/src/stressTimeline.ts`'s `computeStressTimeline` needs intraday
-  heart-rate samples bucketed through the day — real, and already
-  powers the in-app Stress Timeline view — but a periodic worker tick
-  doesn't cheaply have "today's samples so far" the way it has a
-  single latest reading; wiring a same-day "stress has been climbing
-  since 2pm" text is real, scoped future work, not built this round.
-- **Wellness Memory correlation findings** (`ai/src/wellnessMemory.ts`'s
-  `correlateOccurrences`/`describeFinding` — "you focus best around
-  9am"-style findings) aren't wired to text either. These are naturally
-  a weekly-or-rarer cadence (a correlation found once shouldn't repeat
-  every tick), which is exactly the pattern the new weekly-worker
-  texting just established — a good next home for them, not built here.
 - **Not live-verified** against a real BlueBubbles server (see above).
+- **The Stress Timeline lookback window is 16 hours, not "since local
+  midnight."** Getting an exact local-midnight boundary needs
+  per-timezone date math this worker doesn't otherwise do; 16 hours is
+  wide enough to reliably cover the current day's real activity and
+  short enough that yesterday's spike can't still read as recent (the
+  separate 45-minute recency check on the spike itself is the real
+  guard against staleness — the lookback window only bounds how much
+  data goes into computing today's baseline).
+- **Wellness Memory's weekly finding only looks at stress as the
+  outcome metric**, correlating it against meditation sessions and
+  scene runs. Recovery, sleep, and energy as outcome metrics — and
+  playlists/focus sessions as occurrences — are the same function
+  (`correlateOccurrences`) with different inputs; not wired this round
+  to keep the weekly headline to one clear, high-confidence line rather
+  than a wall of maybe-findings.
