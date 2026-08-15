@@ -44,6 +44,8 @@ export {
   checkRoomTemperatureOutsideSleepRange,
   checkSceneTimeOfDayPattern,
   checkBurnoutRisk,
+  checkHabitStreakMilestone,
+  checkSocialBatteryLow,
   type ProactiveNotificationCandidate,
   type RoomTemperatureCheckInput,
   type SceneRunEvent,

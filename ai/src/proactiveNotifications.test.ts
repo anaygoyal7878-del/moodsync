@@ -4,6 +4,8 @@ import {
   checkRoomTemperatureOutsideSleepRange,
   checkSceneTimeOfDayPattern,
   checkBurnoutRisk,
+  checkHabitStreakMilestone,
+  checkSocialBatteryLow,
 } from './proactiveNotifications.js';
 
 describe('checkRecoveryUnusuallyHigh', () => {
@@ -104,5 +106,50 @@ describe('checkBurnoutRisk', () => {
     const result = checkBurnoutRisk({ sleepScore: 30, recoveryScore: 25, restingHeartRateZ: null, calendarEventCountToday: 8 });
     expect(result).not.toBeNull();
     expect(result!.body).toContain('heavily-booked calendar');
+  });
+});
+
+describe('checkHabitStreakMilestone', () => {
+  it('does not fire for a non-milestone streak length', () => {
+    expect(checkHabitStreakMilestone('walking', 4)).toBeNull();
+    expect(checkHabitStreakMilestone('meditation', 0)).toBeNull();
+  });
+
+  it('fires exactly on milestone values', () => {
+    const result = checkHabitStreakMilestone('meditation', 7);
+    expect(result).not.toBeNull();
+    expect(result!.title).toContain('7-day');
+    expect(result!.title).toContain('Meditation');
+  });
+
+  it('uses the right label per habit', () => {
+    expect(checkHabitStreakMilestone('walking', 30)!.title).toContain('Morning Walks');
+    expect(checkHabitStreakMilestone('focus', 30)!.title).toContain('Focus');
+  });
+
+  it('does not fire again the day after a milestone (streak moved past it)', () => {
+    expect(checkHabitStreakMilestone('walking', 8)).toBeNull();
+  });
+});
+
+describe('checkSocialBatteryLow', () => {
+  it('returns null when there is no social battery result at all', () => {
+    expect(checkSocialBatteryLow(null)).toBeNull();
+  });
+
+  it('does not fire for medium or high levels', () => {
+    expect(checkSocialBatteryLow({ level: 'medium', reasons: [] })).toBeNull();
+    expect(checkSocialBatteryLow({ level: 'high', reasons: [] })).toBeNull();
+  });
+
+  it('fires for a low level and includes the top reason', () => {
+    const result = checkSocialBatteryLow({ level: 'low', reasons: ['your recovery is low today', 'you slept poorly'] });
+    expect(result).not.toBeNull();
+    expect(result!.body).toContain('your recovery is low today');
+  });
+
+  it('still fires for a low level with no stated reason', () => {
+    const result = checkSocialBatteryLow({ level: 'low', reasons: [] });
+    expect(result).not.toBeNull();
   });
 });

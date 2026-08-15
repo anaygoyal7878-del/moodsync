@@ -18,7 +18,7 @@ Nothing about *detecting* an insight changed here; only *where it's
 allowed to say it* did.
 
 `workers/src/proactiveNotificationsWorker.ts` runs on a periodic tick
-(suggested 30-60 min) and evaluates four real checkers from
+(suggested 30-60 min) and evaluates six real checkers from
 `ai/src/proactiveNotifications.ts` per user with recent data:
 
 - `checkRecoveryUnusuallyHigh` — recovery score is a real outlier above
@@ -30,6 +30,26 @@ allowed to say it* did.
   user's own configured sleep-temp preference.
 - `checkSceneTimeOfDayPattern` — "you usually run this scene around
   this time."
+- `checkSocialBatteryLow` — this account's computed Social Battery
+  (`computeSocialBattery`: sleep + recovery + HRV-vs-own-baseline +
+  calendar load, calendar always null here for the same reason
+  `checkBurnoutRisk` can't see it) reads as `'low'`. Doesn't fire for
+  `'medium'`/`'high'` — only the actionable end of the scale.
+- `checkHabitStreakMilestone` — a walking/meditation/focus streak
+  (`computeWalkingStreak`/`computeMeditationStreak`/`computeFocusStreak`,
+  all pre-existing) lands *exactly* on a milestone value (3, 7, 14, 21,
+  30, 60, 90, 100, 180, 365 days). The equality check is what keeps this
+  from repeating every day of a long streak without its own dedupe
+  window — the title itself changes daily, so the shared 20h dedupe
+  never needs to suppress a repeat.
+
+Additionally, `workers/src/weeklyReportWorker.ts` — previously silent,
+only ever persisting `Insight` rows for the in-app weekly report page —
+now also delivers (in-app + text) a combined "Your Weekly Check-In"
+headline once a week, built from the same `biggestImprovement`/
+`bestHabit` computation it already had. This worker's own cadence
+*is* the weekly gate; a small dedupe window (6 days) guards only against
+an accidental duplicate run, not against real week-to-week repeats.
 
 Each fires at most once per `DEDUPE_WINDOW_HOURS` (20h) per title, so a
 persistent condition doesn't spam. Previously, a firing candidate only
@@ -124,13 +144,21 @@ this environment, same disclosed gap as docs/MESSAGING_BOT.md.
 - **No separate proactive-texting toggle** (see "Opt-in/opt-out model"
   above) — a deliberate simplicity choice, not an oversight, but worth
   revisiting if real usage asks for it.
-- **Weekly report insights aren't wired to text.** `computeWeeklyInsights`
-  / `computeBiggestImprovement` already generate real narrative content
-  for the in-app weekly report; extending `sendProactiveInsight`-style
-  delivery to a weekly cadence (not just the 30-60min tick) is a natural
-  next step, not built here.
-- **Calendar signal still missing from `checkBurnoutRisk`** inside this
-  worker (pre-existing gap, documented in the worker's own comment —
-  unrelated to texting, but it caps how good the burnout-risk text can
-  be until it's fixed).
+- **Calendar signal still missing from `checkBurnoutRisk`/`checkSocialBatteryLow`**
+  inside this worker (pre-existing gap, documented in the worker's own
+  comment — unrelated to texting, but it caps how good those two texts
+  can be until it's fixed).
+- **Stress Timeline isn't wired to a proactive check.**
+  `ai/src/stressTimeline.ts`'s `computeStressTimeline` needs intraday
+  heart-rate samples bucketed through the day — real, and already
+  powers the in-app Stress Timeline view — but a periodic worker tick
+  doesn't cheaply have "today's samples so far" the way it has a
+  single latest reading; wiring a same-day "stress has been climbing
+  since 2pm" text is real, scoped future work, not built this round.
+- **Wellness Memory correlation findings** (`ai/src/wellnessMemory.ts`'s
+  `correlateOccurrences`/`describeFinding` — "you focus best around
+  9am"-style findings) aren't wired to text either. These are naturally
+  a weekly-or-rarer cadence (a correlation found once shouldn't repeat
+  every tick), which is exactly the pattern the new weekly-worker
+  texting just established — a good next home for them, not built here.
 - **Not live-verified** against a real BlueBubbles server (see above).

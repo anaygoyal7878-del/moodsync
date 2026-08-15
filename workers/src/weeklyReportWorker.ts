@@ -8,8 +8,27 @@
  * touch users with real data" shape as
  * `workers/src/scheduledDispatch.ts`.
  */
-import { biometricReadingRepository, insightRepository, meditationSessionRepository, pendingDeviceCommandRepository } from '@moodsync/database';
-import { computeWeeklyInsights, computeWellnessTrends, computeBiggestImprovement, computeWalkingStreak, computeMeditationStreak } from '@moodsync/ai';
+import {
+  biometricReadingRepository,
+  insightRepository,
+  meditationSessionRepository,
+  notificationRepository,
+  pendingDeviceCommandRepository,
+} from '@moodsync/database';
+import {
+  computeWeeklyInsights,
+  computeWellnessTrends,
+  computeBiggestImprovement,
+  computeWalkingStreak,
+  computeMeditationStreak,
+  deliverNotification,
+  sendProactiveInsight,
+} from '@moodsync/ai';
+
+/** Wide enough that this worker's own weekly cron cadence is the real
+ * dedupe (a run a day or two off-schedule won't double-send), narrow
+ * enough that a genuinely new week's headline always gets through. */
+const WEEKLY_HEADLINE_DEDUPE_HOURS = 6 * 24;
 
 const REPORT_WINDOW_DAYS = 14; // 7 days "current" vs. 7 days "previous", same half-split insights.ts already uses.
 const SESSION_WINDOW_DAYS = 7; // Focus Sessions / habit consistency are "this week," not the 14-day trend window.
@@ -90,6 +109,32 @@ for (const userId of userIds) {
     const inserted = await insightRepository.createMany(rows);
     totalRows += inserted;
     if (inserted > 0) console.log(`[weekly-report] user=${userId} rows=${inserted}`);
+
+    // One combined weekly headline — biggest improvement + best habit,
+    // if either has real data — delivered in-app and (best-effort)
+    // texted, same "Poke, but health-focused" delivery pattern as
+    // proactiveNotificationsWorker.ts. This worker itself only runs
+    // weekly, so WEEKLY_HEADLINE_DEDUPE_HOURS exists as a safety net
+    // against a duplicate send on an off-schedule run, not the primary
+    // cadence control.
+    const headlineParts: string[] = [];
+    if (biggestImprovement) headlineParts.push(`${biggestImprovement.label} improved the most this week.`);
+    if (bestHabit) {
+      const label = bestHabit.habit === 'walking' ? 'Morning Walks' : 'Meditation';
+      headlineParts.push(`${label} was your most consistent habit (${bestHabit.consistencyPct}% of the last 30 days).`);
+    }
+    if (headlineParts.length > 0) {
+      const title = 'Your Weekly Check-In';
+      const body = headlineParts.join(' ');
+      if (!(await notificationRepository.hasRecentTitle(userId, title, WEEKLY_HEADLINE_DEDUPE_HOURS))) {
+        await deliverNotification({ userId, title, body });
+        try {
+          await sendProactiveInsight(userId, title, body);
+        } catch (error) {
+          console.error(`[weekly-report] texting headline failed for user=${userId}:`, error instanceof Error ? error.message : error);
+        }
+      }
+    }
   } catch (error) {
     anyFailed = true;
     console.error(`[weekly-report] user=${userId} failed:`, error instanceof Error ? error.message : error);

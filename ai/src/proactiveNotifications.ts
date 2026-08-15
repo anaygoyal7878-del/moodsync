@@ -1,8 +1,8 @@
 /**
  * Smart (proactive) Notifications — content generated outside the
  * existing rule-fired path (`ai/src/dispatch.ts`/`explain.ts`), which
- * only ever reacts to a matched automation rule. These three producers
- * are the ones with a real, already-available signal to back them —
+ * only ever reacts to a matched automation rule. Each checker here is
+ * one with a real, already-available signal to back them —
  * see docs/SMART_NOTIFICATIONS.md for the honest account of what was
  * considered and NOT built (a "you've been sitting for two hours"
  * sedentary alert needs continuous motion/activity tracking this
@@ -166,4 +166,55 @@ export function checkSceneTimeOfDayPattern(events: SceneRunEvent[], currentHour:
     }
   }
   return null;
+}
+
+/** Streak lengths worth interrupting someone about. Not every day —
+ * that would be the opposite of a positive nudge — just the ones that
+ * feel like a real milestone. MoodSync's own choice, not a research
+ * finding. */
+const HABIT_STREAK_MILESTONES = [3, 7, 14, 21, 30, 60, 90, 100, 180, 365];
+
+const HABIT_LABELS: Record<'walking' | 'meditation' | 'focus', string> = {
+  walking: 'Morning Walks',
+  meditation: 'Meditation',
+  focus: 'Focus',
+};
+
+/**
+ * Fires once, the exact day a habit's current streak lands on a
+ * milestone value — the equality check (not "at least N") is what
+ * keeps this from repeating on every subsequent day of a long streak
+ * without needing a separate dedupe window like the other checkers.
+ */
+export function checkHabitStreakMilestone(
+  habit: 'walking' | 'meditation' | 'focus',
+  currentStreakDays: number,
+): ProactiveNotificationCandidate | null {
+  if (!HABIT_STREAK_MILESTONES.includes(currentStreakDays)) return null;
+  const label = HABIT_LABELS[habit];
+  return {
+    title: `${currentStreakDays}-day ${label} streak`,
+    body: `You've kept up ${label} for ${currentStreakDays} day${currentStreakDays === 1 ? '' : 's'} in a row. Nice consistency.`,
+  };
+}
+
+/**
+ * Fires when computed Social Battery is critically low — the one
+ * `computeSocialBattery` output worth an unprompted heads-up, since
+ * "your capacity for people/demands is low today" is exactly the kind
+ * of thing worth knowing *before* the day gets scheduled full, not
+ * after. Deliberately doesn't fire for 'medium'/'high' — those aren't
+ * actionable in the same way. `result: null` (no sleep or recovery
+ * data at all) never fires, same as every other data-dependent check
+ * here.
+ */
+export function checkSocialBatteryLow(
+  result: { level: 'high' | 'medium' | 'low'; reasons: string[] } | null,
+): ProactiveNotificationCandidate | null {
+  if (!result || result.level !== 'low') return null;
+  const reason = result.reasons[0] ? ` — ${result.reasons[0]}` : '';
+  return {
+    title: 'Your social battery looks low today',
+    body: `Based on your recent data${reason}, today might be a good day to protect some quiet time if you can.`,
+  };
 }

@@ -1,7 +1,9 @@
 /**
  * Smart (proactive) Notifications — the periodic tick that evaluates
- * ai/src/proactiveNotifications.ts's three checkers per user and
- * delivers whichever fire, deduped by title within a rolling window so
+ * ai/src/proactiveNotifications.ts's checkers per user (recovery, room
+ * temperature, burnout risk, scene time-of-day pattern, social battery,
+ * habit streak milestones) and delivers whichever fire, deduped by
+ * title within a rolling window so
  * a persistent condition (e.g. an always-warm bedroom) doesn't spam a
  * notification every single run. Run this on a periodic cron cadence
  * (suggested: every 30-60 minutes — frequent enough that "unusually
@@ -14,6 +16,8 @@
 import {
   biometricReadingRepository,
   homeSnapshotRepository,
+  meditationSessionRepository,
+  focusSessionRepository,
   notificationRepository,
   pendingDeviceCommandRepository,
   userPreferencesRepository,
@@ -21,10 +25,16 @@ import {
 } from '@moodsync/database';
 import {
   computeWellnessScores,
+  computeWalkingStreak,
+  computeMeditationStreak,
+  computeFocusStreak,
+  computeSocialBattery,
   checkRecoveryUnusuallyHigh,
   checkRoomTemperatureOutsideSleepRange,
   checkSceneTimeOfDayPattern,
   checkBurnoutRisk,
+  checkHabitStreakMilestone,
+  checkSocialBatteryLow,
   deliverNotification,
   sendProactiveInsight,
 } from '@moodsync/ai';
@@ -42,8 +52,9 @@ function stdev(values: number[], m: number): number {
 /** Same own-baseline z-score technique wellness.ts uses internally
  * (not exported from there — this worker needs its own small copy, same
  * as proactiveNotifications.ts's own mean/stdev duplication). Needs at
- * least 5 historical points. */
-function restingHeartRateZ(latest: number, history: number[]): number | null {
+ * least 5 historical points. Used for both resting heart rate (burnout
+ * check) and HRV (social battery check) — same math, different signal. */
+function ownBaselineZ(latest: number, history: number[]): number | null {
   if (history.length < 5) return null;
   const m = mean(history);
   const sd = stdev(history, m);
@@ -130,7 +141,7 @@ for (const userId of userIds) {
         .filter((v): v is number => typeof v === 'number');
       const hrZ =
         latest.reading.restingHeartRate !== undefined
-          ? restingHeartRateZ(latest.reading.restingHeartRate, rhrHistory)
+          ? ownBaselineZ(latest.reading.restingHeartRate, rhrHistory)
           : null;
       const burnoutCandidate = checkBurnoutRisk({
         sleepScore: scores.sleep.value,
@@ -139,6 +150,46 @@ for (const userId of userIds) {
         calendarEventCountToday: null,
       });
       if (await deliverIfNotRecentlySent(userId, burnoutCandidate)) totalSent++;
+    }
+
+    // Check 5: Social Battery critically low. Same signals as the
+    // burnout check above, reused rather than re-fetched — HRV history
+    // is the one new own-baseline z-score this check needs.
+    if (latest && scores) {
+      const hrvHistory = history
+        .map((r) => r.heartRateVariability)
+        .filter((v): v is number => typeof v === 'number');
+      const hrvZ =
+        latest.reading.heartRateVariability !== undefined
+          ? ownBaselineZ(latest.reading.heartRateVariability, hrvHistory)
+          : null;
+      const socialBattery = computeSocialBattery({
+        sleepScore: scores.sleep.value,
+        hrvZ,
+        recoveryScore: scores.recovery.value,
+        // Same calendar-access limitation as the burnout check above —
+        // this worker has no live OAuth token refresh available to it.
+        bookedHoursToday: null,
+      });
+      if (await deliverIfNotRecentlySent(userId, checkSocialBatteryLow(socialBattery))) totalSent++;
+    }
+
+    // Check 6: Habit streak milestones (walking, meditation, focus) —
+    // fires the exact day a streak lands on a milestone value, so no
+    // separate dedupe window is needed beyond the title changing daily.
+    const walkingStreak = computeWalkingStreak(history);
+    if (await deliverIfNotRecentlySent(userId, checkHabitStreakMilestone('walking', walkingStreak.currentStreakDays))) {
+      totalSent++;
+    }
+    const meditationSessions = await meditationSessionRepository.listForUser(userId, 400);
+    const meditationStreak = computeMeditationStreak(meditationSessions.map((s) => ({ completedAt: s.completedAt })));
+    if (await deliverIfNotRecentlySent(userId, checkHabitStreakMilestone('meditation', meditationStreak.currentStreakDays))) {
+      totalSent++;
+    }
+    const focusSessions = await focusSessionRepository.listForUser(userId, 400);
+    const focusStreak = computeFocusStreak(focusSessions.map((s) => ({ completedAt: s.completedAt })));
+    if (await deliverIfNotRecentlySent(userId, checkHabitStreakMilestone('focus', focusStreak.currentStreakDays))) {
+      totalSent++;
     }
 
     // Check 2: Bedroom temperature vs. sleep preference.
