@@ -26,6 +26,16 @@ export const userPreferencesRepository = {
    * (ai/src/notificationExecutor.ts) — a missing row means every field
    * is at its schema default (notificationsEnabled: true, no quiet
    * hours), same "absence, not failure" convention as everywhere else. */
+  /** The standing "automations on/off" preference, distinct from the
+   * temporary `automationsPausedUntil` override. Read by the Adaptive
+   * Environment guards (ai/src/environmentGuards.ts); defaults to true
+   * for a user who has never opened preferences, matching the column
+   * default. */
+  async getAutomationsEnabled(userId: string): Promise<boolean> {
+    const row = await prisma.userPreferences.findUnique({ where: { userId }, select: { automationsEnabled: true } });
+    return row?.automationsEnabled ?? true;
+  },
+
   async getNotificationPreferences(userId: string): Promise<{
     notificationsEnabled: boolean;
     quietHoursStart: string | null;

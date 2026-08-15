@@ -48,3 +48,9 @@ export {
 } from './repositories/musicSessionRepository.js';
 export { messagingRepository, normalizeHandle } from './repositories/messagingRepository.js';
 export { messagingPendingActionRepository } from './repositories/messagingPendingActionRepository.js';
+export {
+  environmentRepository,
+  DEFAULT_ENVIRONMENT_SETTINGS,
+  PROPOSAL_TTL_MINUTES,
+  type EnvironmentSettings,
+} from './repositories/environmentRepository.js';

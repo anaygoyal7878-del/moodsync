@@ -15,6 +15,11 @@ export {
 // action list directly, the same way dispatchForReading does, so this
 // export was added rather than duplicating the executor.
 export { executeSpotifyAction } from './spotifyActionExecutor.js';
+/** The provider-agnostic action registry. Exported so the Adaptive
+ * Environment engine dispatches accepted changes through the *same*
+ * executors automation rules already use, rather than a parallel path
+ * that could drift from them. */
+export { executeAction, type ActionExecutionResult } from './actionExecutors.js';
 export {
   computeTrends,
   computeWellnessTrends,
@@ -223,5 +228,17 @@ export {
   type GuardInput,
   type GuardBlockReason,
 } from './environmentGuards.js';
+export {
+  computeAcceptance,
+  computeEnvironmentEffects,
+  describeEffect,
+  shouldProposeForState,
+  preferredHoursForState,
+  MIN_SESSIONS_FOR_FINDING,
+  SUPPRESSION_ACCEPTANCE_RATE,
+  type EnvironmentEffect,
+  type SessionRecord,
+  type StateAcceptance,
+} from './environmentLearning.js';
 export { sendAgenticMessage, type AgenticReply, type AgenticReplyAction } from './agenticMessaging.js';
 export { executeConfirmedAction } from './messagingTools.js';

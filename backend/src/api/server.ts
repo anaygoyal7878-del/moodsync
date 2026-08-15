@@ -36,6 +36,7 @@ import studyPlanRoutes from './routes/studyPlan.js';
 import companionRoutes from './routes/companion.js';
 import musicSessionRoutes from './routes/musicSessions.js';
 import messagingRoutes from './routes/messaging.js';
+import environmentRoutes from './routes/environment.js';
 
 export async function buildServer() {
   const app = Fastify({ loggerInstance: logger, trustProxy: true });
@@ -93,6 +94,7 @@ export async function buildServer() {
   await app.register(companionRoutes, { prefix: '/api' });
   await app.register(musicSessionRoutes, { prefix: '/api' });
   await app.register(messagingRoutes, { prefix: '/api' });
+  await app.register(environmentRoutes, { prefix: '/api' });
 
   return app;
 }

@@ -47,6 +47,8 @@ model User {
   messagingConnections MessagingConnection[]
   messagingMessages    MessagingMessage[]
   messagingPendingActions MessagingPendingAction[]
+  environmentSessions  EnvironmentSession[]
+  environmentAutomationSettings EnvironmentAutomationSettings?
   appleMusicConnection AppleMusicConnection?
   calendarConnection   CalendarConnection?
   preferences          UserPreferences?
@@ -1016,4 +1018,128 @@ model FocusSession {
 
   @@index([userId, completedAt])
   @@map("focus_sessions")
+}
+
+// ---------------------------------------------------------------------
+// Adaptive Environment Intelligence Engine
+// See docs/ADAPTIVE_ENVIRONMENT_ARCHITECTURE.md.
+// ---------------------------------------------------------------------
+
+/// How much MoodSync is allowed to do on its own. Every user starts at
+/// SUGGEST and opts upward — the product principle is a companion that
+/// asks, not a system that takes control.
+enum EnvironmentAutomationLevel {
+  /// Detect and propose. Nothing ever changes without a tap.
+  SUGGEST
+  /// Small, reversible changes (lighting, music) without per-time confirmation.
+  ASSIST
+  /// May additionally run the user's own pre-existing Apple Home scenes.
+  AUTOMATE
+}
+
+enum EnvironmentSessionStatus {
+  /// Shown to the user, awaiting a response.
+  PROPOSED
+  /// User tapped accept; changes were executed.
+  ACCEPTED
+  /// User explicitly declined — the strongest learning signal there is.
+  REJECTED
+  /// User neither accepted nor declined before it aged out. Weaker than
+  /// a rejection and deliberately stored distinctly from one.
+  DISMISSED
+  /// Executed without a prompt under ASSIST/AUTOMATE.
+  AUTO_APPLIED
+}
+
+/// Per-user automation configuration. Separate from UserPreferences
+/// rather than more columns on it: these are all Adaptive-Environment
+/// concerns with their own defaults and their own settings screen, and
+/// UserPreferences is already carrying five unrelated feature areas.
+model EnvironmentAutomationSettings {
+  userId String                     @id
+  user   User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  level  EnvironmentAutomationLevel @default(SUGGEST)
+
+  /// Per-channel opt-out. A user can want lighting help but no music.
+  /// Checked at proposal time, not only at execution, so a disabled
+  /// channel never even appears on the card.
+  lightingEnabled    Boolean @default(true)
+  musicEnabled       Boolean @default(true)
+  temperatureEnabled Boolean @default(true)
+  /// Off by default even at AUTOMATE level: running a whole Home scene
+  /// is the largest-blast-radius thing MoodSync can do, so it takes a
+  /// second, separate opt-in beyond raising the level.
+  sceneEnabled       Boolean @default(false)
+
+  /// Ceilings on a single adjustment — the anti-jarring limits.
+  maxLightingDeltaPct  Int   @default(25)
+  maxTemperatureDeltaC Float @default(1.5)
+
+  /// Suppresses proposals entirely during this local-hour window.
+  /// Distinct from UserPreferences.quietHoursStart/End, which govern
+  /// notification delivery: a user may want no *environment changes*
+  /// during work hours while still wanting notifications.
+  blockedHoursStart Int?
+  blockedHoursEnd   Int?
+
+  /// Last time the user countermanded MoodSync in a way it could
+  /// actually observe — declining a proposal, or pausing automations.
+  /// MoodSync cannot see a light changed directly in the Hue app
+  /// without polling, so this is honestly scoped to observable
+  /// overrides only. See the doc's Known Gaps.
+  lastManualOverrideAt DateTime?
+  /// Last time MoodSync applied anything. Backs the automation
+  /// cooldown — the single most important guard against oscillation.
+  lastAutomationAt     DateTime?
+
+  updatedAt DateTime @updatedAt
+
+  @@map("environment_automation_settings")
+}
+
+/// One proposal and, once it exists, its measured outcome. This row is
+/// the entire MEASURE -> LEARN half of the loop.
+///
+/// Both the proposal and the baseline biometrics are denormalized on
+/// purpose, same rationale as MusicSession: the card the user actually
+/// saw must not silently change later because a device was renamed or
+/// a wearable back-filled a reading.
+model EnvironmentSession {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// MoodState at proposal time (see ai/src/stateEngine.ts). Stored as
+  /// a string rather than an enum so adding a state doesn't require a
+  /// migration in lockstep with the engine.
+  state      String
+  confidence Float
+  /// Serialized SupportingSignal[] — the "why" exactly as shown.
+  signalsJson String
+  /// Serialized EnvironmentProposal — the changes exactly as offered.
+  proposalJson String
+
+  status EnvironmentSessionStatus @default(PROPOSED)
+
+  /// Biometrics at proposal time, for the before/after comparison.
+  baselineHeartRate   Int?
+  baselineStressScore Int?
+
+  /// Populated once the session ends and an outcome is computable.
+  /// Null forever when there was never enough data — never a
+  /// fabricated zero.
+  outcomeHeartRateDelta Float?
+  outcomeStressDelta    Float?
+  /// 'measured' | 'insufficient' — matches the vocabulary
+  /// ai/src/musicFeedback.ts already established.
+  outcomeConfidence     String?
+  outcomeSummary        String?
+
+  respondedAt DateTime?
+  endedAt     DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, state, status])
+  @@map("environment_sessions")
 }
