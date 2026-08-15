@@ -175,5 +175,53 @@ export {
 export { buildCaffeineLogReply, buildProactiveNudge } from './messagingAgent.js';
 export { sendProactiveInsight } from './messagingDelivery.js';
 export { getTodayCalendarLoad, type TodayCalendarLoad } from './calendarSignal.js';
+
+// --- Adaptive Environment Intelligence Engine ---
+// See docs/ADAPTIVE_ENVIRONMENT_ARCHITECTURE.md.
+export {
+  computePersonalBaselines,
+  compareToBaseline,
+  describeBaseline,
+  MIN_SAMPLES_FOR_BASELINE,
+  type BaselineComparison,
+  type PersonalBaselines,
+} from './personalBaselines.js';
+export {
+  assessState,
+  STATE_LABELS,
+  MEDICAL_DISCLAIMER,
+  MIN_SAMPLES_FOR_CONFIDENT_STATE,
+  type MoodState,
+  type StateAssessment,
+  type StateEngineInput,
+  type SupportingSignal,
+} from './stateEngine.js';
+export {
+  composeEnvironment,
+  DEFAULT_MAX_LIGHTING_DELTA_PCT,
+  DEFAULT_MAX_TEMPERATURE_DELTA_C,
+  MIN_AUTOMATED_BRIGHTNESS_PCT,
+  type ActuationMode,
+  type AvailableLight,
+  type AvailableScene,
+  type ComposerPreferences,
+  type EnvironmentCapabilities,
+  type EnvironmentChannel,
+  type EnvironmentProposal,
+  type ProposedChange,
+} from './environmentComposer.js';
+export {
+  canAutomate,
+  canSuggest,
+  executableChanges,
+  AUTOMATION_COOLDOWN_MINUTES,
+  MIN_STATE_DURATION_MINUTES,
+  MIN_CONFIDENCE_TO_ACT,
+  MANUAL_OVERRIDE_RESPECT_MINUTES,
+  type AutomationLevel,
+  type GuardDecision,
+  type GuardInput,
+  type GuardBlockReason,
+} from './environmentGuards.js';
 export { sendAgenticMessage, type AgenticReply, type AgenticReplyAction } from './agenticMessaging.js';
 export { executeConfirmedAction } from './messagingTools.js';
