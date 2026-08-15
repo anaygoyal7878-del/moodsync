@@ -37,6 +37,7 @@ import {
   checkHabitStreakMilestone,
   checkSocialBatteryLow,
   checkRecentStressSpike,
+  getTodayCalendarLoad,
   deliverNotification,
   sendProactiveInsight,
 } from '@moodsync/ai';
@@ -124,6 +125,22 @@ for (const userId of userIds) {
     const timezone = await userTimezoneRepository.getTimezone(userId);
     const currentHour = zonedHourOfDay(new Date(), timezone);
 
+    // Today's calendar load, for the burnout/social-battery checks
+    // below. Approximates "since local midnight" as "now minus the
+    // current local hour" rather than full per-timezone date-component
+    // math — close enough for a load signal, not claimed to be exact
+    // to the minute. `null` on any failure (no connection, expired
+    // refresh token, API error) — same "distinguish no-calendar from
+    // free-day" contract getTodayCalendarLoad documents, and a failure
+    // here must never break the rest of this user's checks.
+    const dayStart = new Date(Date.now() - currentHour * 60 * 60_000);
+    let calendarLoad: Awaited<ReturnType<typeof getTodayCalendarLoad>> = null;
+    try {
+      calendarLoad = await getTodayCalendarLoad(userId, dayStart, new Date());
+    } catch (error) {
+      console.error(`[proactive-notifications] calendar read failed for user=${userId}:`, error instanceof Error ? error.message : error);
+    }
+
     // Check 1: Recovery unusually high today.
     const latest = await biometricReadingRepository.findLatestNormalized(userId);
     let scores: ReturnType<typeof computeWellnessScores> | null = null;
@@ -142,13 +159,10 @@ for (const userId of userIds) {
     }
 
     // Check 4: Burnout risk (poor sleep + low recovery + at least one of
-    // elevated heart rate or an overloaded calendar). Calendar signal is
-    // not wired into this worker yet — reading it requires a live OAuth
-    // token refresh (see backend/src/services/calendarService.ts), which
-    // this background worker doesn't have access to today, so it's
-    // always passed as null here (this check still fires correctly off
-    // the heart rate signal alone; a future improvement could add
-    // calendar reads to this worker).
+    // elevated heart rate or an overloaded calendar). calendarLoad is
+    // null whenever there's no connected calendar (or the read failed),
+    // in which case this check still fires correctly off the heart rate
+    // signal alone.
     if (latest && scores && scores.sleep.value !== null && scores.recovery.value !== null) {
       const rhrHistory = history
         .map((r) => r.restingHeartRate)
@@ -161,7 +175,7 @@ for (const userId of userIds) {
         sleepScore: scores.sleep.value,
         recoveryScore: scores.recovery.value,
         restingHeartRateZ: hrZ,
-        calendarEventCountToday: null,
+        calendarEventCountToday: calendarLoad?.eventCount ?? null,
       });
       if (await deliverIfNotRecentlySent(userId, burnoutCandidate)) totalSent++;
     }
@@ -181,9 +195,7 @@ for (const userId of userIds) {
         sleepScore: scores.sleep.value,
         hrvZ,
         recoveryScore: scores.recovery.value,
-        // Same calendar-access limitation as the burnout check above —
-        // this worker has no live OAuth token refresh available to it.
-        bookedHoursToday: null,
+        bookedHoursToday: calendarLoad?.bookedHours ?? null,
       });
       if (await deliverIfNotRecentlySent(userId, checkSocialBatteryLow(socialBattery))) totalSent++;
     }

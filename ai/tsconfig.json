@@ -9,6 +9,7 @@
   "references": [
     { "path": "../shared" },
     { "path": "../database" },
+    { "path": "../integrations/googleCalendar" },
     { "path": "../integrations/hue" },
     { "path": "../integrations/spotify" }
   ]

@@ -120,11 +120,39 @@ something to build speculatively now.
 Nothing new — literally the existing worker's cadence and dedupe. A
 proactive text is exactly as frequent as an in-app proactive
 notification already was; this round changed the destination, not the
-trigger logic. Extending "what counts as insight-worthy" (e.g. wiring
-`computeWeeklyInsights`/`computeBiggestImprovement`'s weekly-report
-narrative into a text, or the calendar signal `checkBurnoutRisk`
-currently can't see from this worker) is real, scoped, additive work —
-not built this round, listed below.
+trigger logic.
+
+## Calendar signal — closing the accuracy gap
+
+`checkBurnoutRisk` and `checkSocialBatteryLow` both accept a calendar
+load parameter (`calendarEventCountToday`/`bookedHoursToday`), but
+until now `proactiveNotificationsWorker.ts` always passed `null` —
+neither check could see whether "today" was actually a heavily-booked
+day, the exact signal both checks are partly built around.
+
+`ai/src/calendarSignal.ts`'s `getTodayCalendarLoad(userId, windowStart,
+windowEnd)` closes this. Same "this package, like workers, can't reach
+into the backend app's internals" boundary as `hueActionExecutor.ts`
+and `messagingDelivery.ts` before it: rather than importing
+`backend/src/services/calendarService.ts`, this is a small, deliberate
+duplicate of its OAuth-token-refresh logic, reading
+`GOOGLE_CALENDAR_CLIENT_ID`/`_SECRET`/`_REDIRECT_URI` directly from
+`process.env` (the zod-validated version is a backend-app concern
+only).
+
+Returns `null` — never a fake `{eventCount: 0, bookedHours: 0}` — when
+there's no calendar connection, so "no calendar" and "connected
+calendar, genuinely free day" both checkers already distinguish stay
+distinguishable all the way through. A read failure (expired refresh
+token, API error) is caught in the worker and treated the same as
+`null` rather than aborting that user's other checks — a broken
+calendar connection must never silently stop the recovery/streak/
+stress checks from running too.
+
+The "today" window itself is an approximation: `now minus the current
+local hour` rather than exact per-timezone midnight, since full
+date-component math wasn't already present in this worker. Documented
+as a real, bounded approximation in Known Gaps below, not hidden.
 
 ## Verification
 
@@ -144,11 +172,9 @@ this environment, same disclosed gap as docs/MESSAGING_BOT.md.
 - **No separate proactive-texting toggle** (see "Opt-in/opt-out model"
   above) — a deliberate simplicity choice, not an oversight, but worth
   revisiting if real usage asks for it.
-- **Calendar signal still missing from `checkBurnoutRisk`/`checkSocialBatteryLow`**
-  inside this worker (pre-existing gap, documented in the worker's own
-  comment — unrelated to texting, but it caps how good those two texts
-  can be until it's fixed).
-- **Not live-verified** against a real BlueBubbles server (see above).
+- **Not live-verified** against a real BlueBubbles server (see above),
+  nor against a real Google Calendar connection for the calendar-load
+  signal below.
 - **The Stress Timeline lookback window is 16 hours, not "since local
   midnight."** Getting an exact local-midnight boundary needs
   per-timezone date math this worker doesn't otherwise do; 16 hours is
