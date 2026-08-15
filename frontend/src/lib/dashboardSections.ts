@@ -70,6 +70,10 @@ export const NAV_GROUPS = [
     // connected device still gets full value from.
     label: "Environment",
     items: [
+      // The intelligence surface leads this group: it's the "what
+      // should my space be doing" answer, and the three below it are
+      // the device-level controls that answer "what is it doing".
+      { href: "/dashboard/environment", label: "Adaptive", icon: Sparkles },
       { href: "/dashboard/home", label: "Scenes", icon: DoorOpen },
       { href: "/dashboard/devices", label: "Devices", icon: Cpu },
       { href: "/dashboard/automation", label: "Automations", icon: Zap },
