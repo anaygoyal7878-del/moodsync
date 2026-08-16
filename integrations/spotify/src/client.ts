@@ -35,8 +35,65 @@ export function buildPlayRequestBody(params: PlayPlaylistParams): Record<string,
   return { context_uri: params.playlistUri };
 }
 
+export interface SpotifyPlaylistSummary {
+  id: string;
+  name: string;
+  /** The `spotify:playlist:...` URI — what `playPlaylist` needs as its
+   * `context_uri`, so callers never have to construct one by hand. */
+  uri: string;
+}
+
+/**
+ * Picks the playlist best matching any of `keywords`, or null when
+ * none match.
+ *
+ * Pure so the matching rule is testable without a network mock, same
+ * pattern as `buildPlayRequestBody` above. Earlier keywords win, so a
+ * caller can express priority by ordering — and among equal matches
+ * the shortest name wins, since "Deep Focus" is a better answer for
+ * "focus" than "Focus Music For Studying And Long Drives".
+ */
+export function matchPlaylistByKeywords(
+  playlists: SpotifyPlaylistSummary[],
+  keywords: string[],
+): SpotifyPlaylistSummary | null {
+  for (const keyword of keywords) {
+    const needle = keyword.toLowerCase();
+    const matches = playlists.filter((p) => p.name.toLowerCase().includes(needle));
+    if (matches.length > 0) {
+      return matches.reduce((best, p) => (p.name.length < best.name.length ? p : best));
+    }
+  }
+  return null;
+}
+
 export class SpotifyClient {
   constructor(private readonly accessToken: string) {}
+
+  /**
+   * The user's own playlists. Requires the `playlist-read-private`
+   * scope, which this integration already requests (see
+   * SPOTIFY_SCOPES) — no re-consent needed.
+   *
+   * Single page only: 50 is Spotify's per-request maximum and is far
+   * more than keyword matching needs. Paginating would multiply API
+   * calls for a feature that's picking one playlist by name.
+   */
+  async listPlaylists(limit = 50): Promise<SpotifyPlaylistSummary[]> {
+    const url = new URL(`${BASE_URL}/me/playlists`);
+    url.searchParams.set('limit', String(Math.min(limit, 50)));
+
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${this.accessToken}` } });
+    if (!res.ok) {
+      throw new SpotifyApiError(`Spotify playlist list failed: ${res.status}`, res.status);
+    }
+    const payload = (await res.json()) as { items?: Array<{ id?: string; name?: string; uri?: string }> };
+    return (payload.items ?? [])
+      .filter((item): item is { id: string; name: string; uri: string } =>
+        typeof item.id === 'string' && typeof item.name === 'string' && typeof item.uri === 'string',
+      )
+      .map((item) => ({ id: item.id, name: item.name, uri: item.uri }));
+  }
 
   async playPlaylist(params: PlayPlaylistParams): Promise<void> {
     const url = new URL(`${BASE_URL}/me/player/play`);

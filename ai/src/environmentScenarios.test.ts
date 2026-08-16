@@ -67,7 +67,15 @@ function guards(o: Partial<GuardInput> = {}): GuardInput {
 }
 
 function caps(o: Partial<EnvironmentCapabilities> = {}): EnvironmentCapabilities {
-  return { lights: [], homeScenes: [], musicAvailable: false, roomTemperatureC: null, roomName: null, ...o };
+  return {
+    lights: [],
+    homeScenes: [],
+    musicAvailable: false,
+    resolvedPlaylist: null,
+    roomTemperatureC: null,
+    roomName: null,
+    ...o,
+  };
 }
 
 function prefs(o: Partial<ComposerPreferences> = {}): ComposerPreferences {
@@ -95,6 +103,9 @@ const RICH_HOME = caps({
     { sceneId: 's2', name: 'Focus Time' },
   ],
   musicAvailable: true,
+  // A rich home also has a resolvable playlist — music is only proposed
+  // when musicResolver.ts found a real, playable URI.
+  resolvedPlaylist: { uri: 'spotify:playlist:calm', name: 'Evening Calm', basis: 'name_match' },
   roomTemperatureC: 23,
   roomName: 'Bedroom',
 });

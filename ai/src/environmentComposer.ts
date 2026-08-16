@@ -98,6 +98,15 @@ export interface EnvironmentCapabilities {
   homeScenes: AvailableScene[];
   /** True when a music provider is connected and controllable. */
   musicAvailable: boolean;
+  /** A real, playable playlist for this state's music intent, resolved
+   * by `ai/src/musicResolver.ts` against the user's own library.
+   *
+   * Null means "connected, but nothing suitable found" — and the
+   * composer then omits music entirely rather than emitting an action
+   * dispatch cannot execute. An earlier version passed a bare category
+   * string here; `spotify.play_playlist` requires a `playlistUri` and
+   * threw on every accepted music change. */
+  resolvedPlaylist: { uri: string; name: string; basis: 'proven_for_you' | 'name_match' } | null;
   /** Current room temperature in Celsius from the HomeKit snapshot,
    * when a sensor reports one. Read-only — see the file header. */
   roomTemperatureC: number | null;
@@ -331,14 +340,25 @@ export function composeEnvironment(
   }
 
   // ---- Music ---------------------------------------------------------
-  // Never hijacks playback already in progress.
-  if (prefs.musicEnabled && intent.musicCategory && capabilities.musicAvailable && !prefs.musicAlreadyPlaying) {
+  // Never hijacks playback already in progress, and never proposes
+  // music without a real playlist to name — see `resolvedPlaylist`.
+  if (
+    prefs.musicEnabled &&
+    intent.musicCategory &&
+    capabilities.musicAvailable &&
+    capabilities.resolvedPlaylist &&
+    !prefs.musicAlreadyPlaying
+  ) {
+    const playlist = capabilities.resolvedPlaylist;
     changes.push({
       channel: 'music',
-      summary: `Start ${intent.musicCategory} music`,
-      reason: `${reasonPrefix} ${intent.musicCategory === 'calm' ? 'Calmer audio supports a reset.' : 'Matched to what you’re doing.'}`,
+      summary: `Play “${playlist.name}”`,
+      reason:
+        playlist.basis === 'proven_for_you'
+          ? `${reasonPrefix} This is the playlist your own sessions respond to best in this state.`
+          : `${reasonPrefix} ${intent.musicCategory === 'calm' ? 'Calmer audio supports a reset.' : 'Matched to what you’re doing.'}`,
       actuation: 'automatic',
-      action: { type: 'spotify.play_playlist', provider: 'spotify', params: { category: intent.musicCategory } },
+      action: { type: 'spotify.play_playlist', provider: 'spotify', params: { playlistUri: playlist.uri } },
     });
   }
 

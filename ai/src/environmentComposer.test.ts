@@ -13,6 +13,7 @@ function caps(overrides: Partial<EnvironmentCapabilities> = {}): EnvironmentCapa
     lights: [],
     homeScenes: [],
     musicAvailable: false,
+    resolvedPlaylist: null,
     roomTemperatureC: null,
     roomName: null,
     ...overrides,
@@ -161,5 +162,43 @@ describe('composeEnvironment — states with no environment intent', () => {
     const proposal = composeEnvironment('unknown', caps({ lights: [hueLight] }), prefs(), 'Reason.');
     expect(proposal.noChangesNeeded).toBe(true);
     expect(proposal.changes).toHaveLength(0);
+  });
+});
+
+describe('composeEnvironment — music needs a real playlist, not just a category', () => {
+  const provenPlaylist = { uri: 'spotify:playlist:abc', name: 'Evening Calm', basis: 'proven_for_you' as const };
+
+  it('omits music entirely when connected but nothing resolvable was found', () => {
+    // The bug this guards: emitting an action with no playlistUri, which
+    // `spotify.play_playlist`'s executor throws on.
+    const connectedNoMatch = caps({ musicAvailable: true, resolvedPlaylist: null });
+    const proposal = composeEnvironment('stressed', connectedNoMatch, prefs(), 'Reason.');
+    expect(proposal.changes.find((c) => c.channel === 'music')).toBeUndefined();
+  });
+
+  it('emits a playable playlistUri — never a bare category', () => {
+    const withPlaylist = caps({ musicAvailable: true, resolvedPlaylist: provenPlaylist });
+    const proposal = composeEnvironment('stressed', withPlaylist, prefs(), 'Reason.');
+    const music = proposal.changes.find((c) => c.channel === 'music')!;
+    expect(music.action?.params.playlistUri).toBe('spotify:playlist:abc');
+    expect(music.action?.params.category).toBeUndefined();
+  });
+
+  it('names the real playlist in the summary rather than a generic label', () => {
+    const withPlaylist = caps({ musicAvailable: true, resolvedPlaylist: provenPlaylist });
+    const proposal = composeEnvironment('stressed', withPlaylist, prefs(), 'Reason.');
+    expect(proposal.changes.find((c) => c.channel === 'music')!.summary).toContain('Evening Calm');
+  });
+
+  it('says why when the playlist was chosen from the user’s own history', () => {
+    const withPlaylist = caps({ musicAvailable: true, resolvedPlaylist: provenPlaylist });
+    const proposal = composeEnvironment('stressed', withPlaylist, prefs(), 'Reason.');
+    expect(proposal.changes.find((c) => c.channel === 'music')!.reason).toContain('respond to best');
+  });
+
+  it('still refuses to interrupt music already playing, resolved playlist or not', () => {
+    const withPlaylist = caps({ musicAvailable: true, resolvedPlaylist: provenPlaylist });
+    const proposal = composeEnvironment('stressed', withPlaylist, prefs({ musicAlreadyPlaying: true }), 'Reason.');
+    expect(proposal.changes.find((c) => c.channel === 'music')).toBeUndefined();
   });
 });

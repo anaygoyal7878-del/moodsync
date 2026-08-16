@@ -229,6 +229,11 @@ export {
   type GuardBlockReason,
 } from './environmentGuards.js';
 export {
+  resolveMusicPlaylist,
+  pickProvenPlaylist,
+  type ResolvedPlaylist,
+} from './musicResolver.js';
+export {
   computeStateHeldMinutes,
   MAX_OBSERVATION_GAP_MINUTES,
   type StateObservationRecord,

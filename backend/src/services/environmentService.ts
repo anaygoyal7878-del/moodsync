@@ -22,6 +22,8 @@ import {
   shouldProposeForState,
   computeStateHeldMinutes,
   isInMeetingNow,
+  resolveMusicPlaylist,
+  type ResolvedPlaylist,
   executeAction,
   computeWellnessScores,
   listHueLightsForUser,
@@ -159,6 +161,7 @@ async function gatherContext(userId: string, now: Date) {
   }
 
   const spotify = await smartHomeConnectionRepository.findByUserAndProvider(userId, 'SPOTIFY').catch(() => null);
+  const musicAvailable = spotify?.status === 'ACTIVE';
 
   // "Away" comes from the existing geofence events, not a guess. No
   // events at all means unknown, which must read as "not away" —
@@ -181,6 +184,7 @@ async function gatherContext(userId: string, now: Date) {
     ) ?? null;
 
   return {
+    userId,
     timezone,
     localHour: toLocalHour(now, timezone),
     latest: latestRow?.reading ?? null,
@@ -193,7 +197,7 @@ async function gatherContext(userId: string, now: Date) {
     settings,
     snapshot,
     lights,
-    musicAvailable: spotify?.status === 'ACTIVE',
+    musicAvailable,
     userAway,
     inFocusSession,
     inMeeting,
@@ -296,7 +300,7 @@ export const environmentService = {
       };
     }
 
-    const proposal = composeProposal(ctx, assessment);
+    const proposal = await composeProposal(ctx, assessment);
     const level = ctx.settings.level.toLowerCase() as AutomationLevel;
     const autoExecutable = canAutomate(guardInput).allowed ? executableChanges(proposal.changes, level) : [];
 
@@ -455,10 +459,36 @@ function buildGuardInput(
   };
 }
 
-function composeProposal(ctx: Awaited<ReturnType<typeof gatherContext>>, assessment: StateAssessment): EnvironmentProposal {
+/** Which music category each state wants, mirroring the composer's own
+ * INTENTS table. Kept here because the playlist has to be resolved
+ * (a network call) *before* the pure composer runs — the composer
+ * itself must stay synchronous and side-effect free. */
+const STATE_MUSIC_CATEGORY: Partial<Record<MoodState, string>> = {
+  stressed: 'calm',
+  overstimulated: 'calm',
+  focused: 'focus',
+  tired: 'energizing',
+  sleepy: 'sleep',
+  preparing_for_sleep: 'sleep',
+  recovering: 'recovery',
+  energized: 'energizing',
+};
+
+async function composeProposal(
+  ctx: Awaited<ReturnType<typeof gatherContext>>,
+  assessment: StateAssessment,
+): Promise<EnvironmentProposal> {
   const reasonPrefix = assessment.supportingSignals[0]?.description
     ? `${assessment.supportingSignals[0].description}.`
     : `You seem ${assessment.label.toLowerCase()}.`;
+
+  // Resolved to a real, playable URI before composing — see
+  // ai/src/musicResolver.ts for why a bare category was a live bug.
+  let resolvedPlaylist: ResolvedPlaylist | null = null;
+  const category = STATE_MUSIC_CATEGORY[assessment.currentState];
+  if (ctx.musicAvailable && ctx.settings.musicEnabled && category) {
+    resolvedPlaylist = await resolveMusicPlaylist(ctx.userId, category).catch(() => null);
+  }
 
   return composeEnvironment(
     assessment.currentState,
@@ -469,6 +499,7 @@ function composeProposal(ctx: Awaited<ReturnType<typeof gatherContext>>, assessm
         name: s.name,
       })),
       musicAvailable: ctx.musicAvailable,
+      resolvedPlaylist,
       roomTemperatureC: ctx.bedroom?.temperatureC ?? null,
       roomName: ctx.bedroom?.name ?? null,
     },

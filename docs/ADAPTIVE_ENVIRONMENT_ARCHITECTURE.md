@@ -188,6 +188,37 @@ point. Run it every 15-30 minutes; it also prunes state observations,
 so retention rides along with an existing job rather than needing its
 own.
 
+## Music resolution — a category is not an address
+
+`environmentComposer.ts` originally emitted
+`params: { category: 'calm' }` for its music change. But
+`spotify.play_playlist`'s executor requires `params.playlistUri` and
+throws without it — **every accepted music change would have failed at
+dispatch.** The composer was proposing an intent where the executor
+needed an address.
+
+`ai/src/musicResolver.ts` resolves it, in this order:
+
+1. **What has actually worked for this user.** `musicMemory.ts` already
+   ranks playlists by measured biometric effect per mode, including a
+   mode-aware `helped` flag — a playlist that *raised* heart rate during
+   a Relax session did not work, however large its delta. Only playlists
+   still in the user's library are eligible; one that worked wonderfully
+   last year but has since been deleted is not a proposal MoodSync can
+   make.
+2. **Keyword match** against their own playlist names, via
+   `matchPlaylistByKeywords` (pure, so the matching rule is testable
+   without a network mock). Earlier keywords win, and among equal
+   matches the shortest name wins — "Deep Focus" beats "Focus Music For
+   Studying And Long Drives".
+3. **Nothing.** Returning null is a real answer: the composer then omits
+   music entirely rather than proposing something unplayable.
+
+MoodSync never searches Spotify's public catalog — it proposes the
+user's own music, not a stranger's. `SpotifyClient.listPlaylists` uses
+the `playlist-read-private` scope the integration already requests, so
+no re-consent is needed.
+
 ## Known gaps
 
 - **Not live-verified.** No Postgres, Hue bridge, or connected wearable
@@ -203,9 +234,6 @@ own.
   sleep arrives as a next-morning summary, not a "they're asleep right
   now" event. (`inMeeting` was in this list and is now real — see
   "State duration and meeting detection" above.)
-- **Music proposals use a category string**, not a resolved playlist
-  URI — the existing `musicIntelligence.ts` recommender should be wired
-  in so proposals name the actual playlist the user responds best to.
 - **Outcome measurement compares heart rate only.** The worker records
   a real before/after delta, but `outcomeStressDelta` is still always
   null — stress is a per-reading computed score and comparing two of

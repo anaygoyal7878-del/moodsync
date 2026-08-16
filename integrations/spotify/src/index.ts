@@ -36,4 +36,11 @@ export {
   type SpotifyTokenResponse,
 } from './oauth.js';
 
-export { SpotifyClient, SpotifyApiError, buildPlayRequestBody, type PlayPlaylistParams } from './client.js';
+export {
+  SpotifyClient,
+  SpotifyApiError,
+  buildPlayRequestBody,
+  matchPlaylistByKeywords,
+  type PlayPlaylistParams,
+  type SpotifyPlaylistSummary,
+} from './client.js';
