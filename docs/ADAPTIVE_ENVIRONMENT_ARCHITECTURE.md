@@ -41,6 +41,7 @@ answer is much narrower than the product concept assumes:
 | **Apple Home** | **Run a pre-existing scene. That is all.** HomeKit has no cloud API and third parties get no per-accessory write access — see docs/HOMEKIT_ARCHITECTURE.md. MoodSync cannot set a HomeKit light to 40%, cannot create a scene, cannot edit one. |
 | **Spotify** | Start a playlist, server-side. |
 | **Thermostat** | **Read-only. No write path exists anywhere in this codebase.** Room temperature arrives through the cached HomeKit snapshot; no provider integration implements a setpoint write. |
+| **Fragrance** | **Advice only, permanently.** MoodSync cannot apply cologne. See "Scent Intelligence" below. |
 
 This is why `ProposedChange.actuation` exists and why it is the most
 load-bearing field in the whole feature:
@@ -219,6 +220,49 @@ user's own music, not a stranger's. `SpotifyClient.listPlaylists` uses
 the `playlist-read-private` scope the integration already requests, so
 no re-consent is needed.
 
+## Scent Intelligence
+
+A fourth `manual_only` channel: which Nature's Note cologne suits this
+moment, and where to put it. Cologne is the clearest case of the
+actuation rule — MoodSync obviously cannot spray anyone, so the channel
+was designed as advice from the start rather than retrofitted into it.
+
+**Catalog honesty** (`ai/src/scentLibrary.ts`). The four collection
+entries, their descriptions, the pulse-point guidance and the
+application rules are transcribed from naturesnotefragrances.com.
+Solaris's full top/heart/base pyramid is published on the site and is
+stored verbatim. **Everwood's and Burnt Ash's pyramids are `null`** —
+the site's Scent Architecture panel is tabbed and only Solaris's tab
+content was retrievable. A cologne's note pyramid is its actual
+formula; guessing "probably oud and leather" for a real product a real
+business sells would be fabricating a spec sheet. The null propagates:
+the recommender matches on character axes it can defend instead, and a
+test asserts those fields stay null.
+
+The `character` numbers (brightness / intensity / warmth) *are*
+MoodSync's own reading of each published description, used only to rank
+a shortlist. They're labelled as derived and the brand does not publish
+them.
+
+**Ranking**, in weight order: occasion (strongest — a wedding and a gym
+session want different answers regardless of heart rate), then time of
+day, then biometric state (weakest — it nudges intensity, never
+overrides an explicit occasion). Two deliberate choices:
+
+- **Workout steers *away* from intensity, not toward it.** The obvious
+  mapping is "high-energy occasion → bold scent"; heat and exertion
+  amplify projection, so that's exactly the over-application mistake.
+- **Timing advice is grounded in the brand's own note bands.** The site
+  states top notes last ~30 minutes, so for a date the advice is to
+  apply half an hour before leaving — people should meet the heart of
+  the scent, not the first spray.
+
+**Never claims an effect.** Scent-and-mood research isn't settled
+enough for a product to assert a physiological result, and MoodSync
+measures none. The language is fit and appropriateness — "suits",
+"reads", "sits right" — never "will calm you". A test sweeps every
+occasion × state combination for therapeutic phrasing.
+
 ## Known gaps
 
 - **Not live-verified.** No Postgres, Hue bridge, or connected wearable
@@ -229,6 +273,13 @@ no re-consent is needed.
   It sees a declined proposal; it cannot see a light changed directly
   in the Hue app without polling. So "respect the user's manual change"
   holds for in-app countermands only.
+- **Fragrance ownership isn't modelled.** `recommendScent` accepts an
+  `owned` list and honours it, but the service always passes `[]`, so
+  recommendations span the whole collection rather than what the user
+  actually has on their shelf. Wiring a real owned-fragrances list is
+  the obvious next step and the engine already supports it.
+- **Everwood and Burnt Ash note pyramids** are absent (above). If the
+  brand publishes them, they drop straight into `scentLibrary.ts`.
 - **`userAsleep` is always false** in the service. It would need a live
   sleep-session signal that no connected provider currently pushes —
   sleep arrives as a next-morning summary, not a "they're asleep right

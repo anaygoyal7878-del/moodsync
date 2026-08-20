@@ -229,6 +229,27 @@ export {
   type GuardBlockReason,
 } from './environmentGuards.js';
 export {
+  SCENTS,
+  ALL_SCENTS,
+  PULSE_POINTS,
+  APPLICATION_RULES,
+  NOTE_TIMING,
+  MAX_PULSE_POINTS,
+  type PulsePoint,
+  type PulsePointInfo,
+  type Scent,
+  type ScentCharacter,
+  type ScentId,
+  type ScentNotes,
+} from './scentLibrary.js';
+export {
+  recommendScent,
+  OCCASION_LABELS,
+  type Occasion,
+  type ScentRecommendation,
+  type ScentRecommendationInput,
+} from './scentIntelligence.js';
+export {
   resolveMusicPlaylist,
   pickProvenPlaylist,
   type ResolvedPlaylist,

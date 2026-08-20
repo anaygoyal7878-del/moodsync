@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Lightbulb, Music, Thermometer, Home, Sparkles, Check, X, Info } from "lucide-react";
+import { Lightbulb, Music, Thermometer, Home, Sparkles, Check, X, Info, Droplet } from "lucide-react";
 
 /**
  * The Adaptive Environment card — the product's answer to the five
@@ -18,7 +18,7 @@ import { Lightbulb, Music, Thermometer, Home, Sparkles, Check, X, Info } from "l
 type ActuationMode = "automatic" | "queued_to_device" | "manual_only";
 
 interface ProposedChange {
-  channel: "lighting" | "music" | "temperature" | "scene";
+  channel: "lighting" | "music" | "temperature" | "scene" | "scent";
   summary: string;
   reason: string;
   actuation: ActuationMode;
@@ -53,6 +53,7 @@ const CHANNEL_ICON = {
   music: Music,
   temperature: Thermometer,
   scene: Home,
+  scent: Droplet,
 } as const;
 
 /** Actuation is surfaced verbatim, not smoothed over. "MoodSync will

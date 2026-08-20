@@ -14,6 +14,7 @@ function caps(overrides: Partial<EnvironmentCapabilities> = {}): EnvironmentCapa
     homeScenes: [],
     musicAvailable: false,
     resolvedPlaylist: null,
+    scentSuggestion: null,
     roomTemperatureC: null,
     roomName: null,
     ...overrides,
@@ -30,6 +31,7 @@ function prefs(overrides: Partial<ComposerPreferences> = {}): ComposerPreference
     musicEnabled: true,
     temperatureEnabled: true,
     sceneEnabled: true,
+    scentEnabled: true,
     musicAlreadyPlaying: false,
     ...overrides,
   };

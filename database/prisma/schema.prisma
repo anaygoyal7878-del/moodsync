@@ -1071,6 +1071,10 @@ model EnvironmentAutomationSettings {
   /// is the largest-blast-radius thing MoodSync can do, so it takes a
   /// second, separate opt-in beyond raising the level.
   sceneEnabled       Boolean @default(false)
+  /// Cologne suggestions. On by default: it's advice only — MoodSync
+  /// can never apply it — so it carries none of the blast radius that
+  /// makes scene automation opt-in.
+  scentEnabled       Boolean @default(true)
 
   /// Ceilings on a single adjustment — the anti-jarring limits.
   maxLightingDeltaPct  Int   @default(25)

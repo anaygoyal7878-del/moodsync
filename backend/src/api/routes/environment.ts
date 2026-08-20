@@ -15,6 +15,7 @@ const settingsSchema = z.object({
   musicEnabled: z.boolean().optional(),
   temperatureEnabled: z.boolean().optional(),
   sceneEnabled: z.boolean().optional(),
+  scentEnabled: z.boolean().optional(),
   // Bounded server-side, not just in the UI: these are the anti-jarring
   // limits, and a client must not be able to widen them arbitrarily.
   maxLightingDeltaPct: z.number().int().min(5).max(60).optional(),

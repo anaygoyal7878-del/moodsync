@@ -35,7 +35,7 @@ export type ActuationMode =
    * carries out. Shown as advice, never as a pending action. */
   | 'manual_only';
 
-export type EnvironmentChannel = 'lighting' | 'music' | 'temperature' | 'scene';
+export type EnvironmentChannel = 'lighting' | 'music' | 'temperature' | 'scene' | 'scent';
 
 export interface ProposedChange {
   channel: EnvironmentChannel;
@@ -107,6 +107,18 @@ export interface EnvironmentCapabilities {
    * string here; `spotify.play_playlist` requires a `playlistUri` and
    * threw on every accepted music change. */
   resolvedPlaylist: { uri: string; name: string; basis: 'proven_for_you' | 'name_match' } | null;
+  /** A Nature's Note fragrance suggestion for this moment, from
+   * `ai/src/scentIntelligence.ts`. Always `manual_only` when present —
+   * MoodSync obviously cannot apply cologne, which is the same shape
+   * as the temperature channel and for the same reason. Null when the
+   * user has the channel switched off or nothing was resolvable. */
+  scentSuggestion: {
+    name: string;
+    summary: string;
+    reason: string;
+    pulsePoints: string[];
+    timing: string;
+  } | null;
   /** Current room temperature in Celsius from the HomeKit snapshot,
    * when a sensor reports one. Read-only — see the file header. */
   roomTemperatureC: number | null;
@@ -130,6 +142,7 @@ export interface ComposerPreferences {
   musicEnabled: boolean;
   temperatureEnabled: boolean;
   sceneEnabled: boolean;
+  scentEnabled: boolean;
   /** True when the user is already playing something. The composer
    * will not propose taking over playback — spec section 4's "BAD:
    * stop music the user is currently listening to". */
@@ -377,6 +390,19 @@ export function composeEnvironment(
         action: { type: 'home.run_scene', provider: 'homekit', params: { sceneId: match.sceneId, sceneName: match.name } },
       });
     }
+  }
+
+  // ---- Scent (recommendation only) -----------------------------------
+  // Same actuation class as temperature: real, reasoned advice that
+  // MoodSync states plainly it cannot carry out itself.
+  if (prefs.scentEnabled && capabilities.scentSuggestion) {
+    const scent = capabilities.scentSuggestion;
+    changes.push({
+      channel: 'scent',
+      summary: scent.summary,
+      reason: `${scent.reason} ${scent.timing}`,
+      actuation: 'manual_only',
+    });
   }
 
   // ---- Temperature (recommendation only) -----------------------------

@@ -72,6 +72,7 @@ function caps(o: Partial<EnvironmentCapabilities> = {}): EnvironmentCapabilities
     homeScenes: [],
     musicAvailable: false,
     resolvedPlaylist: null,
+    scentSuggestion: null,
     roomTemperatureC: null,
     roomName: null,
     ...o,
@@ -88,6 +89,7 @@ function prefs(o: Partial<ComposerPreferences> = {}): ComposerPreferences {
     musicEnabled: true,
     temperatureEnabled: true,
     sceneEnabled: true,
+    scentEnabled: true,
     musicAlreadyPlaying: false,
     ...o,
   };

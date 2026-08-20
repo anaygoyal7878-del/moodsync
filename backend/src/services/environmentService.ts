@@ -24,6 +24,8 @@ import {
   isInMeetingNow,
   resolveMusicPlaylist,
   type ResolvedPlaylist,
+  recommendScent,
+  type Occasion,
   executeAction,
   computeWellnessScores,
   listHueLightsForUser,
@@ -459,6 +461,18 @@ function buildGuardInput(
   };
 }
 
+/**
+ * The only occasion signal available without asking the user: a live
+ * calendar event means "work" rather than a guess. Everything else is
+ * left `unspecified` on purpose — `scentIntelligence.ts` then decides
+ * on time of day alone, which is more honest than inventing an
+ * occasion from a heart rate.
+ */
+function inferOccasion(ctx: { inMeeting: boolean; localHour: number }): Occasion {
+  if (ctx.inMeeting) return 'work';
+  return 'unspecified';
+}
+
 /** Which music category each state wants, mirroring the composer's own
  * INTENTS table. Kept here because the playlist has to be resolved
  * (a network call) *before* the pure composer runs — the composer
@@ -490,6 +504,32 @@ async function composeProposal(
     resolvedPlaylist = await resolveMusicPlaylist(ctx.userId, category).catch(() => null);
   }
 
+  // Cologne suggestion — permanently manual_only, so no capability
+  // check is needed beyond the user's own toggle. `inMeeting` is the
+  // one real occasion signal available without asking; everything else
+  // falls back to time of day, which is enough on its own.
+  const scentRec = ctx.settings.scentEnabled
+    ? recommendScent({
+        localHour: ctx.localHour,
+        occasion: inferOccasion(ctx),
+        state: assessment.currentState,
+        // The catalog is a single brand's collection and MoodSync has
+        // no record of what the user owns, so it recommends across the
+        // whole collection. Modelling ownership is real future work.
+        owned: [],
+      })
+    : null;
+
+  const scentSuggestion = scentRec
+    ? {
+        name: scentRec.scent.name,
+        summary: `${scentRec.scent.name} — ${scentRec.scent.tagline}`,
+        reason: scentRec.reasons.join(' '),
+        pulsePoints: scentRec.pulsePoints.map((p) => p.label),
+        timing: scentRec.timing,
+      }
+    : null;
+
   return composeEnvironment(
     assessment.currentState,
     {
@@ -500,6 +540,7 @@ async function composeProposal(
       })),
       musicAvailable: ctx.musicAvailable,
       resolvedPlaylist,
+      scentSuggestion,
       roomTemperatureC: ctx.bedroom?.temperatureC ?? null,
       roomName: ctx.bedroom?.name ?? null,
     },
@@ -512,6 +553,7 @@ async function composeProposal(
       musicEnabled: ctx.settings.musicEnabled,
       temperatureEnabled: ctx.settings.temperatureEnabled,
       sceneEnabled: ctx.settings.sceneEnabled,
+      scentEnabled: ctx.settings.scentEnabled,
       musicAlreadyPlaying: false,
     },
     reasonPrefix,

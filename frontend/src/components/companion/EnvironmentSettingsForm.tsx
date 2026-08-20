@@ -17,6 +17,7 @@ interface Settings {
   musicEnabled: boolean;
   temperatureEnabled: boolean;
   sceneEnabled: boolean;
+  scentEnabled: boolean;
   maxLightingDeltaPct: number;
   maxTemperatureDeltaC: number;
 }
@@ -53,6 +54,12 @@ const CHANNELS: Array<{ key: keyof Settings; label: string; help: string }> = [
     key: "sceneEnabled",
     label: "Apple Home scenes",
     help: "Running a scene you already created. Off by default — this is the largest change MoodSync can make.",
+  },
+  {
+    key: "scentEnabled",
+    label: "Fragrance",
+    // Advice only, like temperature — stated rather than implied.
+    help: "Which Nature's Note cologne suits the moment, and where to apply it. Suggestions only — MoodSync obviously can't apply it for you.",
   },
 ];
 
