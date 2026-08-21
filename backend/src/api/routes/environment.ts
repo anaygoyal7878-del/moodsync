@@ -65,6 +65,15 @@ export default async function environmentRoutes(app: FastifyInstance) {
     return reply.send(outcome);
   });
 
+  /** Charts behind the analytics page. `days` bounds only the daily
+   * acceptance series; frequency and outcome aggregate the full
+   * learning window. */
+  app.get('/environment/analytics', { preHandler: app.authenticate }, async (request, reply) => {
+    const parsed = z.object({ days: z.coerce.number().int().min(7).max(90).default(30) }).safeParse(request.query);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    return reply.send(await environmentService.getAnalytics(request.userId!, parsed.data.days));
+  });
+
   app.get('/environment/settings', { preHandler: app.authenticate }, async (request, reply) => {
     return reply.send(await environmentService.getSettings(request.userId!));
   });

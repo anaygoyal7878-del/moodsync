@@ -18,6 +18,7 @@ import {
   executableChanges,
   computeAcceptance,
   computeEnvironmentEffects,
+  computeEnvironmentAnalytics,
   describeEffect,
   shouldProposeForState,
   computeStateHeldMinutes,
@@ -420,6 +421,17 @@ export const environmentService = {
     });
     void now;
     return { confidence: 'measured' as const, delta };
+  },
+
+  /**
+   * The analytics read model. Deliberately a separate call from
+   * `getSnapshot`: the dashboard card needs to be fast and current,
+   * while this scans a 90-day window and is only wanted when someone
+   * opens the analytics page.
+   */
+  async getAnalytics(userId: string, days = 30, now: Date = new Date()) {
+    const sessions = await environmentRepository.listCompletedForLearning(userId, LEARNING_WINDOW_DAYS);
+    return computeEnvironmentAnalytics(sessions, days, now);
   },
 
   async getSettings(userId: string) {

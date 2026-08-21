@@ -263,6 +263,34 @@ measures none. The language is fit and appropriateness — "suits",
 "reads", "sits right" — never "will calm you". A test sweeps every
 occasion × state combination for therapeutic phrasing.
 
+## Analytics
+
+`ai/src/environmentAnalytics.ts` turns the same `EnvironmentSession`
+rows the learning engine reads into charts: state frequency, daily
+acceptance, and biometric response by state.
+
+The rule that shaped it: **a chart is a stronger claim than a
+sentence.** A line implies a trend even when it's three points of
+noise. So:
+
+- **A day with no proposals reports `rate: null`, never `0`.** Those
+  are opposite facts — "nothing was offered" versus "you declined
+  everything" — and plotting both as zero would actively mislead. The
+  UI drops null days from the series rather than drawing them.
+- **Sub-threshold findings are shown, not suppressed.** This is the one
+  place it deliberately diverges from `environmentLearning.ts`: the
+  learning engine's job is deciding what to *say*, so it hides thin
+  evidence; an analytics view's job is showing what exists, so it
+  renders two-sample entries greyed and labelled "too few" rather than
+  dropping them silently.
+- **Sample size is never hidden.** Every row carries its count — that's
+  what separates a finding from a coincidence.
+- **Empty panels explain why they're empty.** "Nothing applied yet" and
+  "applied, but no usable before/after reading" are different problems
+  and get different copy. The measured-vs-applied ratio is shown as a
+  headline stat precisely because it's the honest explanation for an
+  empty outcome chart.
+
 ## Known gaps
 
 - **Not live-verified.** No Postgres, Hue bridge, or connected wearable

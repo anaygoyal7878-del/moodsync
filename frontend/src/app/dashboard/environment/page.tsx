@@ -1,6 +1,6 @@
 import { backendFetch } from "@/lib/api";
 import Link from "next/link";
-import { Settings2 } from "lucide-react";
+import { Settings2, BarChart3 } from "lucide-react";
 import { EnvironmentCard } from "@/components/companion/EnvironmentCard";
 
 /**
@@ -13,7 +13,7 @@ export default async function EnvironmentPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-24 pt-6 sm:px-6">
-      <div className="mb-6 flex items-center justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-medium" style={{ color: "var(--lux-ink)" }}>
             Environment
@@ -22,6 +22,15 @@ export default async function EnvironmentPage() {
             What MoodSync notices, and what it can adjust.
           </p>
         </div>
+        <div className="flex gap-2">
+        <Link
+          href="/dashboard/environment/analytics"
+          className="control-press flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
+          style={{ border: "1px solid var(--lux-muted)", color: "var(--lux-ink)", minHeight: 44 }}
+        >
+          <BarChart3 size={15} aria-hidden />
+          Analytics
+        </Link>
         <Link
           href="/dashboard/environment/settings"
           className="control-press flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
@@ -30,6 +39,7 @@ export default async function EnvironmentPage() {
           <Settings2 size={15} aria-hidden />
           Settings
         </Link>
+        </div>
       </div>
 
       {result.ok ? (

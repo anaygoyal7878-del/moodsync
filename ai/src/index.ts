@@ -260,6 +260,16 @@ export {
   type StateObservationRecord,
 } from './stateHistory.js';
 export {
+  computeEnvironmentAnalytics,
+  computeStateFrequency,
+  computeAcceptanceOverTime,
+  computeOutcomeByState,
+  type AcceptancePoint,
+  type EnvironmentAnalytics,
+  type StateFrequency,
+  type StateOutcome,
+} from './environmentAnalytics.js';
+export {
   computeAcceptance,
   computeEnvironmentEffects,
   describeEffect,
