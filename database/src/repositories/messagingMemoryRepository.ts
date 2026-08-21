@@ -64,6 +64,14 @@ export const messagingMemoryRepository = {
     await prisma.messagingMemoryFact.deleteMany({ where: { id: { in: overflow.map((f) => f.id) } } });
   },
 
+  /** Forgets one fact. Scoped by userId in the same statement rather
+   * than trusting the id alone, so an id from another account deletes
+   * nothing instead of someone else's memory. */
+  async remove(userId: string, id: string): Promise<number> {
+    const { count } = await prisma.messagingMemoryFact.deleteMany({ where: { id, userId } });
+    return count;
+  },
+
   /**
    * Facts ranked the way they'll be spent: most-reinforced first, most
    * recent as the tiebreak. Ordering here rather than in the caller

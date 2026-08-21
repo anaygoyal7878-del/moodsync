@@ -158,6 +158,17 @@ export const messagingRepository = {
     });
   },
 
+  /** Unprompted sends in a window, across every one of this user's
+   * handles — the input to the daily proactive cap. Counts by userId
+   * rather than connectionId on purpose: the cap is "how often may
+   * MoodSync interrupt this person", and texting the same person three
+   * times on two numbers is six interruptions, not three. */
+  async countProactiveSince(userId: string, since: Date): Promise<number> {
+    return prisma.messagingMessage.count({
+      where: { userId, direction: 'OUTBOUND', intent: 'proactive', createdAt: { gte: since } },
+    });
+  },
+
   /** Inbound count in the trailing window — the input to rate limiting,
    * so one sender can't drive unbounded model spend. */
   async countInboundSince(connectionId: string, since: Date): Promise<number> {

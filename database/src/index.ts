@@ -50,6 +50,11 @@ export { messagingRepository, normalizeHandle } from './repositories/messagingRe
 export { messagingPendingActionRepository } from './repositories/messagingPendingActionRepository.js';
 export { messagingMemoryRepository, normalizeFact, MAX_FACTS_PER_USER } from './repositories/messagingMemoryRepository.js';
 export {
+  messagingSettingsRepository,
+  DEFAULT_MESSAGING_SETTINGS,
+  type MessagingSettings,
+} from './repositories/messagingSettingsRepository.js';
+export {
   environmentRepository,
   stateObservationRepository,
   listAllAwaitingOutcome,

@@ -1,6 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { messagingRepository } from '@moodsync/database';
+import {
+  messagingRepository,
+  messagingSettingsRepository,
+  messagingMemoryRepository,
+  MAX_FACTS_PER_USER,
+} from '@moodsync/database';
+import { resolveMessagingCapabilities, selectMessagingTools } from '@moodsync/ai';
 import { messagingService, verifyWebhookSignature } from '../../services/messagingService.js';
 import { env } from '../../config/env.js';
 
@@ -9,6 +15,19 @@ const CHANNELS = ['IMESSAGE', 'SMS', 'WHATSAPP'] as const;
 const startSchema = z.object({
   channel: z.enum(CHANNELS),
   handle: z.string().min(3).max(120),
+});
+
+/**
+ * Bounds are enforced here, not only in the UI. `dailyProactiveLimit`
+ * is capped server-side because it governs how often a product may
+ * interrupt someone — a client must not be able to raise its own
+ * ceiling to an arbitrary number.
+ */
+const settingsSchema = z.object({
+  proactiveEnabled: z.boolean().optional(),
+  quietHoursStart: z.number().int().min(0).max(23).nullable().optional(),
+  quietHoursEnd: z.number().int().min(0).max(23).nullable().optional(),
+  dailyProactiveLimit: z.number().int().min(0).max(10).optional(),
 });
 
 /**
@@ -70,6 +89,79 @@ export default async function messagingRoutes(app: FastifyInstance) {
     const removed = await messagingRepository.disconnect(id, request.userId!);
     if (!removed) return reply.code(404).send({ error: 'Connection not found' });
     return reply.code(204).send();
+  });
+
+  /** Pause or resume a single handle from the app — the same state
+   * texting STOP/START sets, reachable without having to text. */
+  app.patch('/messaging/connections/:id/opted-out', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = z.object({ optedOut: z.boolean() }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    // Re-checked against userId rather than trusting the path id, so
+    // one account can't mute another's number.
+    const owned = (await messagingRepository.listForUser(request.userId!)).some((c) => c.id === id);
+    if (!owned) return reply.code(404).send({ error: 'Connection not found' });
+
+    await messagingRepository.setOptedOut(id, parsed.data.optedOut);
+    return reply.code(204).send();
+  });
+
+  app.get('/messaging/settings', { preHandler: app.authenticate }, async (request, reply) => {
+    return reply.send(await messagingSettingsRepository.get(request.userId!));
+  });
+
+  app.patch('/messaging/settings', { preHandler: app.authenticate }, async (request, reply) => {
+    const parsed = settingsSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    await messagingSettingsRepository.update(request.userId!, parsed.data);
+    return reply.send(await messagingSettingsRepository.get(request.userId!));
+  });
+
+  /**
+   * What MoodSync has remembered about this person from texting, and
+   * the ability to forget any of it.
+   *
+   * A memory the subject can't see isn't a feature, it's a dossier —
+   * and until this existed a wrong fact could only be evicted by
+   * waiting for the cap to push it out (harder now that reinforcement
+   * ranks eviction). See docs/MESSAGING_AGENTIC_ARCHITECTURE.md.
+   */
+  app.get('/messaging/memory', { preHandler: app.authenticate }, async (request, reply) => {
+    const facts = await messagingMemoryRepository.listForUser(request.userId!, MAX_FACTS_PER_USER);
+    return reply.send({
+      facts: facts.map((f) => ({
+        id: f.id,
+        fact: f.fact,
+        reinforcedCount: f.reinforcedCount,
+        lastReinforcedAt: f.lastReinforcedAt,
+      })),
+      cap: MAX_FACTS_PER_USER,
+    });
+  });
+
+  app.delete('/messaging/memory/:id', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const removed = await messagingMemoryRepository.remove(request.userId!, id);
+    if (removed === 0) return reply.code(404).send({ error: 'No such remembered fact' });
+    return reply.code(204).send();
+  });
+
+  /**
+   * What the bot can actually do for *this* account right now.
+   *
+   * Reads the same `resolveMessagingCapabilities` the agent itself uses
+   * to build its tool surface, rather than a hardcoded feature list —
+   * so this screen can never advertise an ability the agent doesn't
+   * actually have this turn.
+   */
+  app.get('/messaging/capabilities', { preHandler: app.authenticate }, async (request, reply) => {
+    const capabilities = await resolveMessagingCapabilities(request.userId!);
+    const tools = selectMessagingTools(capabilities);
+    return reply.send({
+      hueConnected: capabilities.hueConnected,
+      tools: Object.keys(tools),
+    });
   });
 
   /**

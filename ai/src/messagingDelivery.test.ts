@@ -1,20 +1,43 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const { listForUserMock, logMessageMock, touchMock } = vi.hoisted(() => ({
-  listForUserMock: vi.fn(),
-  logMessageMock: vi.fn(),
-  touchMock: vi.fn(),
-}));
+const { listForUserMock, logMessageMock, touchMock, countProactiveMock, getSettingsMock, getTimezoneMock } = vi.hoisted(
+  () => ({
+    listForUserMock: vi.fn(),
+    logMessageMock: vi.fn(),
+    touchMock: vi.fn(),
+    countProactiveMock: vi.fn(async () => 0),
+    // Explicitly typed: without the annotation the literal `null`
+    // defaults narrow quietHours* to type `null`, and a test that sets
+    // a real hour stops compiling.
+    getSettingsMock: vi.fn(
+      async (): Promise<{
+        proactiveEnabled: boolean;
+        quietHoursStart: number | null;
+        quietHoursEnd: number | null;
+        dailyProactiveLimit: number;
+      }> => ({
+        proactiveEnabled: true,
+        quietHoursStart: null,
+        quietHoursEnd: null,
+        dailyProactiveLimit: 3,
+      }),
+    ),
+    getTimezoneMock: vi.fn(async () => 'UTC'),
+  }),
+);
 
 vi.mock('@moodsync/database', () => ({
   messagingRepository: {
     listForUser: listForUserMock,
     logMessage: logMessageMock,
     touch: touchMock,
+    countProactiveSince: countProactiveMock,
   },
+  messagingSettingsRepository: { get: getSettingsMock },
+  userTimezoneRepository: { getTimezone: getTimezoneMock },
 }));
 
-const { sendProactiveInsight } = await import('./messagingDelivery.js');
+const { sendProactiveInsight, canSendProactive, withinQuietHours } = await import('./messagingDelivery.js');
 
 const verifiedConn = { id: 'c1', userId: 'u1', channel: 'IMESSAGE', handle: '+15551234567', verifiedAt: new Date(), optedOutAt: null };
 
@@ -91,5 +114,124 @@ describe('sendProactiveInsight', () => {
 
     expect(result.sent).toBe(1);
     expect(logMessageMock).toHaveBeenCalledWith(expect.objectContaining({ externalId: null }));
+  });
+});
+
+describe('withinQuietHours', () => {
+  it('is never quiet when no window is set', () => {
+    expect(withinQuietHours(3, null, null)).toBe(false);
+    expect(withinQuietHours(3, 22, null)).toBe(false);
+  });
+
+  it('handles a window that crosses midnight — the common case', () => {
+    expect(withinQuietHours(23, 22, 7)).toBe(true);
+    expect(withinQuietHours(3, 22, 7)).toBe(true);
+    expect(withinQuietHours(12, 22, 7)).toBe(false);
+  });
+
+  it('is half-open, so "quiet until 7" lets the 7am message through', () => {
+    expect(withinQuietHours(6, 22, 7)).toBe(true);
+    expect(withinQuietHours(7, 22, 7)).toBe(false);
+    // And the start hour is inclusive.
+    expect(withinQuietHours(22, 22, 7)).toBe(true);
+  });
+
+  it('handles a same-day window too', () => {
+    expect(withinQuietHours(10, 9, 17)).toBe(true);
+    expect(withinQuietHours(20, 9, 17)).toBe(false);
+  });
+
+  it('treats a zero-width window as no quiet hours, never as always-quiet', () => {
+    // Reading start === end as "quiet all day" would silently mute
+    // every proactive message from a setting that looks like a no-op.
+    expect(withinQuietHours(3, 9, 9)).toBe(false);
+    expect(withinQuietHours(9, 9, 9)).toBe(false);
+  });
+});
+
+describe('canSendProactive', () => {
+  const base = { proactiveEnabled: true, quietHoursStart: null, quietHoursEnd: null, dailyProactiveLimit: 3 };
+
+  it('allows a normal send', () => {
+    expect(canSendProactive(base, 14, 0, 1)).toEqual({ allowed: true, reason: null });
+  });
+
+  it('refuses when the user turned proactive messages off', () => {
+    expect(canSendProactive({ ...base, proactiveEnabled: false }, 14, 0, 1).reason).toBe('disabled');
+  });
+
+  it('refuses with nothing connected', () => {
+    expect(canSendProactive(base, 14, 0, 0).reason).toBe('no_connections');
+  });
+
+  it('refuses inside quiet hours', () => {
+    const settings = { ...base, quietHoursStart: 22, quietHoursEnd: 7 };
+    expect(canSendProactive(settings, 2, 0, 1).reason).toBe('quiet_hours');
+    expect(canSendProactive(settings, 14, 0, 1).allowed).toBe(true);
+  });
+
+  it('refuses once the daily cap is reached, not after exceeding it', () => {
+    expect(canSendProactive(base, 14, 2, 1).allowed).toBe(true);
+    expect(canSendProactive(base, 14, 3, 1).reason).toBe('daily_limit_reached');
+  });
+
+  it('treats a zero limit as never texting first', () => {
+    expect(canSendProactive({ ...base, dailyProactiveLimit: 0 }, 14, 0, 1).reason).toBe('daily_limit_reached');
+  });
+
+  it('reports the user-set reason ahead of incidental ones', () => {
+    // Someone who switched proactive off should see that, not
+    // "quiet hours" — the explicit choice is the real answer.
+    const settings = { ...base, proactiveEnabled: false, quietHoursStart: 22, quietHoursEnd: 7 };
+    expect(canSendProactive(settings, 2, 99, 0).reason).toBe('disabled');
+  });
+});
+
+describe('sendProactiveInsight — settings enforcement', () => {
+  it('tags the outbound row `proactive`, which is what makes the daily cap countable', async () => {
+    listForUserMock.mockResolvedValueOnce([verifiedConn]);
+
+    await sendProactiveInsight('u1', 'Heads up', 'Your recovery is low.');
+
+    expect(logMessageMock).toHaveBeenCalledWith(expect.objectContaining({ direction: 'OUTBOUND', intent: 'proactive' }));
+  });
+
+  it('sends nothing at all once today’s cap is reached', async () => {
+    listForUserMock.mockResolvedValueOnce([verifiedConn]);
+    countProactiveMock.mockResolvedValueOnce(3);
+
+    const result = await sendProactiveInsight('u1', 'Heads up', 'Your recovery is low.');
+
+    expect(result).toEqual({ sent: 0, blocked: 'daily_limit_reached' });
+    expect(logMessageMock).not.toHaveBeenCalled();
+  });
+
+  it('stays silent during quiet hours', async () => {
+    listForUserMock.mockResolvedValueOnce([verifiedConn]);
+    getSettingsMock.mockResolvedValueOnce({
+      proactiveEnabled: true,
+      quietHoursStart: 22,
+      quietHoursEnd: 7,
+      dailyProactiveLimit: 3,
+    });
+
+    // 03:00 UTC, with the user's timezone mocked to UTC.
+    const result = await sendProactiveInsight('u1', 'Heads up', 'x', new Date(Date.UTC(2026, 7, 20, 3, 0, 0)));
+
+    expect(result.blocked).toBe('quiet_hours');
+    expect(logMessageMock).not.toHaveBeenCalled();
+  });
+
+  it('respects the user switching proactive messages off entirely', async () => {
+    listForUserMock.mockResolvedValueOnce([verifiedConn]);
+    getSettingsMock.mockResolvedValueOnce({
+      proactiveEnabled: false,
+      quietHoursStart: null,
+      quietHoursEnd: null,
+      dailyProactiveLimit: 3,
+    });
+
+    expect((await sendProactiveInsight('u1', 'Heads up', 'x')).blocked).toBe('disabled');
+    expect(logMessageMock).not.toHaveBeenCalled();
   });
 });

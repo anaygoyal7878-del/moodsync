@@ -48,6 +48,7 @@ model User {
   messagingMessages    MessagingMessage[]
   messagingPendingActions MessagingPendingAction[]
   messagingMemoryFacts MessagingMemoryFact[]
+  messagingSettings    MessagingSettings?
   environmentSessions  EnvironmentSession[]
   stateObservations    StateObservation[]
   environmentAutomationSettings EnvironmentAutomationSettings?
@@ -703,8 +704,11 @@ model MessagingMessage {
   direction    MessagingDirection
   body         String
   /// The classified intent for inbound messages (see
-  /// ai/src/messagingAgent.ts). Null for outbound. Stored so the crisis
-  /// path is auditable after the fact.
+  /// ai/src/messagingAgent.ts). Stored so the crisis path is auditable
+  /// after the fact, and so the conversation profile can count topics.
+  /// Outbound rows are normally null, with one exception: unprompted
+  /// sends are tagged `proactive`, which is what makes the daily
+  /// proactive cap in MessagingSettings countable rather than notional.
   intent       String?
   /// Provider's own message id, when it returns one — for reconciling
   /// delivery failures.
@@ -742,6 +746,46 @@ model MessagingPendingAction {
   expiresAt    DateTime
 
   @@map("messaging_pending_actions")
+}
+
+/// Per-user policy for the messaging bot, chiefly for the messages
+/// MoodSync sends *unprompted*.
+///
+/// Separate from `MessagingConnection` because this is one policy per
+/// person, not per phone number — someone with both an iMessage and an
+/// SMS handle wants one answer to "when may you text me first", not two.
+///
+/// Note the asymmetry with everything else in this schema: the
+/// conservative default here is `true`, not `false`. Proactive health
+/// texting already shipped and already fires, so defaulting this off
+/// would silently switch off a live feature on migration. The
+/// conservative choice is the one that doesn't change behaviour behind
+/// the user's back; the *control* is the new thing, not a new default.
+model MessagingSettings {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Whether MoodSync may text first at all. Distinct from a STOP
+  /// opt-out, which silences replies too — someone can reasonably want
+  /// a bot that answers when asked and never interrupts otherwise.
+  proactiveEnabled Boolean @default(true)
+
+  /// Local-hour window during which MoodSync never texts first.
+  /// Null means no quiet hours. Wrap-around (22 -> 7) is expected and
+  /// handled by the gate, since the useful window crosses midnight.
+  quietHoursStart Int?
+  quietHoursEnd   Int?
+
+  /// Hard ceiling on unprompted texts per local day. A wellness product
+  /// that can text you has to have a number here — "as many as the
+  /// insight engine happens to generate" is not a policy.
+  dailyProactiveLimit Int @default(3)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("messaging_settings")
 }
 
 /// A short, durable fact the agentic messaging model chose to remember

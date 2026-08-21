@@ -1,5 +1,70 @@
-import { messagingRepository } from '@moodsync/database';
+import { messagingRepository, messagingSettingsRepository, userTimezoneRepository, type MessagingSettings } from '@moodsync/database';
 import { buildProactiveNudge } from './messagingAgent.js';
+
+export type ProactiveBlockReason = 'disabled' | 'quiet_hours' | 'daily_limit_reached' | 'no_connections';
+
+export interface ProactiveDecision {
+  allowed: boolean;
+  reason: ProactiveBlockReason | null;
+}
+
+/**
+ * Whether MoodSync may text this person right now, unprompted.
+ *
+ * Pure and exported so the interruption policy is testable without a
+ * database, a clock, or a phone. Every branch is a reason to stay
+ * quiet: this function's job is to say no, and the caller only sends
+ * when it has run out of reasons to.
+ *
+ * The asymmetry with `handleInbound` is deliberate. Replying to someone
+ * who texted first needs almost no permission; interrupting someone who
+ * didn't needs all of it.
+ */
+export function canSendProactive(
+  settings: MessagingSettings,
+  localHour: number,
+  sentToday: number,
+  connectionCount: number,
+): ProactiveDecision {
+  if (!settings.proactiveEnabled) return { allowed: false, reason: 'disabled' };
+  if (connectionCount === 0) return { allowed: false, reason: 'no_connections' };
+  if (sentToday >= settings.dailyProactiveLimit) return { allowed: false, reason: 'daily_limit_reached' };
+  if (withinQuietHours(localHour, settings.quietHoursStart, settings.quietHoursEnd)) {
+    return { allowed: false, reason: 'quiet_hours' };
+  }
+  return { allowed: true, reason: null };
+}
+
+/**
+ * Half-open [start, end): a 22→7 window covers 22:00 through 06:59 and
+ * releases at 07:00, so "quiet until 7" means the 7am brief still
+ * lands. Wrap-around across midnight is the common case here, not an
+ * edge case — quiet hours that don't cross midnight are the unusual
+ * ones.
+ */
+export function withinQuietHours(hour: number, start: number | null, end: number | null): boolean {
+  if (start === null || end === null) return false;
+  // A zero-width window (start === end) is treated as "no quiet hours"
+  // rather than "always quiet" — the latter would silently mute every
+  // proactive message from a setting that reads like a no-op.
+  if (start === end) return false;
+  return start < end ? hour >= start && hour < end : hour >= start || hour < end;
+}
+
+function localHourIn(timeZone: string, now: Date): number {
+  try {
+    return Number(new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', hour12: false }).format(now));
+  } catch {
+    return now.getUTCHours();
+  }
+}
+
+/** Midnight local, as an instant — the boundary the daily cap counts
+ * from. A rolling 24h window would let a burst at 11pm block the next
+ * morning's brief, which is not what "3 a day" means to a person. */
+function startOfLocalDay(timeZone: string, now: Date): Date {
+  return new Date(now.getTime() - localHourIn(timeZone, now) * 3_600_000 - (now.getMinutes() * 60 + now.getSeconds()) * 1000);
+}
 
 /**
  * Sends a proactive health insight as a text, from wherever a real
@@ -15,11 +80,24 @@ import { buildProactiveNudge } from './messagingAgent.js';
  * than through a zod schema (that validation lives in the backend app
  * only). See docs/HEALTH_INSIGHTS_TEXTING_ARCHITECTURE.md.
  */
-export async function sendProactiveInsight(userId: string, title: string, body: string): Promise<{ sent: number }> {
+export async function sendProactiveInsight(
+  userId: string,
+  title: string,
+  body: string,
+  now: Date = new Date(),
+): Promise<{ sent: number; blocked: ProactiveBlockReason | null }> {
   const connections = (await messagingRepository.listForUser(userId)).filter(
     (c) => c.verifiedAt && !c.optedOutAt && c.channel !== 'WHATSAPP',
   );
-  if (connections.length === 0) return { sent: 0 };
+
+  const [settings, timeZone] = await Promise.all([
+    messagingSettingsRepository.get(userId),
+    userTimezoneRepository.getTimezone(userId).catch(() => 'UTC'),
+  ]);
+  const sentToday = await messagingRepository.countProactiveSince(userId, startOfLocalDay(timeZone, now));
+
+  const decision = canSendProactive(settings, localHourIn(timeZone, now), sentToday, connections.length);
+  if (!decision.allowed) return { sent: 0, blocked: decision.reason };
 
   const text = buildProactiveNudge(title, body);
   let sent = 0;
@@ -37,12 +115,21 @@ export async function sendProactiveInsight(userId: string, title: string, body: 
     }
     // Logged regardless of send success — same "never lose the message
     // from the audit trail" principle as backend's deliverAndRecord.
-    await messagingRepository.logMessage({ connectionId: connection.id, userId, direction: 'OUTBOUND', body: text, externalId });
+    // Tagged `proactive` so countProactiveSince can enforce the daily
+    // cap. An untagged send would make the cap notional.
+    await messagingRepository.logMessage({
+      connectionId: connection.id,
+      userId,
+      direction: 'OUTBOUND',
+      body: text,
+      intent: 'proactive',
+      externalId,
+    });
     await messagingRepository.touch(connection.id, 'OUTBOUND');
     sent++;
   }
 
-  return { sent };
+  return { sent, blocked: null };
 }
 
 /** Miniature duplicate of backend's BlueBubbles client — see this

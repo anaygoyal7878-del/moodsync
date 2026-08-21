@@ -302,11 +302,94 @@ summarization. Thirty short facts read in full is cheap and legible; a
 retrieval pipeline would be solving a problem this account size doesn't
 have yet.
 
+## The settings surface — and what Poke does
+
+Poke (Interaction Co.) is the closest shipping comparison: an AI
+assistant that lives in iMessage, is "proactive, private, personal",
+remembers your preferences, and acts through connected integrations.
+Four of its patterns were worth taking, and the reasons they map onto
+MoodSync differ in each case:
+
+| Poke pattern | What MoodSync does with it |
+|---|---|
+| Proactive messaging — morning briefings, flagged email, scheduled automations | Kept, but **gated**. MoodSync already texted unprompted; what was missing was any way to say when. |
+| Memory that learns preferences | Already built (`MessagingMemoryFact`); this round added the screen that makes it inspectable and erasable. |
+| Integrations define what it can do | Mapped onto the capability-derived tool surface, and surfaced read-only so the screen can't over-promise. |
+| An explicit privacy control ("Maximum Privacy" excludes data from training) | Not adopted — MoodSync doesn't train on user data, and adding a toggle implying it might would be theatre. |
+
+The screen lives at `/dashboard/connections/messaging`, ordered by what
+a person actually needs to decide: is it connected → what can it do →
+when may it interrupt me → what does it know about me. Interruption
+controls sit above memory because "stop texting me at 2am" is more
+urgent than "forget that I prefer mornings".
+
+### Everything here governs unprompted messages only
+
+`MessagingSettings` (per user, not per handle — someone with two
+numbers wants one answer to "when may you text me") holds three
+controls, and all three gate `sendProactiveInsight` through one pure
+function, `canSendProactive`:
+
+- **`proactiveEnabled`** — may it text first at all. Deliberately
+  distinct from a STOP opt-out, which silences replies too; wanting a
+  bot that answers when asked and never interrupts otherwise is a
+  coherent position the old model couldn't express.
+- **Quiet hours** — a local-hour window, half-open, wrap-around
+  handled because 22→7 is the normal case not the edge case. A
+  zero-width window (start === end) reads as *no* quiet hours, never
+  "always quiet" — the latter would silently mute everything from a
+  setting that looks like a no-op.
+- **`dailyProactiveLimit`** — a hard ceiling counted from local
+  midnight. This is enforceable rather than notional only because
+  proactive sends are now tagged `intent: 'proactive'` on the outbound
+  row; without that tag there'd be nothing to count.
+
+`canSendProactive` is pure and entirely composed of reasons to stay
+quiet, in the same spirit as `environmentGuards.ts`. The asymmetry with
+`handleInbound` is the design: replying to someone who texted first
+needs almost no permission, interrupting someone who didn't needs all
+of it.
+
+The default is `proactiveEnabled: true`, which breaks this codebase's
+usual conservative-default habit *on purpose*. Proactive texting already
+shipped and already fires; defaulting the new row to `false` would have
+silently switched off a live feature at migration time. The conservative
+choice is the one that doesn't change behaviour behind the user's back
+— the control is the new thing, not a new default.
+
+### Memory you can actually see
+
+`GET/DELETE /messaging/memory` and the panel over it exist because a
+memory the subject can't inspect isn't a feature, it's a dossier. It
+also closes a gap this doc previously disclosed: with reinforcement
+ranking eviction, a *confidently wrong* fact became harder to remove by
+attrition than a rarely-repeated true one. The reinforcement count is
+shown rather than hidden, because "concluded this 4 separate times"
+explains why a fact keeps shaping replies in a way a bare list can't.
+
+### A capability list that can't lie
+
+`GET /messaging/capabilities` returns the output of the same
+`selectMessagingTools` the agent uses to build its tool surface, so the
+screen structurally cannot advertise an ability the agent won't have
+when you text it — the failure mode every hardcoded feature list
+eventually has. Unavailable abilities render greyed with the reason
+("needs a connected Hue bridge") rather than hidden, since silently
+omitting them looks like the feature doesn't exist.
+
 ## Verification
 
 Unit-tested: tool handlers (target-not-found errors, confirm-prompt
-text, nutrition data shape) and the confirm/cancel/fall-through paths in
-`messagingService`. Not live-tested: an actual Gemini function-calling
+text, nutrition data shape), the confirm/cancel/fall-through paths in
+`messagingService`, the profile compiler's suppression floors, the
+tool-surface selection rules, and every branch of `canSendProactive`
+including the wrap-around and zero-width quiet-hours cases.
+
+The settings screen itself is build- and lint-verified and its routes
+are registered, but it has **not been rendered logged-in**: no Postgres
+was running in this environment, so the page could only be observed
+307-redirecting to `/login`, which at least confirms it compiles, serves,
+and is behind the auth guard. Not live-tested: an actual Gemini function-calling
 round trip and an actual Hue API call from a text message — no live
 Gemini key or Hue bridge was available in this environment, matching
 every other "not round-tripped against a real X" disclosure in
@@ -331,6 +414,12 @@ docs/MESSAGING_BOT.md.
   for the cap to push it out — and reinforcement now makes a
   *confidently wrong* stale fact harder to evict, not easier. No in-app
   UI shows a user what MoodSync has remembered about them from texts.
+- **The settings screen has never been rendered with real data.** See
+  Verification — auth guard confirmed, everything past it unobserved.
+- **Quiet hours and the daily cap are enforced only for
+  `sendProactiveInsight`.** They are not consulted by anything else
+  that might one day message a user unprompted; a second proactive
+  sender would have to opt in to the same gate deliberately.
 - **Observed traits have no decay.** `compileConversationProfile`
   weights a message from four months ago exactly like yesterday's, so a
   person whose habits genuinely changed carries the old pattern until
