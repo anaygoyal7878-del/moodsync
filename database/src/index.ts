@@ -48,6 +48,7 @@ export {
 } from './repositories/musicSessionRepository.js';
 export { messagingRepository, normalizeHandle } from './repositories/messagingRepository.js';
 export { messagingPendingActionRepository } from './repositories/messagingPendingActionRepository.js';
+export { messagingMemoryRepository, MAX_FACTS_PER_USER } from './repositories/messagingMemoryRepository.js';
 export {
   environmentRepository,
   stateObservationRepository,

@@ -1,4 +1,5 @@
 import { GoogleGenAI, createPartFromFunctionResponse, type Content } from '@google/genai';
+import { messagingMemoryRepository } from '@moodsync/database';
 import { AtlasNotConfiguredError, buildAtlasSystemPrompt, type AtlasChatMessage } from './atlasChat.js';
 import { MESSAGING_TOOLS, MESSAGING_ACTION_TOOL_NAMES } from './messagingTools.js';
 
@@ -30,11 +31,15 @@ export interface AgenticReply {
 
 const SYSTEM_PROMPT_SUFFIX = `
 
-You also have tools to look up this user's real wearable/biometric data, list and control their connected smart home devices, and give general nutrition guidance. Use a tool whenever the user's message calls for real data or a real action rather than answering from general knowledge alone — never guess a biometric number or invent a device name when a tool can get the real one.
+You also have tools to look up this user's real wearable/biometric data (including readiness), list and control their connected smart home devices, log a caffeinated drink they report having, give general nutrition guidance, and remember a durable fact about them. Use a tool whenever the user's message calls for real data or a real action rather than answering from general knowledge alone — never guess a biometric number or invent a device name when a tool can get the real one.
 
 For control_hue_light and activate_hue_scene: calling the tool does NOT turn anything on or off yet — it only prepares a confirmation. After calling either tool, your turn is over; do not describe additional actions or ask a second question in the same turn.
 
-Never call control_hue_light or activate_hue_scene with a light or scene name that didn't come from list_smart_home_devices in this conversation — call list_smart_home_devices first if you don't already have the real names.`;
+Never call control_hue_light or activate_hue_scene with a light or scene name that didn't come from list_smart_home_devices in this conversation — call list_smart_home_devices first if you don't already have the real names.
+
+log_caffeine_intake and remember_fact execute immediately — they don't need a confirmation, unlike the device-control tools above. Only call log_caffeine_intake when the person is reporting a drink they actually had, never for a hypothetical ("should I have a coffee?"). Call remember_fact only for something genuinely durable — a preference or recurring pattern worth recalling weeks from now — not for today's mood or schedule; most turns should call it zero times.
+
+"How am I doing" or "status" style questions should be answered from get_wearable_snapshot's real numbers, including its readiness figure — do not invent or estimate any of them.`;
 
 function toGeminiTools() {
   return [
@@ -59,7 +64,17 @@ export async function sendAgenticMessage(userId: string, messages: AtlasChatMess
   if (!apiKey) throw new AtlasNotConfiguredError();
 
   const client = new GoogleGenAI({ apiKey });
-  const systemInstruction = await buildAtlasSystemPrompt(userId);
+  const [systemInstruction, facts] = await Promise.all([
+    buildAtlasSystemPrompt(userId),
+    // Best-effort — a memory lookup failing should never take down the
+    // whole reply, it should just mean this turn has no memory of past
+    // conversations.
+    messagingMemoryRepository.listForUser(userId).catch(() => []),
+  ]);
+  const memoryBlock =
+    facts.length > 0
+      ? `\n\nWhat you remember about this person from past conversations:\n${facts.map((f) => `- ${f.fact}`).join('\n')}`
+      : '';
   const contents: Content[] = messages.map((m) => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.content }],
@@ -69,7 +84,7 @@ export async function sendAgenticMessage(userId: string, messages: AtlasChatMess
     const response = await client.models.generateContent({
       model: MODEL,
       contents,
-      config: { systemInstruction: systemInstruction + SYSTEM_PROMPT_SUFFIX, tools: toGeminiTools() },
+      config: { systemInstruction: systemInstruction + SYSTEM_PROMPT_SUFFIX + memoryBlock, tools: toGeminiTools() },
     });
 
     const calls = response.functionCalls ?? [];

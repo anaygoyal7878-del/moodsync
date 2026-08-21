@@ -1,26 +1,19 @@
 import { createHmac, timingSafeEqual, randomInt } from 'node:crypto';
-import { messagingRepository, messagingPendingActionRepository, caffeineLogRepository } from '@moodsync/database';
+import { messagingRepository, messagingPendingActionRepository } from '@moodsync/database';
 import type { MessagingChannel } from '@moodsync/database';
 import {
   classifyInbound,
   deterministicReply,
-  buildStatusReply,
-  buildCaffeineLogReply,
   shapeReply,
   sendAgenticMessage,
   executeConfirmedAction,
   AtlasNotConfiguredError,
-  computeReadiness,
-  computeLiveEnergyMeter,
-  composeDailyBrief,
-  timeOfDayFor,
   UNVERIFIED_REPLY,
   OPTED_OUT_REPLY,
   MESSAGING_STYLE_PROMPT,
   type AtlasChatMessage,
 } from '@moodsync/ai';
 import { env } from '../config/env.js';
-import { loadCompanionContext, bookedHoursFrom } from './companionContext.js';
 import { sendBlueBubblesMessage, MessagingProviderNotConfiguredError } from './messagingProviders/blueBubbles.js';
 
 type MessagingConnectionRecord = NonNullable<Awaited<ReturnType<typeof messagingRepository.findByHandle>>>;
@@ -221,39 +214,19 @@ async function resolveReply(
     return { text: "That's a lot of messages — give me a few minutes to catch up.", intent: 'rate_limited' };
   }
 
-  // 6a. Deterministic commands.
+  // 6a. Deterministic commands — only ever fires for `help` at this
+  // point in the flow (crisis/stop/start are handled earlier). Status
+  // and caffeine logging used to short-circuit here too; both now go
+  // through the model at 6b, via get_wearable_snapshot (with a real
+  // readiness figure) and log_caffeine_intake respectively — real
+  // numbers either way, but routed through judgment instead of a
+  // regex, so a phrasing the classifier doesn't recognize still works.
   const canned = deterministicReply(classification);
   if (canned) return { text: canned, intent: classification.intent };
 
-  // 6b. Status — real numbers, no model.
-  if (classification.intent === 'status') {
-    return { text: await buildStatus(connection.userId), intent: 'status' };
-  }
-
-  // 6c. Health logging by text. Writes to the same CaffeineLog the
-  // in-app logger uses, so a drink logged from Messages shows up in
-  // the energy meter identically.
-  if (classification.intent === 'log_caffeine' && classification.mg) {
-    await caffeineLogRepository.create({
-      userId: connection.userId,
-      mg: classification.mg,
-      loggedAt: new Date(),
-    });
-    const context = await loadCompanionContext(connection.userId);
-    const energy = context.scores
-      ? computeLiveEnergyMeter(
-          context.scores,
-          (await caffeineLogRepository.listRecentForUser(connection.userId, 5)).map((log) => ({
-            mg: log.mg,
-            loggedAt: log.loggedAt,
-          })),
-        ).value
-      : null;
-    return { text: buildCaffeineLogReply(classification.mg, energy), intent: 'log_caffeine' };
-  }
-
-  // 6d. Open question — the agentic Atlas path (real tool calls for
-  // wearable data, smart home, and nutrition guidance — see
+  // 6b. Everything else — the agentic Atlas path (real tool calls for
+  // wearable data + readiness, smart home, caffeine logging, durable
+  // memory, and nutrition guidance — see
   // docs/MESSAGING_AGENTIC_ARCHITECTURE.md), with conversation history
   // replayed since the channel has no client holding it.
   try {
@@ -330,30 +303,4 @@ async function deliverAndRecord(connection: MessagingConnectionRecord, reply: Ou
     externalId,
   });
   await messagingRepository.touch(connection.id, 'OUTBOUND');
-}
-
-/** The deterministic "how am I doing" payload, from the same context
- * loader the dashboard uses — so a text and the app never disagree. */
-async function buildStatus(userId: string): Promise<string> {
-  const context = await loadCompanionContext(userId);
-  if (!context.scores) {
-    return buildStatusReply({ readiness: null, energy: null, sleep: null, focusToday: null });
-  }
-
-  const readiness = computeReadiness(context.scores);
-  const brief = composeDailyBrief({
-    timeOfDay: timeOfDayFor(new Date().getHours()),
-    readiness: readiness.value,
-    energy: context.energy,
-    burnoutRisk: false,
-    focusWindow: null,
-    bookedHoursToday: bookedHoursFrom(context.todayEvents),
-  });
-
-  return buildStatusReply({
-    readiness: readiness.value,
-    energy: context.energy,
-    sleep: context.scores.sleep.value,
-    focusToday: brief.focusToday,
-  });
 }

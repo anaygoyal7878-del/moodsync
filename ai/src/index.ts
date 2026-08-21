@@ -173,6 +173,7 @@ export {
   OPTED_OUT_REPLY,
   MESSAGING_STYLE_PROMPT,
   MAX_REPLY_CHARS,
+  CAFFEINE_DRINK_PRESETS,
   type InboundClassification,
   type InboundIntent,
   type StatusSnapshot,

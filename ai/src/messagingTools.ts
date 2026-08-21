@@ -2,10 +2,13 @@ import {
   biometricReadingRepository,
   caffeineLogRepository,
   smartHomeConnectionRepository,
+  messagingMemoryRepository,
 } from '@moodsync/database';
 import { computeWellnessScores, type WellnessScores } from './wellness.js';
 import { computeLiveEnergyMeter } from './energyMeter.js';
+import { computeReadiness } from './dailyBrief.js';
 import { listHueLightsForUser, listHueScenesForUser } from './hueActionExecutor.js';
+import { CAFFEINE_DRINK_PRESETS } from './messagingAgent.js';
 
 /**
  * Task-completing tools for the messaging channel — see
@@ -24,9 +27,16 @@ import { listHueLightsForUser, listHueScenesForUser } from './hueActionExecutor.
  * execution once the user confirms. Splitting it this way means the
  * model can never cause a real side effect in a single turn — only a
  * confirmed second message can.
+ *
+ * `kind: 'write'` is a third category, for changes that are real but
+ * low-stakes and easily corrected — logging a drink, remembering a
+ * fact about the person — where making the user type "YES" back would
+ * just be friction, not safety. These execute immediately, same as a
+ * read tool, and the model's next turn is expected to confirm what it
+ * did in plain language rather than asking permission first.
  */
 
-export type MessagingToolKind = 'read' | 'action';
+export type MessagingToolKind = 'read' | 'action' | 'write';
 
 export interface MessagingToolResult {
   /** Always JSON-serializable — fed back to Gemini as a function
@@ -67,6 +77,11 @@ const getWearableSnapshot: MessagingTool = {
       history.filter((r) => r.timestamp !== latest.reading.timestamp),
     );
     const r = latest.reading;
+    // Same recovery+sleep readiness figure the daily brief and the
+    // (now-retired) deterministic "how am I doing" reply used — a text
+    // asking "how am I doing" should get the same number the app would
+    // show, not a model's independent read of the raw scores.
+    const readiness = computeReadiness(scores);
     return {
       data: {
         hasData: true,
@@ -77,6 +92,7 @@ const getWearableSnapshot: MessagingTool = {
         sleepScoreRaw: r.sleepScore ?? null,
         steps: r.steps ?? null,
         calories: r.calories ?? null,
+        readiness: formatScore(readiness),
         stress: formatScore(scores.stress),
         recovery: formatScore(scores.recovery),
         sleep: formatScore(scores.sleep),
@@ -229,12 +245,85 @@ const getNutritionGuidance: MessagingTool = {
   },
 };
 
+const logCaffeineIntake: MessagingTool = {
+  kind: 'write',
+  declaration: {
+    name: 'log_caffeine_intake',
+    description:
+      "Logs a caffeinated drink the user says they just had (e.g. \"just had a coffee\", \"drinking an espresso\"). Only call this when the message reports something already consumed — never for a hypothetical or a question like \"should I have a coffee?\". Pick the closest drinkType; use customMg only when the user states a specific amount themselves.",
+    parameters: {
+      type: 'object',
+      properties: {
+        drinkType: {
+          type: 'string',
+          enum: Object.keys(CAFFEINE_DRINK_PRESETS),
+          description: 'The closest matching drink preset.',
+        },
+        customMg: {
+          type: 'number',
+          description: 'Only when the user stated an exact milligram amount themselves — otherwise omit and use drinkType.',
+        },
+      },
+    },
+  },
+  handler: async (userId, args) => {
+    const drinkType = typeof args.drinkType === 'string' ? args.drinkType : undefined;
+    const customMg = typeof args.customMg === 'number' ? args.customMg : undefined;
+    const mg = customMg ?? (drinkType ? CAFFEINE_DRINK_PRESETS[drinkType] : undefined);
+    if (!mg || mg <= 0) throw new Error('log_caffeine_intake needs a known drinkType or a positive customMg');
+
+    await caffeineLogRepository.create({ userId, mg, loggedAt: new Date() });
+
+    const latest = await biometricReadingRepository.findLatestNormalized(userId);
+    let energyAfter: number | null = null;
+    if (latest) {
+      const history = await biometricReadingRepository.listRecentNormalized(userId, 30);
+      const scores = computeWellnessScores(
+        latest.reading,
+        history.filter((r) => r.timestamp !== latest.reading.timestamp),
+      );
+      const recent = await caffeineLogRepository.listRecentForUser(userId, 5);
+      energyAfter = computeLiveEnergyMeter(
+        scores,
+        recent.map((log) => ({ mg: log.mg, loggedAt: log.loggedAt })),
+      ).value;
+    }
+
+    return { data: { logged: true, mg, energyAfter } };
+  },
+};
+
+const rememberFact: MessagingTool = {
+  kind: 'write',
+  declaration: {
+    name: 'remember_fact',
+    description:
+      "Saves one short, durable fact about this person for future conversations — a preference or recurring context that would be useful to recall days or weeks from now (e.g. \"trains best in the morning\", \"has a big presentation every Monday\", \"prefers metric units\"). Do NOT save anything transient (today's schedule, a single day's mood) or a medical/diagnostic claim. One plain sentence, third person.",
+    parameters: {
+      type: 'object',
+      properties: {
+        fact: { type: 'string', description: 'The fact, as one short plain sentence (e.g. "Prefers evening workouts.")' },
+      },
+      required: ['fact'],
+    },
+  },
+  handler: async (userId, args) => {
+    const fact = String(args.fact ?? '').trim();
+    if (!fact) throw new Error('remember_fact requires a fact');
+    if (fact.length > 200) throw new Error('That fact is too long to remember concisely — say it in one short sentence.');
+    await messagingMemoryRepository.add(userId, fact);
+    return { data: { saved: true, fact } };
+  },
+};
+
 export const MESSAGING_TOOLS: Record<string, MessagingTool> = {
   get_wearable_snapshot: getWearableSnapshot,
   list_smart_home_devices: listSmartHomeDevices,
   control_hue_light: controlHueLight,
   activate_hue_scene: activateHueScene,
   get_nutrition_guidance: getNutritionGuidance,
+  log_caffeine_intake: logCaffeineIntake,
+  remember_fact: rememberFact,
 };
 
 export const MESSAGING_ACTION_TOOL_NAMES = new Set(

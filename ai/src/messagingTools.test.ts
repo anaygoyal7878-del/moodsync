@@ -1,24 +1,37 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const { listLightsMock, listScenesMock, setHueLightByNameMock, activateHueSceneByNameMock, findByUserAndProviderMock, findLatestNormalizedMock, listRecentNormalizedMock, listRecentForUserMock } =
-  vi.hoisted(() => ({
-    listLightsMock: vi.fn(),
-    listScenesMock: vi.fn(),
-    setHueLightByNameMock: vi.fn(),
-    activateHueSceneByNameMock: vi.fn(),
-    findByUserAndProviderMock: vi.fn(),
-    findLatestNormalizedMock: vi.fn(),
-    listRecentNormalizedMock: vi.fn(async () => []),
-    listRecentForUserMock: vi.fn(async () => []),
-  }));
+const {
+  listLightsMock,
+  listScenesMock,
+  setHueLightByNameMock,
+  activateHueSceneByNameMock,
+  findByUserAndProviderMock,
+  findLatestNormalizedMock,
+  listRecentNormalizedMock,
+  listRecentForUserMock,
+  createCaffeineLogMock,
+  addMemoryFactMock,
+} = vi.hoisted(() => ({
+  listLightsMock: vi.fn(),
+  listScenesMock: vi.fn(),
+  setHueLightByNameMock: vi.fn(),
+  activateHueSceneByNameMock: vi.fn(),
+  findByUserAndProviderMock: vi.fn(),
+  findLatestNormalizedMock: vi.fn(),
+  listRecentNormalizedMock: vi.fn(async () => []),
+  listRecentForUserMock: vi.fn(async () => []),
+  createCaffeineLogMock: vi.fn(),
+  addMemoryFactMock: vi.fn(),
+}));
 
 vi.mock('@moodsync/database', () => ({
   biometricReadingRepository: {
     findLatestNormalized: findLatestNormalizedMock,
     listRecentNormalized: listRecentNormalizedMock,
   },
-  caffeineLogRepository: { listRecentForUser: listRecentForUserMock },
+  caffeineLogRepository: { listRecentForUser: listRecentForUserMock, create: createCaffeineLogMock },
   smartHomeConnectionRepository: { findByUserAndProvider: findByUserAndProviderMock },
+  messagingMemoryRepository: { add: addMemoryFactMock },
 }));
 
 vi.mock('./hueActionExecutor.js', () => ({
@@ -29,6 +42,12 @@ vi.mock('./hueActionExecutor.js', () => ({
 }));
 
 const { MESSAGING_TOOLS, executeConfirmedAction } = await import('./messagingTools.js');
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  listRecentNormalizedMock.mockResolvedValue([]);
+  listRecentForUserMock.mockResolvedValue([]);
+});
 
 describe('list_smart_home_devices', () => {
   it('reports no Hue connection distinctly from an empty light list', async () => {
@@ -103,6 +122,56 @@ describe('get_wearable_snapshot', () => {
     findLatestNormalizedMock.mockResolvedValueOnce(null);
     const result = await MESSAGING_TOOLS.get_wearable_snapshot!.handler('u1', {});
     expect(result.data.hasData).toBe(false);
+  });
+
+  it('includes a real readiness figure so "how am I doing" never needs the retired deterministic path', async () => {
+    findLatestNormalizedMock.mockResolvedValueOnce({
+      id: 'r1',
+      reading: { provider: 'WHOOP', timestamp: new Date().toISOString(), heartRate: 62 },
+    });
+    listRecentNormalizedMock.mockResolvedValueOnce([]);
+    const result = await MESSAGING_TOOLS.get_wearable_snapshot!.handler('u1', {});
+    expect(result.data.hasData).toBe(true);
+    expect(typeof result.data.readiness).toBe('string');
+  });
+});
+
+describe('log_caffeine_intake — write tool', () => {
+  it('logs the preset mg for a known drink type without needing confirmation', async () => {
+    findLatestNormalizedMock.mockResolvedValueOnce(null);
+    const result = await MESSAGING_TOOLS.log_caffeine_intake!.handler('u1', { drinkType: 'espresso' });
+    expect(createCaffeineLogMock).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', mg: 63 }));
+    expect(result.confirmPrompt).toBeUndefined();
+    expect(result.data).toMatchObject({ logged: true, mg: 63 });
+  });
+
+  it('prefers a stated custom amount over the preset', async () => {
+    findLatestNormalizedMock.mockResolvedValueOnce(null);
+    await MESSAGING_TOOLS.log_caffeine_intake!.handler('u1', { drinkType: 'coffee', customMg: 200 });
+    expect(createCaffeineLogMock).toHaveBeenCalledWith(expect.objectContaining({ mg: 200 }));
+  });
+
+  it('rejects an unknown drink type with no custom amount rather than logging 0mg', async () => {
+    await expect(MESSAGING_TOOLS.log_caffeine_intake!.handler('u1', {})).rejects.toThrow();
+    expect(createCaffeineLogMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('remember_fact — write tool', () => {
+  it('saves a short fact immediately, no confirmation', async () => {
+    const result = await MESSAGING_TOOLS.remember_fact!.handler('u1', { fact: 'Trains best in the morning.' });
+    expect(addMemoryFactMock).toHaveBeenCalledWith('u1', 'Trains best in the morning.');
+    expect(result.confirmPrompt).toBeUndefined();
+    expect(result.data).toEqual({ saved: true, fact: 'Trains best in the morning.' });
+  });
+
+  it('rejects an empty fact', async () => {
+    await expect(MESSAGING_TOOLS.remember_fact!.handler('u1', { fact: '  ' })).rejects.toThrow();
+    expect(addMemoryFactMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a fact that is too long to be a durable one-liner', async () => {
+    await expect(MESSAGING_TOOLS.remember_fact!.handler('u1', { fact: 'x'.repeat(250) })).rejects.toThrow('too long');
   });
 });
 

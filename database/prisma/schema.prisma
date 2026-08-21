@@ -47,6 +47,7 @@ model User {
   messagingConnections MessagingConnection[]
   messagingMessages    MessagingMessage[]
   messagingPendingActions MessagingPendingAction[]
+  messagingMemoryFacts MessagingMemoryFact[]
   environmentSessions  EnvironmentSession[]
   stateObservations    StateObservation[]
   environmentAutomationSettings EnvironmentAutomationSettings?
@@ -741,6 +742,29 @@ model MessagingPendingAction {
   expiresAt    DateTime
 
   @@map("messaging_pending_actions")
+}
+
+/// A short, durable fact the agentic messaging model chose to remember
+/// about a person — a preference or recurring context, not a one-off
+/// data point (their heart rate is never stored here; it's already in
+/// BiometricReading). Scoped to `userId`, not a connection, because the
+/// agent is explicitly channel-agnostic (see ai/src/messagingAgent.ts's
+/// file header) — a fact learned by text should be available if the
+/// user later reaches the same account from the in-app chat too.
+///
+/// Unbounded growth here would slowly bloat every future prompt with
+/// stale trivia, so the repository enforces a per-user cap and prunes
+/// the oldest fact on overflow rather than letting this table (and the
+/// prompt built from it) grow forever.
+model MessagingMemoryFact {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fact      String
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("messaging_memory_facts")
 }
 
 /// What a music session was *for* — the mode decides which biometric

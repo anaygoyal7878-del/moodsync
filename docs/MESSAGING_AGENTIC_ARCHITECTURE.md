@@ -20,6 +20,34 @@ in MoodSync or what's a proportionate new build:
 Everything else (crisis detection, verification, opt-out, rate limiting,
 outbound delivery) is unchanged — see docs/MESSAGING_BOT.md.
 
+## Routing: what stays deterministic, and why
+
+`classifyInbound` used to also short-circuit "status" and "log_caffeine"
+straight to a canned reply — real numbers, but chosen by regex, so a
+phrasing it didn't recognize ("what's my HRV looking like") fell through
+to a generic "I don't recognize that" instead of just answering.
+
+Those two now route through the model like any other question, via
+`get_wearable_snapshot` (which now includes a real `readiness` figure —
+the same one the retired deterministic status reply used) and the new
+`log_caffeine_intake` tool. What's still handled without a model call is
+narrower and deliberately mechanical:
+
+| Stays deterministic | Why |
+|---|---|
+| Crisis language | Must never be improvised by a model, ever |
+| Verification code | A 6-digit reply has exactly one meaning |
+| STOP / START | Carrier-mandated opt-out words — no judgment involved |
+| HELP | Static capability list, not a data lookup |
+| Rate limiting | Must reject before spending a model call, not after |
+| Pending-action yes/no | "Yes" means "do what I proposed last turn," decided before normal routing even runs |
+
+Everything else — status, caffeine logging, device control, nutrition
+questions, anything conversational — goes through
+`sendAgenticMessage`. The dividing line isn't "safety-critical vs. not,"
+it's "has exactly one correct mechanical answer vs. requires picking the
+right real data and phrasing a reply."
+
 ## Why tool-calling, not a bigger regex
 
 The existing `classifyInbound` intent classifier (HELP/STOP/START,
@@ -40,25 +68,29 @@ inbound text
      ▼
 messagingService.handleInbound
      │
+     ├─ crisis / verify code / STOP / START / HELP / rate limit → deterministic, no model call
      ├─ pending action from last turn? ─ yes/no reply? → confirm/cancel (no model call)
      │
-     └─ open question → ai/src/agenticMessaging.ts (sendAgenticMessage)
+     └─ everything else → ai/src/agenticMessaging.ts (sendAgenticMessage)
+                              │
+                system prompt + recent MessagingMemoryFact rows
                               │
                     Gemini function-calling loop (MAX_TOOL_ROUNDS = 4)
                               │
-                 ┌────────────┴────────────┐
-                 ▼                         ▼
-         read tool (ai/src/messagingTools.ts)   action tool
-         executes immediately,                   NEVER executes itself —
-         result fed back to the model             only validates the target
-                                                    exists and returns a
-                                                    confirm sentence
+              ┌───────────────┼───────────────┐
+              ▼                ▼               ▼
+      read tool          write tool        action tool
+   (ai/src/messagingTools.ts)
+   executes             executes           NEVER executes itself —
+   immediately,          immediately,       only validates the target
+   result fed             no confirm        exists and returns a
+   back to model          needed            confirm sentence
 ```
 
 ### `ai/src/messagingTools.ts` — the tool registry
 
 Each tool declares a Gemini `FunctionDeclaration` and pairs it with a
-handler. Tools are `kind: 'read'` or `kind: 'action'`:
+handler. Tools are `kind: 'read'`, `kind: 'action'`, or `kind: 'write'`:
 
 - **Read tools** (`get_wearable_snapshot`, `list_smart_home_devices`,
   `get_nutrition_guidance`) run immediately and hand data back to the
@@ -70,11 +102,22 @@ handler. Tools are `kind: 'read'` or `kind: 'action'`:
   string — nothing else. The actual Hue API call
   (`executeConfirmedAction` in the same file) only runs after a second,
   separate inbound message confirms it.
+- **Write tools** (`log_caffeine_intake`, `remember_fact`) sit between
+  the two: they do cause a real write, immediately, with no
+  confirmation — but the blast radius is a database row the user can
+  ignore or that self-corrects (a bad log doesn't compound; a
+  forgettable fact just... isn't remembered next time), not a physical
+  device changing state in someone's home. Requiring "YES" to log a
+  coffee would be friction with no matching safety benefit.
 
-This split is the safety property, not a convention layered on top of
-it: there is no code path from "model decided to call
+The action-tool split is the safety property, not a convention layered
+on top of it: there is no code path from "model decided to call
 `control_hue_light`" to "a light actually changed" without a second,
-independent inbound message in between.
+independent inbound message in between. `MESSAGING_ACTION_TOOL_NAMES`
+(only `kind: 'action'` tools) is what the tool-calling loop checks
+before treating a result as something to confirm rather than something
+to just execute — a write tool is never in that set, so it always takes
+the same "execute and feed the result back" path a read tool does.
 
 ### Confirmation survives statelessness — `MessagingPendingAction`
 
@@ -134,6 +177,39 @@ guidance, not a personalized plan. This mirrors how Atlas's in-app chat
 already handles workout suggestions — general knowledge, explicitly
 labeled as general, grounded in real data where real data exists.
 
+## Persistent memory across conversations
+
+Before this round, `sendAgenticMessage` only ever saw the last
+`HISTORY_TURNS` (10) messages, replayed fresh each call — the model had
+no way to recall anything from a conversation that had scrolled out of
+that window, let alone from a previous day. `MessagingMemoryFact`
+(`database/prisma/schema.prisma`, `messagingMemoryRepository.ts`) is a
+small, explicit long-term memory on top of that short-term replay:
+
+- **The model decides what's worth remembering**, via the `remember_fact`
+  write tool — a preference or recurring pattern, one short sentence,
+  never a one-off (today's mood, today's schedule) or a medical claim.
+  The system prompt tells it explicitly that most turns should call
+  this zero times; it's meant to be rare, not a running transcript.
+- **Facts are scoped to `userId`, not the messaging connection** — this
+  agent is deliberately channel-agnostic (see this file's header, and
+  `ai/src/messagingAgent.ts`'s), so a fact learned by text is available
+  if the same account later reaches the in-app chat, and vice versa.
+- **Every call to `sendAgenticMessage` fetches the most recent facts
+  and injects them into the system prompt** as a "what you remember
+  about this person" block, before the model sees the current message.
+  This is a best-effort lookup (`.catch(() => [])`) — a memory-store
+  outage degrades to "no memory this turn," not a broken reply.
+- **`MAX_FACTS_PER_USER = 30`, oldest dropped first.** Unbounded memory
+  growth would slowly bloat every future prompt with years of trivia;
+  capping it means the model's own most recent judgment about what
+  matters always wins over what it decided mattered longest ago.
+
+This is deliberately simple — no embeddings, no relevance ranking, no
+summarization. Thirty short facts read in full is cheap and legible; a
+retrieval pipeline would be solving a problem this account size doesn't
+have yet.
+
 ## Verification
 
 Unit-tested: tool handlers (target-not-found errors, confirm-prompt
@@ -154,4 +230,20 @@ docs/MESSAGING_BOT.md.
   instruction, not an enforced constraint.
 - **No live Gemini function-calling round trip has been run.**
   `@google/genai`'s function-calling shapes were confirmed from its
-  shipped `.d.ts` types, not from an authenticated call.
+  shipped `.d.ts` types, not from an authenticated call. This now also
+  covers `log_caffeine_intake` and `remember_fact` — their write paths
+  are unit-tested directly, but never through an actual model turn that
+  chose to call them.
+- **Memory has no forget/edit surface yet.** A saved fact can go stale
+  (a preference that changed) with no way to correct it except waiting
+  for the 30-fact cap to eventually push it out, and no in-app UI shows
+  a user what MoodSync has remembered about them from texts.
+- **"How am I doing" lost the calendar-aware `focusToday` line.** The
+  retired deterministic status reply used
+  `loadCompanionContext`+`composeDailyBrief`, which factored in today's
+  booked calendar hours; `get_wearable_snapshot` (in the `ai` package,
+  which can't reach the backend's calendar-aware context loader — see
+  this project's established cross-package-duplication convention)
+  only has the biometric-derived readiness figure. A status reply from
+  text is now real numbers without that one extra nuance the in-app
+  daily brief still has.

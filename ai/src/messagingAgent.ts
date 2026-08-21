@@ -43,13 +43,26 @@ export interface InboundClassification {
  * logger (USDA / Mayo Clinic typical-serving figures). They are
  * approximate servings, not measurements of what the user drank — the
  * same caveat `CaffeineLog`'s schema comment carries.
+ *
+ * Exported so `messagingTools.ts`'s `log_caffeine_intake` tool logs the
+ * exact same mg figures the regex classifier below would have used —
+ * one preset table, whether the drink was matched by keyword here or
+ * picked by the model as a tool argument.
  */
+export const CAFFEINE_DRINK_PRESETS: Record<string, number> = {
+  double_espresso: 126,
+  espresso: 63,
+  energy_drink: 80,
+  tea: 47,
+  coffee: 95,
+};
+
 const CAFFEINE_DRINKS: Array<{ pattern: RegExp; mg: number }> = [
-  { pattern: /\b(?:double|large|two)\s+espressos?\b/, mg: 126 },
-  { pattern: /\bespressos?\b/, mg: 63 },
-  { pattern: /\b(?:energy\s+drink|red\s?bull|monster)\b/, mg: 80 },
-  { pattern: /\b(?:matcha|green\s+tea|tea)\b/, mg: 47 },
-  { pattern: /\b(?:coffee|latte|cappuccino|americano|cold\s?brew|flat\s+white)\b/, mg: 95 },
+  { pattern: /\b(?:double|large|two)\s+espressos?\b/, mg: CAFFEINE_DRINK_PRESETS.double_espresso! },
+  { pattern: /\bespressos?\b/, mg: CAFFEINE_DRINK_PRESETS.espresso! },
+  { pattern: /\b(?:energy\s+drink|red\s?bull|monster)\b/, mg: CAFFEINE_DRINK_PRESETS.energy_drink! },
+  { pattern: /\b(?:matcha|green\s+tea|tea)\b/, mg: CAFFEINE_DRINK_PRESETS.tea! },
+  { pattern: /\b(?:coffee|latte|cappuccino|americano|cold\s?brew|flat\s+white)\b/, mg: CAFFEINE_DRINK_PRESETS.coffee! },
 ];
 
 /** Only treat a drink mention as a log when the message reads like a
