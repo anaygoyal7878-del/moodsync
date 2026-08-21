@@ -403,6 +403,41 @@ Gemini key or Hue bridge was available in this environment, matching
 every other "not round-tripped against a real X" disclosure in
 docs/MESSAGING_BOT.md.
 
+## Model choice: cost and adaptivity
+
+Both call sites (`atlasChat.ts`, `agenticMessaging.ts`) run
+`gemini-flash-latest` — Google's maintained "latest flash" alias rather
+than a dated model name, chosen because a dated name (`gemini-2.5-flash`)
+was confirmed to 404 with "no longer available to new users" while still
+listed in `models.list`; the alias is what Google itself repoints as
+models deprecate, so it's the pin that doesn't rot.
+
+Evaluated against pricing as of August 2026 (per 1M tokens, in/out):
+
+| Model | Price | Verdict |
+|---|---|---|
+| `gemini-flash-lite-latest` | ~$0.25 / $1.50 | Cheapest, but function-calling reliability is weaker — risky for the confirm-then-execute Hue path, where a misfire is a real device change, not a bad sentence. |
+| `gemini-flash-latest` (current) | ~$0.75 / $3.75 | Right-sized for tool-calling turns; capable enough for the confirm/action split to hold. |
+| `gemini-*-pro-latest` | ~$2 / $12 | Overkill — this is a text assistant answering from structured tool output, not doing novel reasoning. Paying Pro-tier price buys capability the task doesn't use. |
+
+**Recommendation, not yet built:** a two-tier split — route the high
+volume of simple turns (status questions, caffeine logging, anything
+that resolves to zero or one tool call) to Flash-Lite, and reserve
+Flash for turns that need multi-step tool orchestration or touch the
+compiled per-conversation profile (`messagingProfile.ts`). That's where
+"adaptive" actually lives for this system: not a model property, but a
+routing decision made per turn, ahead of `sendAgenticMessage`. Left as a
+recommendation rather than implemented — it's a real architecture
+change (a classifier or heuristic deciding model choice before the
+tool-calling loop even starts), not a config swap, and hasn't been
+asked for as a build yet.
+
+**Not adopted:** switching provider families (OpenAI, Anthropic).
+`toGeminiTools()`'s function-calling shape and the "latest" alias
+repoint behavior are both Gemini-specific; a switch would mean
+rebuilding the tool-declaration layer for a different provider's
+schema, for no capability or cost gain this workload needs.
+
 ## Known gaps
 
 - **HomeKit and Spotify control-by-text are not built.** Only Hue.
