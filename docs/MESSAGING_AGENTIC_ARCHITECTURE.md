@@ -315,7 +315,15 @@ MoodSync differ in each case:
 | Proactive messaging — morning briefings, flagged email, scheduled automations | Kept, but **gated**. MoodSync already texted unprompted; what was missing was any way to say when. |
 | Memory that learns preferences | Already built (`MessagingMemoryFact`); this round added the screen that makes it inspectable and erasable. |
 | Integrations define what it can do | Mapped onto the capability-derived tool surface, and surfaced read-only so the screen can't over-promise. |
-| An explicit privacy control ("Maximum Privacy" excludes data from training) | Not adopted — MoodSync doesn't train on user data, and adding a toggle implying it might would be theatre. |
+| An explicit privacy control ("Maximum Privacy" excludes data from training) | Not adopted **for this path** — the LLM is used for inference only, never training. See the correction below. |
+
+> **Correction (superseding the row above).** MoodSync now *does* fit a
+> model to user data — see docs/AFFECT_MODEL_ARCHITECTURE.md. It is a
+> per-user statistical model over that person's own check-ins and
+> readings, never pooled across users and never sent to a model
+> provider, and it is unrelated to the Gemini path described in this
+> document. The original claim was true of the LLM and is still true of
+> it; it was too broad as written.
 
 The screen lives at `/dashboard/connections/messaging`, ordered by what
 a person actually needs to decide: is it connected → what can it do →

@@ -47,6 +47,10 @@ export {
   type CompleteMusicSessionInput,
 } from './repositories/musicSessionRepository.js';
 export { messagingRepository, normalizeHandle } from './repositories/messagingRepository.js';
+export {
+  moodCheckInRepository,
+  MAX_CHECK_INS_FOR_TRAINING,
+} from './repositories/moodCheckInRepository.js';
 export { messagingPendingActionRepository } from './repositories/messagingPendingActionRepository.js';
 export { messagingMemoryRepository, normalizeFact, MAX_FACTS_PER_USER } from './repositories/messagingMemoryRepository.js';
 export {

@@ -37,6 +37,7 @@ import companionRoutes from './routes/companion.js';
 import musicSessionRoutes from './routes/musicSessions.js';
 import messagingRoutes from './routes/messaging.js';
 import environmentRoutes from './routes/environment.js';
+import affectRoutes from './routes/affect.js';
 
 export async function buildServer() {
   const app = Fastify({ loggerInstance: logger, trustProxy: true });
@@ -95,6 +96,7 @@ export async function buildServer() {
   await app.register(musicSessionRoutes, { prefix: '/api' });
   await app.register(messagingRoutes, { prefix: '/api' });
   await app.register(environmentRoutes, { prefix: '/api' });
+await app.register(affectRoutes, { prefix: '/api' });
 
   return app;
 }

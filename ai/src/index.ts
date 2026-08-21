@@ -182,6 +182,42 @@ export { buildCaffeineLogReply, buildProactiveNudge } from './messagingAgent.js'
 export { sendProactiveInsight } from './messagingDelivery.js';
 export { getTodayCalendarLoad, isInMeetingNow, type TodayCalendarLoad } from './calendarSignal.js';
 
+// --- Affect model: learning how biometrics relate to self-reported mood ---
+// See docs/AFFECT_MODEL_ARCHITECTURE.md.
+export {
+  learnAffectModel,
+  predictAffect,
+  describeAssociation,
+  crossValidatedR2,
+  selectFeatures,
+  fitRidge,
+  pearson,
+  AFFECT_SCALE_MIN,
+  AFFECT_SCALE_MAX,
+  MIN_SAMPLES_TO_LEARN,
+  MIN_USABLE_R2,
+  SAMPLES_PER_FEATURE,
+  type AffectModel,
+  type AffectTarget,
+  type FeatureAssociation,
+  type LabeledSample,
+} from './affectModel.js';
+export {
+  extractFeatures,
+  readingForMoment,
+  usableFeatures,
+  featureLabel,
+  FEATURE_LABELS,
+  FEATURE_WINDOW_MINUTES,
+} from './affectFeatures.js';
+export {
+  learnAffect,
+  buildSamples,
+  learningStatus,
+  type AffectLearning,
+  type CheckInRecord,
+} from './affectTraining.js';
+
 // --- Adaptive Environment Intelligence Engine ---
 // See docs/ADAPTIVE_ENVIRONMENT_ARCHITECTURE.md.
 export {

@@ -49,6 +49,7 @@ model User {
   messagingPendingActions MessagingPendingAction[]
   messagingMemoryFacts MessagingMemoryFact[]
   messagingSettings    MessagingSettings?
+  moodCheckIns         MoodCheckIn[]
   environmentSessions  EnvironmentSession[]
   stateObservations    StateObservation[]
   environmentAutomationSettings EnvironmentAutomationSettings?
@@ -746,6 +747,39 @@ model MessagingPendingAction {
   expiresAt    DateTime
 
   @@map("messaging_pending_actions")
+}
+
+/// A self-reported mood check-in — the label that makes learning the
+/// biometric→mood relationship possible at all.
+///
+/// Before this table, `StateEngineInput.userDeclaredState` was passed
+/// `null` at its only call site: MoodSync inferred moods from
+/// hand-written rules and had never once compared them to how anyone
+/// actually felt. Every claim about biometrics and mood in the product
+/// rests on these rows.
+///
+/// Stored as the two circumplex axes rather than named emotions, on a
+/// coarse -2..+2 scale. See ai/src/affectModel.ts for why both choices
+/// (people can't reliably self-report finer than about five points, and
+/// arousal is far more learnable from cardiac data than valence — which
+/// only stays visible if the axes never get averaged together).
+model MoodCheckIn {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Unpleasant (-2) → pleasant (+2).
+  valence Int
+  /// Calm (-2) → activated (+2).
+  arousal Int
+  /// Optional free text. Never fed to the model as a feature — it's for
+  /// the person reading their own history back, not for training.
+  note    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("mood_check_ins")
 }
 
 /// Per-user policy for the messaging bot, chiefly for the messages
