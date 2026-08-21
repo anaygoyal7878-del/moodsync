@@ -529,6 +529,60 @@ if/when that becomes a priority.
 
 ---
 
+### Alexa as a *device control* path — re-verified August 2026, still no
+
+Re-checked specifically for the question "can MoodSync control the
+lights and thermostat already in someone's Alexa account, without any
+voice involvement?" **No.** Confirmed against Amazon's own
+`understand-the-smart-home-skill-api` documentation:
+
+- A Smart Home Skill lets a developer expose **their own**
+  cloud-connected devices *to* Alexa. Control flows Alexa → your skill →
+  your device cloud → your hardware.
+- Device discovery is you **describing your devices to Alexa**
+  (`Discover.Response` in reply to a `Discover` directive) — not Alexa
+  describing the user's devices to you.
+- There is no documented mechanism for enumerating or commanding
+  devices another manufacturer registered. A skill "cannot discover or
+  manipulate devices from Philips Hue, LIFX, or other manufacturers'
+  systems."
+
+So the two Alexa integration shapes are: **voice-in** (the Custom Skill
+this codebase actually built — see docs/ALEXA_ARCHITECTURE.md) or
+**expose-your-own-hardware** (irrelevant; MoodSync makes no devices).
+"Alexa but device-control-only, no voice" is not a scoping choice that
+was passed over — it is not a thing the platform offers.
+
+Note the trap in secondary sources: several summaries describe Smart
+Home Skills as letting developers "integrate with users' existing smart
+home devices", which reads as the opposite of what Amazon's own docs
+say. The phrase in the official docs is *your* device cloud.
+
+### Smart diffusers — no official API from anyone, August 2026
+
+Checked for Pura and Aera, the two mainstream smart fragrance brands:
+
+- **No official public developer API or developer program** could be
+  found for either.
+- The only working third-party control is a **community
+  reverse-engineered** Home Assistant integration
+  (`natekspencer/ha-pura`), which authenticates with the user's **raw
+  Pura account username and password**. It documents no official-API
+  status either way.
+
+That authentication shape is disqualifying here independent of whether
+the endpoints work: every other credential in this codebase is an OAuth
+token, AES-256-GCM encrypted at rest (`oauth_tokens`). Asking a user to
+hand over a reusable third-party account password, to a wellness app,
+against an undocumented endpoint that can change without notice, is a
+materially worse security posture than anything else MoodSync does.
+
+**Conclusion: no dedicated diffuser integration.** A diffuser that
+supports HomeKit can be an accessory inside a user's own scene, which
+MoodSync can already trigger via `homekit.activate_scene` — no new
+integration, no credentials, and it degrades honestly (if the scene
+doesn't include a diffuser, nothing happens and nothing was promised).
+
 ## What this means for the milestone plan
 
 Milestone sequencing (`docs/MILESTONES.md`) follows directly from this
