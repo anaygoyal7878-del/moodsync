@@ -1,7 +1,13 @@
 import { GoogleGenAI, createPartFromFunctionResponse, type Content } from '@google/genai';
 import { messagingMemoryRepository } from '@moodsync/database';
 import { AtlasNotConfiguredError, buildAtlasSystemPrompt, type AtlasChatMessage } from './atlasChat.js';
-import { MESSAGING_TOOLS, MESSAGING_ACTION_TOOL_NAMES } from './messagingTools.js';
+import {
+  MESSAGING_ACTION_TOOL_NAMES,
+  selectMessagingTools,
+  resolveMessagingCapabilities,
+  type MessagingTool,
+} from './messagingTools.js';
+import { compileConversationProfile, renderProfileBlock, type InboundRecord } from './messagingProfile.js';
 
 /** Same alias rationale as atlasChat.ts — see that file's comment. */
 const MODEL = 'gemini-flash-latest';
@@ -41,10 +47,10 @@ log_caffeine_intake and remember_fact execute immediately — they don't need a 
 
 "How am I doing" or "status" style questions should be answered from get_wearable_snapshot's real numbers, including its readiness figure — do not invent or estimate any of them.`;
 
-function toGeminiTools() {
+function toGeminiTools(tools: Record<string, MessagingTool>) {
   return [
     {
-      functionDeclarations: Object.values(MESSAGING_TOOLS).map((tool) => ({
+      functionDeclarations: Object.values(tools).map((tool) => ({
         name: tool.declaration.name,
         description: tool.declaration.description,
         parametersJsonSchema: tool.declaration.parameters,
@@ -54,37 +60,69 @@ function toGeminiTools() {
 }
 
 /**
+ * What the caller knows about this conversation that the `ai` package
+ * can't reach on its own — the inbound log with its intents and
+ * timestamps, and the user's timezone.
+ *
+ * Optional: without it the agent still works, it just runs without a
+ * compiled profile. That degradation is deliberate — a missing profile
+ * should cost personalization, never the reply itself.
+ */
+export interface AgenticContext {
+  inboundHistory: InboundRecord[];
+  timeZone: string;
+}
+
+/**
  * The messaging channel's agentic counterpart to `sendAtlasMessage` —
  * same grounded-in-real-data philosophy, extended with real tool calls
  * so a text can complete a task, not just describe one. See
  * docs/MESSAGING_AGENTIC_ARCHITECTURE.md.
  */
-export async function sendAgenticMessage(userId: string, messages: AtlasChatMessage[]): Promise<AgenticReply> {
+export async function sendAgenticMessage(
+  userId: string,
+  messages: AtlasChatMessage[],
+  context?: AgenticContext,
+): Promise<AgenticReply> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new AtlasNotConfiguredError();
 
   const client = new GoogleGenAI({ apiKey });
-  const [systemInstruction, facts] = await Promise.all([
+  // Every lookup here is best-effort: a failure should cost this turn
+  // its personalization, never its reply. The fallbacks are all the
+  // *smaller* claim — no facts, no capabilities — so a degraded turn
+  // under-promises rather than over-promises.
+  const [systemInstruction, facts, capabilities] = await Promise.all([
     buildAtlasSystemPrompt(userId),
-    // Best-effort — a memory lookup failing should never take down the
-    // whole reply, it should just mean this turn has no memory of past
-    // conversations.
     messagingMemoryRepository.listForUser(userId).catch(() => []),
+    resolveMessagingCapabilities(userId),
   ]);
-  const memoryBlock =
-    facts.length > 0
-      ? `\n\nWhat you remember about this person from past conversations:\n${facts.map((f) => `- ${f.fact}`).join('\n')}`
-      : '';
+
+  // This is where the agent stops being one program. The tool surface,
+  // the capability statement, and the profile block are all assembled
+  // from this account's real state — two people texting the same
+  // sentence get different tools and a different prompt.
+  const tools = selectMessagingTools(capabilities);
+  const capabilityBlock = capabilities.hueConnected
+    ? ''
+    : "\n\nThis person has no smart home bridge connected, so you have no device-control tools this turn. If they ask you to change a light, say plainly that they haven't connected one yet — never imply you tried.";
+
+  const profileBlock = context
+    ? renderProfileBlock(compileConversationProfile(context.inboundHistory, context.timeZone), facts)
+    : renderProfileBlock({ stillLearning: true, totalInbound: 0, replyLength: null, activeBand: null, recurringInterests: null }, facts);
+
   const contents: Content[] = messages.map((m) => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.content }],
   }));
 
+  const systemPrompt = systemInstruction + SYSTEM_PROMPT_SUFFIX + capabilityBlock + profileBlock;
+
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const response = await client.models.generateContent({
       model: MODEL,
       contents,
-      config: { systemInstruction: systemInstruction + SYSTEM_PROMPT_SUFFIX + memoryBlock, tools: toGeminiTools() },
+      config: { systemInstruction: systemPrompt, tools: toGeminiTools(tools) },
     });
 
     const calls = response.functionCalls ?? [];
@@ -99,7 +137,12 @@ export async function sendAgenticMessage(userId: string, messages: AtlasChatMess
     // steers this away, and MAX_TOOL_ROUNDS bounds the cost either way.
     const call = calls[0]!;
     const name = call.name ?? '';
-    const tool = MESSAGING_TOOLS[name];
+    // Looked up in the *selected* surface, not the full registry: not
+    // declaring a tool is the efficiency win, but refusing to execute
+    // one that wasn't selected is the safety property. A model that
+    // names a de-selected tool anyway (from prior context, or a
+    // hallucinated name) must not reach its handler.
+    const tool = tools[name];
     if (!tool) {
       return { text: "I tried to do something I don't actually support — let me try answering directly instead.", pendingAction: null };
     }

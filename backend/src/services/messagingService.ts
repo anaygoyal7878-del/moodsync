@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual, randomInt } from 'node:crypto';
-import { messagingRepository, messagingPendingActionRepository } from '@moodsync/database';
+import { messagingRepository, messagingPendingActionRepository, userTimezoneRepository } from '@moodsync/database';
 import type { MessagingChannel } from '@moodsync/database';
 import {
   classifyInbound,
@@ -44,6 +44,10 @@ const RATE_MAX_INBOUND = 15;
 /** Conversation turns replayed to Atlas. Enough for a follow-up
  * question to make sense, short enough to stay cheap. */
 const HISTORY_TURNS = 10;
+/** How far back the conversation profile counts. Much wider than the
+ * replay window because these rows are only ever aggregated, never sent
+ * to the model as text — see ai/src/messagingProfile.ts. */
+const PROFILE_WINDOW_MESSAGES = 120;
 
 export interface InboundMessage {
   channel: MessagingChannel;
@@ -230,7 +234,16 @@ async function resolveReply(
   // docs/MESSAGING_AGENTIC_ARCHITECTURE.md), with conversation history
   // replayed since the channel has no client holding it.
   try {
-    const history = await messagingRepository.recentHistory(connection.id, HISTORY_TURNS);
+    // Two different windows on the same log, for two different jobs:
+    // `recentHistory` is replayed to the model verbatim (so it stays
+    // short — every turn costs tokens), while `listInboundForProfile`
+    // is a wider sample that only ever gets *counted*, never sent as
+    // text. See ai/src/messagingProfile.ts.
+    const [history, profileHistory, timeZone] = await Promise.all([
+      messagingRepository.recentHistory(connection.id, HISTORY_TURNS),
+      messagingRepository.listInboundForProfile(connection.id, PROFILE_WINDOW_MESSAGES),
+      userTimezoneRepository.getTimezone(connection.userId).catch(() => 'UTC'),
+    ]);
     const messages: AtlasChatMessage[] = history.map((row) => ({
       role: row.direction === 'INBOUND' ? 'user' : 'assistant',
       content: row.body,
@@ -240,7 +253,10 @@ async function resolveReply(
     // its richer formatting.
     messages.push({ role: 'user', content: `${MESSAGING_STYLE_PROMPT}\n\nMessage: ${message.body}` });
 
-    const reply = await sendAgenticMessage(connection.userId, messages);
+    const reply = await sendAgenticMessage(connection.userId, messages, {
+      inboundHistory: profileHistory,
+      timeZone,
+    });
     if (reply.pendingAction) {
       await messagingPendingActionRepository.set({
         connectionId: connection.id,

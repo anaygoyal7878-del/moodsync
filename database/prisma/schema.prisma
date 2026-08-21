@@ -761,9 +761,21 @@ model MessagingMemoryFact {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   fact      String
-  createdAt DateTime @default(now())
+  /// Normalized form (lowercased, punctuation stripped) used to detect
+  /// that the model has re-concluded something it already knows, so a
+  /// repeated observation reinforces one row instead of accumulating
+  /// near-duplicate rows that each spend prompt budget saying the same
+  /// thing.
+  normalized String
+  /// How many separate times the model independently arrived at this.
+  /// Ranks what earns prompt space — see ai/src/messagingProfile.ts's
+  /// rankDeclaredFacts.
+  reinforcedCount  Int      @default(1)
+  lastReinforcedAt DateTime @default(now())
+  createdAt        DateTime @default(now())
 
-  @@index([userId, createdAt])
+  @@unique([userId, normalized])
+  @@index([userId, lastReinforcedAt])
   @@map("messaging_memory_facts")
 }
 

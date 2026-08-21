@@ -73,7 +73,15 @@ messagingService.handleInbound
      │
      └─ everything else → ai/src/agenticMessaging.ts (sendAgenticMessage)
                               │
-                system prompt + recent MessagingMemoryFact rows
+                   ┌──────────┴──────────┐   compile this chat's agent
+                   ▼          ▼          ▼
+              capability   observed   declared
+              (live        (counted   (MessagingMemoryFact,
+               connections) profile)   ranked by reinforcement)
+                   │          │          │
+                   └──────────┬──────────┘
+                              ▼
+                  tool surface + system prompt
                               │
                     Gemini function-calling loop (MAX_TOOL_ROUNDS = 4)
                               │
@@ -177,6 +185,81 @@ guidance, not a personalized plan. This mirrors how Atlas's in-app chat
 already handles workout suggestions — general knowledge, explicitly
 labeled as general, grounded in real data where real data exists.
 
+## The compiled agent — why two chats aren't the same program
+
+The prompt and the tool surface are **assembled per conversation**, not
+templated. Three inputs feed the assembly, and they are deliberately
+never mixed together:
+
+| Input | Source | What it decides |
+|---|---|---|
+| **Declared** | `remember_fact` — the model chose to save these | What it knows it was told |
+| **Observed** | `ai/src/messagingProfile.ts`, counted from the real message log | Register, timing, recurring topics |
+| **Capability** | live connection state | Which tools exist at all this turn |
+
+### Capability → tool surface
+
+`selectMessagingTools` builds the function-declaration list from what
+the account actually has connected. Someone with no Hue bridge is never
+handed `control_hue_light` — the tool is not declared, so "turn off the
+bedroom light" produces an honest "you haven't connected a bridge" and
+not a confident confirmation prompt for a light that doesn't exist.
+
+This is deliberately structural rather than a prompt instruction,
+because it buys two things at once: **credibility** (a capability the
+model cannot see is one it cannot promise — telling a model not to use
+a tool is advisory, not declaring it is not) and **efficiency** (three
+unused declarations otherwise ride along in every request of every
+turn). The gate is enforced twice: at declaration, and again at
+execution, where the loop resolves tool names against the *selected*
+surface so a hallucinated or carried-over tool name can't reach a
+handler.
+
+`get_wearable_snapshot` is pointedly *not* gated on owning a wearable —
+with no data it returns `hasData: false`, which is a real answer.
+Removing it would leave the model with no grounded way to discover
+there's no data, which is exactly the situation where models guess.
+
+### Observed traits, and the rule that keeps them honest
+
+`compileConversationProfile` counts three things from the inbound log:
+typical message length (→ how long the reply should be), time-of-day
+band, and recurring intents. Two floors gate every one of them:
+
+- **A sample floor.** Under 8 inbound messages nothing is derived at
+  all, and the profile reports `stillLearning` — which is distinct from
+  "plenty of messages, no pattern found", because those are different
+  things to tell a model.
+- **A dominance floor.** A time band must hold ≥40% of messages before
+  it counts. Across five bands, chance alone puts ~20% in each, so a
+  22% plurality is what noise looks like. Reporting it as "you text
+  mostly in the evening" would fabricate a habit and then let the model
+  repeat it back as though MoodSync knew something.
+
+Median (not mean) message length means one pasted paragraph doesn't
+reclassify someone who otherwise texts in fragments. Channel-mechanics
+intents (`help`, `question`, `stop`) are excluded from "interests" —
+"they ask for help a lot" is not an insight about a person.
+
+Observed traits render under a heading that states they were *counted*,
+with the count inline (`8 of 10 messages`), and explicitly instructs the
+model not to state them back as things the person said. That labelling
+is load-bearing, not decoration: "you told me you train in the
+mornings" and "you tend to text me at night" are different epistemic
+claims, and a model handed one undifferentiated list will assert the
+second with the confidence of the first.
+
+### Efficiency
+
+The wide profile window (120 messages) is only ever *aggregated* —
+counted, never sent to the model as text — which is why it can afford
+to be much wider than the 10-turn replay window that does cost tokens
+per message. The rendered block is capped at
+`PROFILE_BLOCK_BUDGET_CHARS`, drops whole facts rather than truncating
+one mid-sentence, and returns the empty string when there's nothing
+credible to say, so a brand-new conversation costs nothing extra rather
+than carrying a paragraph explaining that MoodSync knows nothing yet.
+
 ## Persistent memory across conversations
 
 Before this round, `sendAgenticMessage` only ever saw the last
@@ -200,10 +283,19 @@ small, explicit long-term memory on top of that short-term replay:
   about this person" block, before the model sees the current message.
   This is a best-effort lookup (`.catch(() => [])`) — a memory-store
   outage degrades to "no memory this turn," not a broken reply.
-- **`MAX_FACTS_PER_USER = 30`, oldest dropped first.** Unbounded memory
-  growth would slowly bloat every future prompt with years of trivia;
-  capping it means the model's own most recent judgment about what
-  matters always wins over what it decided mattered longest ago.
+- **Re-saving reinforces instead of duplicating.** `normalizeFact`
+  (casing and punctuation only — deliberately *not* fuzzy or semantic,
+  since wrongly merging two distinct memories destroys one silently)
+  keys an upsert, so a conclusion the model keeps independently
+  reaching bumps a counter rather than filling the prompt with near
+  identical lines. The original wording is kept over the rephrase: a
+  stored memory that rewrites itself on every repeat is less stable,
+  not more.
+- **`MAX_FACTS_PER_USER = 30`, least-reinforced dropped first** (oldest
+  as the tiebreak). Unbounded growth would slowly bloat every future
+  prompt with years of trivia; capping by reinforcement means something
+  concluded four separate times outranks something noted once and never
+  returned to.
 
 This is deliberately simple — no embeddings, no relevance ranking, no
 summarization. Thirty short facts read in full is cheap and legible; a
@@ -236,8 +328,21 @@ docs/MESSAGING_BOT.md.
   chose to call them.
 - **Memory has no forget/edit surface yet.** A saved fact can go stale
   (a preference that changed) with no way to correct it except waiting
-  for the 30-fact cap to eventually push it out, and no in-app UI shows
-  a user what MoodSync has remembered about them from texts.
+  for the cap to push it out — and reinforcement now makes a
+  *confidently wrong* stale fact harder to evict, not easier. No in-app
+  UI shows a user what MoodSync has remembered about them from texts.
+- **Observed traits have no decay.** `compileConversationProfile`
+  weights a message from four months ago exactly like yesterday's, so a
+  person whose habits genuinely changed carries the old pattern until
+  the new one out-counts it across the whole 120-message window.
+- **Capability gating covers Hue only**, because Hue is the only
+  control integration wired to this channel. When HomeKit or Spotify
+  land, each needs its own entry in `HUE_DEPENDENT_TOOLS`' successor —
+  the mechanism generalizes, the current table does not.
+- **The SQL backfill and `normalizeFact` must stay in lockstep** and
+  nothing enforces it. They're byte-matched by hand and covered by
+  unit tests on the TS side only; the SQL half has never run, since no
+  Postgres was available in this environment.
 - **"How am I doing" lost the calendar-aware `focusToday` line.** The
   retired deterministic status reply used
   `loadCompanionContext`+`composeDailyBrief`, which factored in today's

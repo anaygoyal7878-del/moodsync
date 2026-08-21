@@ -282,5 +282,29 @@ export {
   type SessionRecord,
   type StateAcceptance,
 } from './environmentLearning.js';
-export { sendAgenticMessage, type AgenticReply, type AgenticReplyAction } from './agenticMessaging.js';
+export { sendAgenticMessage, type AgenticReply, type AgenticReplyAction, type AgenticContext } from './agenticMessaging.js';
+export {
+  compileConversationProfile,
+  renderProfileBlock,
+  rankDeclaredFacts,
+  BAND_LABELS,
+  MIN_MESSAGES_FOR_TRAITS,
+  MIN_BAND_DOMINANCE,
+  MIN_INTENT_COUNT,
+  PROFILE_BLOCK_BUDGET_CHARS,
+  type ActiveBand,
+  type ConversationProfile,
+  type DeclaredFact,
+  type InboundRecord,
+  type ProfileTrait,
+  type ReplyLength,
+} from './messagingProfile.js';
+export {
+  selectMessagingTools,
+  resolveMessagingCapabilities,
+  MESSAGING_TOOLS,
+  type MessagingCapabilities,
+  type MessagingTool,
+  type MessagingToolKind,
+} from './messagingTools.js';
 export { executeConfirmedAction } from './messagingTools.js';

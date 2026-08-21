@@ -41,7 +41,9 @@ vi.mock('./hueActionExecutor.js', () => ({
   activateHueSceneByName: activateHueSceneByNameMock,
 }));
 
-const { MESSAGING_TOOLS, executeConfirmedAction } = await import('./messagingTools.js');
+const { MESSAGING_TOOLS, executeConfirmedAction, selectMessagingTools, resolveMessagingCapabilities } = await import(
+  './messagingTools.js'
+);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -182,5 +184,60 @@ describe('get_nutrition_guidance', () => {
     const result = await MESSAGING_TOOLS.get_nutrition_guidance!.handler('u1', { question: 'what should I eat before a run?' });
     expect(result.data.instructionsForModel).toContain('Never invent a calorie count');
     expect(result.data.energy).toEqual({ hasData: false });
+  });
+});
+
+describe('selectMessagingTools — the per-conversation tool surface', () => {
+  it('withholds every Hue tool from an account with no bridge', () => {
+    const tools = selectMessagingTools({ hueConnected: false });
+
+    expect(tools.control_hue_light).toBeUndefined();
+    expect(tools.activate_hue_scene).toBeUndefined();
+    expect(tools.list_smart_home_devices).toBeUndefined();
+  });
+
+  it('grants them once a bridge is actually connected', () => {
+    const tools = selectMessagingTools({ hueConnected: true });
+
+    expect(tools.control_hue_light).toBeDefined();
+    expect(tools.activate_hue_scene).toBeDefined();
+    expect(tools.list_smart_home_devices).toBeDefined();
+  });
+
+  it('keeps the wearable snapshot regardless — "nothing has synced" is a real answer', () => {
+    // Gating this would leave the model with no grounded way to find
+    // out there is no data, which is exactly when it would guess.
+    expect(selectMessagingTools({ hueConnected: false }).get_wearable_snapshot).toBeDefined();
+  });
+
+  it('keeps tools with no external dependency available to everyone', () => {
+    const tools = selectMessagingTools({ hueConnected: false });
+
+    expect(tools.log_caffeine_intake).toBeDefined();
+    expect(tools.remember_fact).toBeDefined();
+    expect(tools.get_nutrition_guidance).toBeDefined();
+  });
+
+  it('never invents a tool that is not in the full registry', () => {
+    for (const name of Object.keys(selectMessagingTools({ hueConnected: true }))) {
+      expect(MESSAGING_TOOLS[name]).toBeDefined();
+    }
+  });
+});
+
+describe('resolveMessagingCapabilities', () => {
+  it('grants Hue only on an ACTIVE connection', async () => {
+    findByUserAndProviderMock.mockResolvedValueOnce({ status: 'ACTIVE' });
+    expect(await resolveMessagingCapabilities('u1')).toEqual({ hueConnected: true });
+  });
+
+  it('treats an expired connection as no capability', async () => {
+    findByUserAndProviderMock.mockResolvedValueOnce({ status: 'EXPIRED' });
+    expect(await resolveMessagingCapabilities('u1')).toEqual({ hueConnected: false });
+  });
+
+  it('fails closed to the smaller surface rather than granting on a lookup error', async () => {
+    findByUserAndProviderMock.mockRejectedValueOnce(new Error('db down'));
+    expect(await resolveMessagingCapabilities('u1')).toEqual({ hueConnected: false });
   });
 });

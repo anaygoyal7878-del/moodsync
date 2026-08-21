@@ -24,8 +24,10 @@ vi.mock('@moodsync/database', () => ({
     confirmVerification: vi.fn(),
     countInboundSince: vi.fn().mockResolvedValue(0),
     recentHistory: vi.fn().mockResolvedValue([]),
+    listInboundForProfile: vi.fn().mockResolvedValue([]),
     startVerification: vi.fn(),
   },
+  userTimezoneRepository: { getTimezone: vi.fn().mockResolvedValue('UTC') },
   messagingPendingActionRepository: {
     findActive: (...args: unknown[]) => findActivePending(...args),
     clear: (...args: unknown[]) => clearPending(...args),
@@ -201,5 +203,22 @@ describe('messagingService.handleInbound — agentic action confirmation', () =>
 
     expect(executeConfirmedAction).not.toHaveBeenCalled();
     expect(clearPending).not.toHaveBeenCalled();
+  });
+});
+
+describe('messagingService.handleInbound — conversation profile wiring', () => {
+  it('passes the wide inbound sample and the user timezone to the agent, not just the replay window', async () => {
+    findByHandle.mockResolvedValue(baseConnection);
+    findActivePending.mockResolvedValue(null);
+    sendAgenticMessage.mockResolvedValue({ text: 'Sure.', pendingAction: null });
+
+    const { messagingService } = await import('./messagingService.js');
+    await messagingService.handleInbound({ channel: 'IMESSAGE', from: '+15551234567', body: 'how did I sleep?' });
+
+    // The third argument is what makes the agent per-conversation —
+    // without it sendAgenticMessage falls back to a generic profile.
+    const context = sendAgenticMessage.mock.calls[0]![2];
+    expect(context).toMatchObject({ timeZone: 'UTC' });
+    expect(Array.isArray(context.inboundHistory)).toBe(true);
   });
 });

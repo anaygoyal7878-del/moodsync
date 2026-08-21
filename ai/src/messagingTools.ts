@@ -332,6 +332,63 @@ export const MESSAGING_ACTION_TOOL_NAMES = new Set(
     .map(([name]) => name),
 );
 
+/** What this specific account can actually do, resolved once per turn.
+ * See `selectMessagingTools`. */
+export interface MessagingCapabilities {
+  hueConnected: boolean;
+}
+
+/** Tools that only make sense against a live Hue bridge. */
+const HUE_DEPENDENT_TOOLS = new Set(['list_smart_home_devices', 'control_hue_light', 'activate_hue_scene']);
+
+/**
+ * Builds the tool surface for one conversation.
+ *
+ * This is where two users' agents stop being the same program. A
+ * person with no Hue bridge is not handed light-control tools that
+ * would fail — the functions are never declared to the model at all,
+ * so "turn off the bedroom light" gets an honest "you haven't
+ * connected a bridge yet" instead of a confident confirmation prompt
+ * for a light that does not exist.
+ *
+ * Two things at once, which is why it's worth doing structurally
+ * rather than in prompt text:
+ *
+ *  - **Credibility.** A capability the model cannot see is a
+ *    capability it cannot promise. Prompt instructions telling a model
+ *    not to use a tool are advisory; not declaring the tool is not.
+ *  - **Efficiency.** Three unused function declarations are three
+ *    function declarations in every request of every turn, forever.
+ *
+ * `get_wearable_snapshot` is deliberately *not* gated on having a
+ * wearable connected: with no data it returns an explicit
+ * `hasData: false`, which is a real and useful answer ("nothing has
+ * synced yet"). Removing it would leave the model with no grounded way
+ * to find that out, which is exactly when models guess.
+ */
+export function selectMessagingTools(capabilities: MessagingCapabilities): Record<string, MessagingTool> {
+  const selected: Record<string, MessagingTool> = {};
+  for (const [name, tool] of Object.entries(MESSAGING_TOOLS)) {
+    if (HUE_DEPENDENT_TOOLS.has(name) && !capabilities.hueConnected) continue;
+    selected[name] = tool;
+  }
+  return selected;
+}
+
+/** Resolves what this account can do right now. Kept next to the tools
+ * it gates so the two can't drift apart. */
+export async function resolveMessagingCapabilities(userId: string): Promise<MessagingCapabilities> {
+  try {
+    const hue = await smartHomeConnectionRepository.findByUserAndProvider(userId, 'HUE');
+    return { hueConnected: hue?.status === 'ACTIVE' };
+  } catch {
+    // A lookup failure must not silently grant capabilities — the safe
+    // direction is the smaller tool surface, which degrades to "I
+    // can't control anything right now", not a broken promise.
+    return { hueConnected: false };
+  }
+}
+
 /** Actually performs a previously-confirmed action tool. Re-resolves
  * the target by name again rather than trusting the stored args blindly
  * — a light could have been renamed or disconnected in the few minutes

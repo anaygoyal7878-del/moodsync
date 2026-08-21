@@ -138,6 +138,26 @@ export const messagingRepository = {
     return rows.reverse();
   },
 
+  /**
+   * Inbound messages only, for compiling the conversation profile (see
+   * ai/src/messagingProfile.ts).
+   *
+   * Deliberately a separate read from `recentHistory`: that one is the
+   * short conversational window replayed verbatim to the model and is
+   * kept small because every turn of it costs tokens. This one is a
+   * wider, cheaper sample used only to *count* things — length, hour,
+   * intent — and never sent to the model as text, so it can afford a
+   * much longer window than the replay can.
+   */
+  async listInboundForProfile(connectionId: string, limit: number) {
+    return prisma.messagingMessage.findMany({
+      where: { connectionId, direction: 'INBOUND' },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: { body: true, intent: true, createdAt: true },
+    });
+  },
+
   /** Inbound count in the trailing window — the input to rate limiting,
    * so one sender can't drive unbounded model spend. */
   async countInboundSince(connectionId: string, since: Date): Promise<number> {
