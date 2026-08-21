@@ -20,6 +20,39 @@ Where something is uncertain, it's marked uncertain rather than assumed.
 
 ---
 
+## Scope freeze — August 2026
+
+**The integration surface is closed.** What exists (WHOOP, Google
+Health, Apple Health, Amazfit, Hue, Hue BLE, Spotify, HomeKit, Alexa
+voice, Google Calendar, weather) stays and keeps working. **No new
+device or service integrations get built.**
+
+Future environment work is scoped to four categories, and reaches them
+through **a scene the user already built in Apple's Home app**, which
+`homekit.activate_scene` already triggers:
+
+| Category | How it's reached |
+|---|---|
+| Lights | Inside the user's HomeKit scene (or existing direct Hue, for users who have it) |
+| Temperature | Inside the scene. Recommendation-only otherwise — no thermostat write path exists anywhere in this codebase |
+| Music (stress relief) | Inside the scene (or existing direct Spotify) |
+| Diffuser | Inside the scene only — no diffuser has a usable public API, see below |
+
+Why a scene rather than more integrations: one connection covers all
+four categories, needs no new credentials, and degrades honestly — if
+the user's scene has no diffuser in it, nothing happens and nothing was
+promised.
+
+Two shapes were evaluated and rejected as *impossible*, not merely
+out of scope — see the Alexa and diffuser sections below:
+
+- **Alexa as a device-control path.** The platform does not offer it.
+- **A dedicated diffuser integration.** No vendor offers a usable API.
+
+Anything proposing a new integration has to clear this section first.
+
+---
+
 ### Apple Health — no OAuth flow exists, by design
 
 - **Confirmed directly against Apple's own HealthKit developer docs**:
