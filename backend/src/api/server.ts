@@ -1,6 +1,7 @@
 import Fastify, { type FastifyError } from 'fastify';
 import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
+import rateLimit from '@fastify/rate-limit';
 import { env } from '../config/env.js';
 import { logger } from '../logging/logger.js';
 import authenticatePlugin from './plugins/authenticate.js';
@@ -45,6 +46,12 @@ export async function buildServer() {
 
   await app.register(cors, { origin: env.CORS_ORIGIN, credentials: true });
   await app.register(sensible);
+  // Global default: generous enough that normal dashboard usage (several
+  // parallel GETs on page load) never trips it, but a real ceiling on
+  // any endpoint that has none of its own. `trustProxy: true` above is
+  // what makes `request.ip` (this plugin's default key) the real client
+  // address rather than a load balancer's, in production.
+  await app.register(rateLimit, { global: true, max: 300, timeWindow: '1 minute' });
   await app.register(authenticatePlugin);
 
   // Registered before any route plugins deliberately: Fastify captures the
