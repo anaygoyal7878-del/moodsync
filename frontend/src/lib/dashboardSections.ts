@@ -40,6 +40,11 @@ export const NAV_GROUPS = [
     label: "Today",
     items: [
       { href: "/dashboard", label: "Today", icon: Home, exact: true },
+      // Leads the group, right after the home summary — Atlas is the
+      // conversational front door to the whole intelligence engine
+      // (same tool-calling engine the iMessage bot runs on, see
+      // backend/src/api/routes/atlas.ts), not one routine among many.
+      { href: "/dashboard/atlas", label: "Atlas", icon: Bot },
       { href: "/dashboard/energy", label: "Energy", icon: BatteryMedium },
       { href: "/dashboard/focus", label: "Focus", icon: Timer },
       { href: "/dashboard/sleep", label: "Sleep", icon: Moon },
@@ -53,7 +58,6 @@ export const NAV_GROUPS = [
       { href: "/dashboard/habits", label: "Habits", icon: Repeat },
       { href: "/dashboard/meditation", label: "Meditate", icon: Sparkle },
       { href: "/dashboard/music", label: "Music", icon: Music },
-      { href: "/dashboard/atlas", label: "Atlas", icon: Bot },
     ],
   },
   {
