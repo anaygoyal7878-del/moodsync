@@ -225,6 +225,17 @@ export {
   type AffectLearning,
   type CheckInRecord,
 } from './affectTraining.js';
+export {
+  calibrateStateConfidence,
+  applyCalibration,
+  AGREEMENT_THRESHOLD,
+  DISAGREEMENT_THRESHOLD,
+  AGREEMENT_MULTIPLIER,
+  DISAGREEMENT_MULTIPLIER,
+  MAX_CALIBRATED_CONFIDENCE,
+  type AffectAgreement,
+  type AffectCalibration,
+} from './affectCalibration.js';
 
 // --- Adaptive Environment Intelligence Engine ---
 // See docs/ADAPTIVE_ENVIRONMENT_ARCHITECTURE.md.

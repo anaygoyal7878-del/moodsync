@@ -155,6 +155,59 @@ appears. Only the single strongest association is surfaced — the
 second-strongest feature in a 4-feature model fit on 25 points is not a
 finding.
 
+## Calibrating the state engine
+
+The learned model now feeds `environmentService.getSnapshot`, but not
+in the way the gap list originally anticipated. Two findings changed the
+design, both worth recording because both are traps.
+
+**`userDeclaredState` is not a prediction slot.** The obvious wiring —
+pass `predictAffect`'s output as `StateEngineInput.userDeclaredState` —
+is wrong twice. That field short-circuits inference entirely and returns
+**confidence 1.0**, with the supporting signal "You told MoodSync what
+you're doing." A model prediction is not a declaration: routing one
+through there would attribute to the user something they never said, at
+a confidence no inference in this codebase is permitted to reach, and
+bypass every guard in `assessState`. It stays `null`, with a comment at
+the call site saying why.
+
+**The model and the rules share inputs.** `affectFeatures.ts` builds its
+vector from heart rate, HRV, sleep, and activity — precisely what
+`assessState` already reasons over. So adding the prediction as an
+ordinary supporting signal would count the same measurement twice and
+inflate confidence for free.
+
+What the model uniquely knows is neither of those things. The rules
+assert "elevated heart rate plus depressed HRV means stress" for
+everyone; the learned model is the only thing in this codebase that can
+say whether that holds for *this* person. That belongs on the
+confidence, not on the claim. So `ai/src/affectCalibration.ts`:
+
+1. Places each `MoodState` on the circumplex (MoodSync's own mapping,
+   approximate by design — it answers "roughly the same direction?",
+   never shown to a user as a number).
+2. Compares the model's prediction against that position, **per axis**,
+   skipping any axis whose model didn't clear its usability floor. This
+   is what keeps "I can read your energy but not your mood" intact here
+   rather than averaging it away.
+3. Returns a confidence multiplier.
+
+**The asymmetry is deliberate.** Agreement multiplies confidence by
+1.1; disagreement by 0.7. Because both sides read the same biometrics,
+some agreement is structurally guaranteed and therefore weak evidence —
+while disagreement, despite shared inputs, means the person-specific fit
+genuinely diverges from the generic rule, which is a real finding.
+
+There is an explicit **inconclusive band** between the two thresholds. A
+middling deviation is not evidence in either direction and is not forced
+into one.
+
+Every other path returns a multiplier of exactly 1.0. No usable model,
+no reading, an `unknown` state, a thrown error — all return the original
+assessment untouched. Since most accounts have no usable model, *doing
+nothing is the overwhelmingly common outcome*, and the wiring is written
+so that outcome costs one cheap count query and nothing else.
+
 ## Does this "train on user data"?
 
 Yes, and that is a change from what the messaging docs previously said.
@@ -173,12 +226,15 @@ this per-user statistical model exists.
 
 ## Verification
 
-Unit-tested (42 tests): the linear algebra against known solutions;
+Unit-tested (55 tests): the linear algebra against known solutions;
 ridge shrinkage including that the intercept is never penalised (a
 penalised intercept would bias every prediction toward "neutral" on a
 -2..+2 scale); feature-count capping; the noise-rejection property; the
 learnable-vs-unlearnable axis split within one dataset; both leakage
-guards; and the causal-language ban.
+guards; and the causal-language ban. Calibration adds 13 more, weighted toward
+the fail-safe paths — no usable model, an `unknown` state, the
+inconclusive band, and that an unusable axis genuinely never
+participates rather than quietly contributing a zero.
 
 **Not verified:** no real human has ever checked in, so no model has
 been fit on genuine data. Everything here is exercised against seeded
@@ -207,11 +263,10 @@ available, so the migration and repository are unexecuted.
   confirmed only that the route compiles, serves, and sits behind the
   auth guard (307 to `/login`), same limitation as every other screen
   built this way this project.
-- **The learned model doesn't feed `stateEngine.ts` yet.** It is
-  computed and explained but does not yet override the hand-written
-  rules — `userDeclaredState` is still `null` at its call site. Wiring
-  `predictAffect` in is deliberate future work, not an oversight: it
-  should only happen for models that clear the floors.
+- **Wired into the state engine — as calibration, not as a state
+  source.** See "## Calibrating the state engine" above. The obvious
+  wiring (feed the prediction into `userDeclaredState`) was investigated
+  and rejected as actively wrong; `userDeclaredState` stays `null`.
 - **Linear only.** A genuinely U-shaped relationship (arousal that is
   unpleasant at both extremes is the obvious candidate) is invisible to
   this model.

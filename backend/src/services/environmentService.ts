@@ -8,6 +8,7 @@ import {
   userTimezoneRepository,
   focusSessionRepository,
   locationEventRepository,
+  moodCheckInRepository,
   type EnvironmentSettings,
 } from '@moodsync/database';
 import {
@@ -30,6 +31,11 @@ import {
   executeAction,
   computeWellnessScores,
   listHueLightsForUser,
+  learnAffect,
+  extractFeatures,
+  calibrateStateConfidence,
+  applyCalibration,
+  MIN_SAMPLES_TO_LEARN,
   STATE_LABELS,
   type AutomationLevel,
   type AvailableLight,
@@ -209,6 +215,64 @@ async function gatherContext(userId: string, now: Date) {
   };
 }
 
+/**
+ * Adjusts confidence in the rule-based assessment using this person's
+ * own learned affect model — see ai/src/affectCalibration.ts for why
+ * this is a calibration rather than a state source, and why it isn't
+ * routed through `userDeclaredState`.
+ *
+ * Entirely best-effort. Any failure, any missing data, and any
+ * not-yet-usable model returns the original assessment byte-for-byte.
+ * For most accounts most of the time there is no usable model, so the
+ * overwhelmingly common outcome of this function is that it changes
+ * nothing.
+ */
+async function calibrateWithAffectModel(
+  userId: string,
+  assessment: StateAssessment,
+  ctx: Awaited<ReturnType<typeof gatherContext>>,
+  now: Date,
+): Promise<StateAssessment> {
+  if (assessment.currentState === 'unknown' || !ctx.latest) return assessment;
+
+  try {
+    const checkIns = await moodCheckInRepository.listForUser(userId);
+    // Cheap pre-check: below the model's own sample floor there is
+    // nothing to fit, so skip the work entirely rather than running a
+    // regression that is guaranteed to come back unusable.
+    if (checkIns.length < MIN_SAMPLES_TO_LEARN) return assessment;
+
+    const learning = learnAffect(
+      checkIns.map((c) => ({ valence: c.valence, arousal: c.arousal, createdAt: c.createdAt })),
+      ctx.history,
+    );
+    if (!learning.valence.usable && !learning.arousal.usable) return assessment;
+
+    // Features must come from the same reading the assessment itself
+    // was based on — comparing a prediction from one moment against a
+    // state inferred from another would be measuring nothing. `history`
+    // excludes `latest`, which is exactly the "baseline must not
+    // include the value being scored" contract extractFeatures wants.
+    const features = extractFeatures(ctx.latest, ctx.history);
+    const calibration = calibrateStateConfidence(assessment.currentState, learning, features);
+    if (calibration.explanation === null) return assessment;
+
+    return {
+      ...assessment,
+      confidence: applyCalibration(assessment.confidence, calibration),
+      supportingSignals: [
+        ...assessment.supportingSignals,
+        // 'measured' because it rests on real check-ins compared to
+        // real readings, not on the clock or a calendar.
+        { kind: 'measured' as const, description: calibration.explanation },
+      ],
+    };
+  } catch {
+    // A calibration failure must never take down the environment card.
+    return assessment;
+  }
+}
+
 export const environmentService = {
   /**
    * The read model behind the dashboard's environment card. Assesses
@@ -218,7 +282,7 @@ export const environmentService = {
   async getSnapshot(userId: string, now: Date = new Date()): Promise<EnvironmentSnapshot> {
     const ctx = await gatherContext(userId, now);
 
-    const assessment = assessState(
+    const ruleAssessment = assessState(
       {
         latest: ctx.latest,
         history: ctx.history,
@@ -226,10 +290,17 @@ export const environmentService = {
         bookedHoursToday: null,
         inFocusSession: ctx.inFocusSession,
         minutesSinceWorkout: null,
+        // Stays null on purpose. This field means "the user said so"
+        // and returns confidence 1.0 — a learned prediction is not a
+        // declaration and must never be routed through it. The affect
+        // model instead calibrates confidence below; see
+        // ai/src/affectCalibration.ts for the full reasoning.
         userDeclaredState: null,
       },
       now,
     );
+
+    const assessment = await calibrateWithAffectModel(userId, ruleAssessment, ctx, now);
 
     // Record every assessment so held-duration is measurable next time.
     // Best-effort: failing to write history must not fail the read, and
