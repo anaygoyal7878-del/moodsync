@@ -318,6 +318,5 @@ noise. So:
   null — stress is a per-reading computed score and comparing two of
   them needs the same windowing care `musicFeedback.ts` applies, which
   isn't wired here yet.
-- **No analytics charts yet.** The spec's section 21 asked for a
-  charting surface; the data model supports it (every session stores
-  state, confidence, response, and outcome) but the page isn't built.
+- ~~No analytics charts yet~~ — built, see "## Analytics" above
+  (`/dashboard/environment/analytics`, commit b744902).
