@@ -15,11 +15,19 @@ const { listForUserMock, logMessageMock, touchMock, countProactiveMock, getSetti
         quietHoursStart: number | null;
         quietHoursEnd: number | null;
         dailyProactiveLimit: number;
+        recurringNudgesEnabled: boolean;
+        recurringNudgeIntervalHours: number;
+        lastRecurringNudgeAt: Date | null;
+        lastRecurringNudgeKind: string | null;
       }> => ({
         proactiveEnabled: true,
         quietHoursStart: null,
         quietHoursEnd: null,
         dailyProactiveLimit: 3,
+        recurringNudgesEnabled: false,
+        recurringNudgeIntervalHours: 3,
+        lastRecurringNudgeAt: null,
+        lastRecurringNudgeKind: null,
       }),
     ),
     getTimezoneMock: vi.fn(async () => 'UTC'),
@@ -150,7 +158,16 @@ describe('withinQuietHours', () => {
 });
 
 describe('canSendProactive', () => {
-  const base = { proactiveEnabled: true, quietHoursStart: null, quietHoursEnd: null, dailyProactiveLimit: 3 };
+  const base = {
+    proactiveEnabled: true,
+    quietHoursStart: null,
+    quietHoursEnd: null,
+    dailyProactiveLimit: 3,
+    recurringNudgesEnabled: false,
+    recurringNudgeIntervalHours: 3,
+    lastRecurringNudgeAt: null,
+    lastRecurringNudgeKind: null,
+  };
 
   it('allows a normal send', () => {
     expect(canSendProactive(base, 14, 0, 1)).toEqual({ allowed: true, reason: null });
@@ -213,6 +230,10 @@ describe('sendProactiveInsight — settings enforcement', () => {
       quietHoursStart: 22,
       quietHoursEnd: 7,
       dailyProactiveLimit: 3,
+      recurringNudgesEnabled: false,
+      recurringNudgeIntervalHours: 3,
+      lastRecurringNudgeAt: null,
+      lastRecurringNudgeKind: null,
     });
 
     // 03:00 UTC, with the user's timezone mocked to UTC.
@@ -229,6 +250,10 @@ describe('sendProactiveInsight — settings enforcement', () => {
       quietHoursStart: null,
       quietHoursEnd: null,
       dailyProactiveLimit: 3,
+      recurringNudgesEnabled: false,
+      recurringNudgeIntervalHours: 3,
+      lastRecurringNudgeAt: null,
+      lastRecurringNudgeKind: null,
     });
 
     expect((await sendProactiveInsight('u1', 'Heads up', 'x')).blocked).toBe('disabled');

@@ -3,10 +3,13 @@
  * ai/src/proactiveNotifications.ts's checkers per user (recovery, room
  * temperature, a cross-domain recovery/environment/calendar
  * conjunction, burnout risk, scene time-of-day pattern, social battery,
- * habit streak milestones) and delivers whichever fire, deduped by
- * title within a rolling window so
- * a persistent condition (e.g. an always-warm bedroom) doesn't spam a
- * notification every single run. Run this on a periodic cron cadence
+ * habit streak milestones) and delivers whichever fire, deduped by title
+ * within a rolling window so a persistent condition (e.g. an
+ * always-warm bedroom) doesn't spam a notification every single run —
+ * plus a second, separate pass at the bottom of this file sending plain
+ * time-interval nudges (ai/src/recurringNudge.ts, deliberately NOT
+ * deduped the same way — see that pass's own comment) to anyone who
+ * opted into those. Run this on a periodic cron cadence
  * (suggested: every 30-60 minutes — frequent enough that "unusually
  * high recovery today" and the time-of-day scene pattern stay timely,
  * infrequent enough not to waste API calls/DB reads) via
@@ -23,6 +26,7 @@ import {
   pendingDeviceCommandRepository,
   userPreferencesRepository,
   userTimezoneRepository,
+  messagingSettingsRepository,
 } from '@moodsync/database';
 import {
   computeWellnessScores,
@@ -43,6 +47,10 @@ import {
   getTodayCalendarLoad,
   deliverNotification,
   sendProactiveInsight,
+  nextNudgeKind,
+  isRecurringNudgeDue,
+  NUDGE_CONTENT,
+  type NudgeKind,
 } from '@moodsync/ai';
 
 function mean(values: number[]): number {
@@ -286,5 +294,44 @@ for (const userId of userIds) {
   }
 }
 
-console.log(`[proactive-notifications] Done. ${totalSent} notification(s) sent across ${userIds.length} user(s).`);
+// Recurring interval nudges — a separate loop over a separate user
+// list on purpose. Every check above requires recent biometric data
+// (see `listUserIdsWithRecentReadings`); a recurring nudge requires
+// none at all, so gating it on that list would silently exclude anyone
+// who wants "remind me to drink water" but hasn't synced a wearable.
+// Bypasses `deliverIfNotRecentlySent`'s in-app-notification-plus-title-
+// dedupe path deliberately: that dedupe exists to stop a *persistent
+// condition* from spamming the same finding, which is the opposite of
+// what a recurring nudge is for — it's supposed to repeat by design,
+// on its own interval, which is frequently shorter than
+// DEDUPE_WINDOW_HOURS (20h) and would otherwise be silently swallowed.
+const nudgeUserIds = await messagingSettingsRepository.listUserIdsWithRecurringNudgesEnabled();
+let nudgesSent = 0;
+
+for (const userId of nudgeUserIds) {
+  try {
+    const settings = await messagingSettingsRepository.get(userId);
+    if (!isRecurringNudgeDue(settings.recurringNudgeIntervalHours, settings.lastRecurringNudgeAt, new Date())) continue;
+
+    const kind = nextNudgeKind(settings.lastRecurringNudgeKind as NudgeKind | null);
+    const content = NUDGE_CONTENT[kind];
+    // sendProactiveInsight is the same gate every other proactive text
+    // goes through — proactiveEnabled, quiet hours, and the daily cap
+    // all still apply, tagged the same `intent: 'proactive'`. There is
+    // one policy for "may MoodSync text first," not a second one here.
+    const result = await sendProactiveInsight(userId, content.title, content.body, new Date());
+    if (result.sent > 0) {
+      await messagingSettingsRepository.recordRecurringNudgeSent(userId, kind, new Date());
+      nudgesSent++;
+    }
+  } catch (error) {
+    anyFailed = true;
+    console.error(`[proactive-notifications] recurring nudge for user=${userId} failed:`, error instanceof Error ? error.message : error);
+  }
+}
+
+console.log(
+  `[proactive-notifications] Done. ${totalSent} notification(s) sent across ${userIds.length} user(s), ` +
+    `${nudgesSent} recurring nudge(s) sent across ${nudgeUserIds.length} subscriber(s).`,
+);
 process.exit(anyFailed ? 1 : 0);

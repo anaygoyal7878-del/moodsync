@@ -17,6 +17,8 @@ interface Settings {
   quietHoursStart: number | null;
   quietHoursEnd: number | null;
   dailyProactiveLimit: number;
+  recurringNudgesEnabled: boolean;
+  recurringNudgeIntervalHours: number;
 }
 
 function hourLabel(hour: number): string {
@@ -48,6 +50,17 @@ export function MessagingSettingsForm({ initial }: { initial: Settings }) {
     }
   }
 
+  // The daily-limit slider updates the visible number on every drag
+  // frame (setLocal) but only PATCHes once the drag/keypress settles
+  // (commitRange) — otherwise dragging fires one request per pixel.
+  function setLocal(update: Partial<Settings>) {
+    setSettings((prev) => ({ ...prev, ...update }));
+  }
+
+  function commitRange(update: Partial<Settings>) {
+    void patch(update);
+  }
+
   const quietHoursOn = settings.quietHoursStart !== null && settings.quietHoursEnd !== null;
 
   return (
@@ -65,7 +78,7 @@ export function MessagingSettingsForm({ initial }: { initial: Settings }) {
             checked={settings.proactiveEnabled}
             onChange={(e) => patch({ proactiveEnabled: e.target.checked })}
             className="mt-1"
-            style={{ minWidth: 16, minHeight: 16 }}
+            style={{ minWidth: 16, minHeight: 16, accentColor: "var(--lux-sage)" }}
           />
           <span>
             <span className="block text-sm" style={{ color: "var(--lux-ink)" }}>
@@ -103,7 +116,7 @@ export function MessagingSettingsForm({ initial }: { initial: Settings }) {
               )
             }
             className="mt-1"
-            style={{ minWidth: 16, minHeight: 16 }}
+            style={{ minWidth: 16, minHeight: 16, accentColor: "var(--lux-sage)" }}
           />
           <span className="block text-sm" style={{ color: "var(--lux-ink)" }}>
             Keep quiet hours
@@ -163,14 +176,71 @@ export function MessagingSettingsForm({ initial }: { initial: Settings }) {
             max={10}
             step={1}
             value={settings.dailyProactiveLimit}
-            onChange={(e) => patch({ dailyProactiveLimit: Number(e.target.value) })}
+            onChange={(e) => setLocal({ dailyProactiveLimit: Number(e.target.value) })}
+            onMouseUp={(e) => commitRange({ dailyProactiveLimit: Number(e.currentTarget.value) })}
+            onTouchEnd={(e) => commitRange({ dailyProactiveLimit: Number(e.currentTarget.value) })}
+            onKeyUp={(e) => commitRange({ dailyProactiveLimit: Number(e.currentTarget.value) })}
             className="mt-2 w-full"
+            style={{ accentColor: "var(--lux-sage)" }}
           />
           <span className="mt-1 block text-xs" style={{ color: "var(--lux-muted)" }}>
             A hard ceiling, counted from midnight in your timezone. MoodSync usually sends far fewer —
             it only texts when a real signal clears its threshold.
           </span>
         </label>
+      </fieldset>
+
+      <fieldset disabled={!settings.proactiveEnabled} style={{ opacity: settings.proactiveEnabled ? 1 : 0.45 }}>
+        <legend className="text-sm font-medium" style={{ color: "var(--lux-ink)" }}>
+          Recurring nudges
+        </legend>
+        <p className="mt-1 text-xs" style={{ color: "var(--lux-muted)" }}>
+          Plain reminders on a timer — move, hydrate, sit up straight — separate from the threshold
+          messages above. These still count toward the daily limit and respect quiet hours.
+        </p>
+
+        <label
+          className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl p-4"
+          style={{ background: "var(--lux-bg-card-2)" }}
+        >
+          <input
+            type="checkbox"
+            checked={settings.recurringNudgesEnabled}
+            onChange={(e) => patch({ recurringNudgesEnabled: e.target.checked })}
+            className="mt-1"
+            style={{ minWidth: 16, minHeight: 16, accentColor: "var(--lux-sage)" }}
+          />
+          <span>
+            <span className="block text-sm" style={{ color: "var(--lux-ink)" }}>
+              Send periodic wellness nudges
+            </span>
+            <span className="block text-xs" style={{ color: "var(--lux-muted)" }}>
+              Rotates through hydration, movement, and posture — off by default.
+            </span>
+          </span>
+        </label>
+
+        {settings.recurringNudgesEnabled && (
+          <label className="mt-2 block rounded-xl p-4" style={{ background: "var(--lux-bg-card-2)" }}>
+            <span className="flex items-baseline justify-between text-sm" style={{ color: "var(--lux-ink)" }}>
+              Every
+              <span style={{ color: "var(--lux-sage)" }}>{settings.recurringNudgeIntervalHours}h</span>
+            </span>
+            <input
+              type="range"
+              min={1}
+              max={12}
+              step={1}
+              value={settings.recurringNudgeIntervalHours}
+              onChange={(e) => setLocal({ recurringNudgeIntervalHours: Number(e.target.value) })}
+              onMouseUp={(e) => commitRange({ recurringNudgeIntervalHours: Number(e.currentTarget.value) })}
+              onTouchEnd={(e) => commitRange({ recurringNudgeIntervalHours: Number(e.currentTarget.value) })}
+              onKeyUp={(e) => commitRange({ recurringNudgeIntervalHours: Number(e.currentTarget.value) })}
+              className="mt-2 w-full"
+              style={{ accentColor: "var(--lux-sage)" }}
+            />
+          </label>
+        )}
       </fieldset>
 
       <p aria-live="polite" className="text-xs" style={{ color: "var(--lux-muted)" }}>

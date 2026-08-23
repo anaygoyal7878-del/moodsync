@@ -846,6 +846,26 @@ model MessagingSettings {
   /// insight engine happens to generate" is not a policy.
   dailyProactiveLimit Int @default(3)
 
+  /// Plain time-interval nudges (move, hydrate, sit up straight) —
+  /// distinct from every other proactive message in this product, which
+  /// only fires when a real biometric/context signal crosses a
+  /// threshold. This is Poke's "remind me to drink water every two
+  /// hours" pattern: no signal required, just elapsed time. Off by
+  /// default — unlike `proactiveEnabled` (already-shipped behavior,
+  /// defaults true so the row's existence doesn't change it), this is a
+  /// brand-new way for MoodSync to start texting someone, so the
+  /// conservative default is off.
+  recurringNudgesEnabled     Boolean   @default(false)
+  recurringNudgeIntervalHours Int      @default(3)
+  /// Rotation state — see ai/src/recurringNudge.ts's nextNudgeKind.
+  /// Still gated by `proactiveEnabled`/quiet hours/`dailyProactiveLimit`
+  /// above: a recurring nudge is a `sendProactiveInsight` call like any
+  /// other, tagged the same `intent: 'proactive'`, so it counts against
+  /// the same daily ceiling rather than having a second, competing
+  /// policy.
+  lastRecurringNudgeAt   DateTime?
+  lastRecurringNudgeKind String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

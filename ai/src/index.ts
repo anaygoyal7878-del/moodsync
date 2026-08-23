@@ -226,6 +226,12 @@ export {
   type CheckInRecord,
 } from './affectTraining.js';
 export {
+  nextNudgeKind,
+  isRecurringNudgeDue,
+  NUDGE_CONTENT,
+  type NudgeKind,
+} from './recurringNudge.js';
+export {
   calibrateStateConfidence,
   applyCalibration,
   AGREEMENT_THRESHOLD,

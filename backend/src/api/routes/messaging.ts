@@ -28,6 +28,12 @@ const settingsSchema = z.object({
   quietHoursStart: z.number().int().min(0).max(23).nullable().optional(),
   quietHoursEnd: z.number().int().min(0).max(23).nullable().optional(),
   dailyProactiveLimit: z.number().int().min(0).max(10).optional(),
+  recurringNudgesEnabled: z.boolean().optional(),
+  // 1-12h: below 1 is indistinguishable from a threshold-based check at
+  // that point, and above 12 stops matching what a person means by
+  // "remind me periodically" — same server-side-bounds-not-just-UI
+  // reasoning as dailyProactiveLimit above.
+  recurringNudgeIntervalHours: z.number().int().min(1).max(12).optional(),
 });
 
 /**
