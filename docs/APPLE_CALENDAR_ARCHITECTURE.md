@@ -186,16 +186,20 @@ worse experience than asking once, early.
 
 ## Known gaps
 
-- **Not wired into the app's UI or lifecycle.** `EventKitReader`,
-  `MoodSyncAPIClient`'s calendar methods, `CalendarSyncCoordinator`, and
-  `CalendarWriteCoordinator` all exist and are tested, but nothing in
-  `MoodSyncCompanionView.swift` or `OnboardingView.swift` calls any of
-  them yet — the same call-site pattern `HomeKitController.fetchHomeSnapshot()`
-  uses there is the model to follow. Deliberately left undone this round
-  rather than editing those large, unreviewed UI files blind. This is
-  now the single biggest gap in the whole calendar feature: read, write,
-  and the messaging tool are all real and tested, but a real device has
-  no path to actually run either coordinator.
+- ~~Not wired into the app's UI or lifecycle~~ — wired. `OnboardingView`
+  gained an explicit Calendar step (step 6, after HomeKit) that requests
+  EventKit authorization up front, same "explain before the system
+  prompt" pattern as its Health step — chosen over HomeKit's *implicit*
+  prompt because `EKEventStore.requestFullAccessToEvents()` has a real
+  completion to react to, unlike `HMHomeManager`'s. `MoodSyncCompanionView.sync()`
+  now calls `pushCalendarSnapshot` and `checkPendingCalendarWrites`
+  right after the existing HomeKit snapshot/command calls, same
+  best-effort shape: a failure only appends to the status string, it
+  never fails the overall sync. `swift build`/`swift test` both still
+  pass (42 tests, count unchanged — UI call sites aren't unit-tested
+  here, matching how the HomeKit call sites never were either).
+  **Still not run on a real device or simulator** — the wiring is code-
+  reviewed and compiles, not observed working.
 - **Move/reschedule is not built, on purpose** — see "Writing back"
   above for why (no stored identifier for an existing event to
   reference). If this becomes a real need, the honest path is storing

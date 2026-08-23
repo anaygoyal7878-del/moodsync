@@ -207,9 +207,13 @@ public struct MoodSyncCompanionView: View {
         // you open the app" moment docs/HOMEKIT_ARCHITECTURE.md describes
         // for homekit.* actions, since there's no other reliable wake
         // point available to a third-party app without Apple's
-        // case-by-case background-execution entitlement.
+        // case-by-case background-execution entitlement. Calendar reads
+        // and writes are the same story — see
+        // docs/APPLE_CALENDAR_ARCHITECTURE.md.
         await checkPendingDeviceCommands(accessToken: accessToken)
         await pushHomeSnapshot(accessToken: accessToken)
+        await pushCalendarSnapshot(accessToken: accessToken)
+        await checkPendingCalendarWrites(accessToken: accessToken)
     }
 
     #if canImport(HomeKit)
@@ -262,5 +266,52 @@ public struct MoodSyncCompanionView: View {
     }
     #else
     private func checkPendingDeviceCommands(accessToken: String) async {}
+    #endif
+
+    #if canImport(EventKit)
+    /// Pushes today+tomorrow's event windows so the backend's calendar
+    /// signal (`ai/src/calendarSignal.ts`) has a fresh, cached copy —
+    /// EventKit has no server-side read path either. Best-effort, same
+    /// as the HomeKit snapshot above: a declined/failed calendar read
+    /// only updates the status string, it never fails the overall sync.
+    /// See docs/APPLE_CALENDAR_ARCHITECTURE.md.
+    private func pushCalendarSnapshot(accessToken: String) async {
+        let coordinator = CalendarSyncCoordinator(calendar: EventKitReader(), apiClient: MoodSyncAPIClient(baseURL: baseURL))
+        switch await coordinator.sync(accessToken: accessToken) {
+        case .success, .notAuthorized:
+            // `.notAuthorized` isn't an error worth surfacing here —
+            // calendar access is optional, and the status string
+            // should stay about what actually went wrong, not about a
+            // permission the person may simply not have granted yet.
+            break
+        case .failure(let message):
+            status += " · Calendar not synced: \(message)"
+        }
+    }
+    #else
+    private func pushCalendarSnapshot(accessToken: String) async {}
+    #endif
+
+    #if canImport(EventKit)
+    /// The write-side counterpart: creates any event MoodSync queued
+    /// via the messaging agent's `create_calendar_event` tool (or the
+    /// in-app Atlas chat, which now shares the same tool — see
+    /// backend/src/api/routes/atlas.ts). Same "next time the app opens"
+    /// wake point as HomeKit commands above.
+    private func checkPendingCalendarWrites(accessToken: String) async {
+        let coordinator = CalendarWriteCoordinator(calendar: EventKitReader(), apiClient: MoodSyncAPIClient(baseURL: baseURL))
+        switch await coordinator.run(accessToken: accessToken) {
+        case .noWritesPending:
+            break
+        case .completed(let executed, let failed):
+            if executed > 0 || failed > 0 {
+                status += " · Calendar: \(executed) event\(executed == 1 ? "" : "s") added" + (failed > 0 ? ", \(failed) failed" : "")
+            }
+        case .failure(let message):
+            status += " · Calendar write check failed: \(message)"
+        }
+    }
+    #else
+    private func checkPendingCalendarWrites(accessToken: String) async {}
     #endif
 }

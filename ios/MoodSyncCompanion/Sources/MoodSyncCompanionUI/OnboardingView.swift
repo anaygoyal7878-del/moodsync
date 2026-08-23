@@ -21,11 +21,16 @@ import MoodSyncCompanion
 ///    (`HomeKitController.listSceneNames()`), so this step just explains
 ///    that before it happens and confirms the user has a Home set up in
 ///    Apple's Home app at all.
-/// 6. Done.
+/// 6. Calendar — explicit, like Health: EventKit's authorization call
+///    has a real completion (unlike HomeKit's implicit prompt), so this
+///    step asks up front rather than letting the first background sync
+///    surprise the user with a system dialog it never explained. See
+///    docs/APPLE_CALENDAR_ARCHITECTURE.md.
+/// 7. Done.
 @available(iOS 17.0, macOS 14.0, *)
 public struct OnboardingView: View {
     private enum Step: Int, CaseIterable {
-        case welcome, serverURL, health, locationWhenInUse, locationAlways, homeKit, done
+        case welcome, serverURL, health, locationWhenInUse, locationAlways, homeKit, calendar, done
     }
 
     @AppStorage("moodsync.hasCompletedOnboarding") private var hasCompletedOnboarding = false
@@ -35,6 +40,7 @@ public struct OnboardingView: View {
     @State private var healthStatus: String?
     @State private var locationStatus: String?
     @State private var homeKitStatus: String?
+    @State private var calendarStatus: String?
     @State private var isBusy = false
 
     #if canImport(CoreLocation)
@@ -127,6 +133,17 @@ public struct OnboardingView: View {
                     Text(homeKitStatus).font(.caption).foregroundStyle(.secondary)
                 }
             }
+        case .calendar:
+            VStack(spacing: 12) {
+                Text("Calendar").font(.title2).fontWeight(.semibold)
+                Text("MoodSync reads how booked your day is and whether you're in a meeting right now, so it won't suggest changing your lights or music mid-call. It can also add an event you asked for by text, but never moves or edits anything already on your calendar.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                if let calendarStatus {
+                    Text(calendarStatus).font(.caption).foregroundStyle(.secondary)
+                }
+            }
         case .done:
             VStack(spacing: 12) {
                 Text("You're set").font(.title2).fontWeight(.semibold)
@@ -166,6 +183,11 @@ public struct OnboardingView: View {
             Button(isBusy ? "Checking…" : "Continue") { Task { await checkHomeKit() } }
                 .buttonStyle(.borderedProminent)
                 .disabled(isBusy)
+        case .calendar:
+            Button(isBusy ? "Requesting…" : "Allow Calendar Access") { Task { await requestCalendar() } }
+                .buttonStyle(.borderedProminent)
+                .disabled(isBusy)
+            Button("Skip for now") { advance() }.buttonStyle(.plain).foregroundStyle(.secondary)
         case .done:
             Button("Continue to login") { hasCompletedOnboarding = true }.buttonStyle(.borderedProminent)
         }
@@ -281,5 +303,23 @@ public struct OnboardingView: View {
     }
     #else
     private func checkHomeKit() async { advance() }
+    #endif
+
+    #if canImport(EventKit)
+    private func requestCalendar() async {
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            let granted = try await EventKitReader().requestAuthorization()
+            calendarStatus = granted
+                ? "Calendar access granted."
+                : "Calendar access denied — you can change this later in Settings > Privacy & Security > Calendars > MoodSync."
+            advance()
+        } catch {
+            calendarStatus = "Couldn't request Calendar access: \(error.localizedDescription)"
+        }
+    }
+    #else
+    private func requestCalendar() async { advance() }
     #endif
 }
