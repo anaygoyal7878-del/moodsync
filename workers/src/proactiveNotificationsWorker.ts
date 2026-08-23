@@ -1,7 +1,8 @@
 /**
  * Smart (proactive) Notifications — the periodic tick that evaluates
  * ai/src/proactiveNotifications.ts's checkers per user (recovery, room
- * temperature, burnout risk, scene time-of-day pattern, social battery,
+ * temperature, a cross-domain recovery/environment/calendar
+ * conjunction, burnout risk, scene time-of-day pattern, social battery,
  * habit streak milestones) and delivers whichever fire, deduped by
  * title within a rolling window so
  * a persistent condition (e.g. an always-warm bedroom) doesn't spam a
@@ -37,6 +38,8 @@ import {
   checkHabitStreakMilestone,
   checkSocialBatteryLow,
   checkRecentStressSpike,
+  checkRecoveryEnvironmentConjunction,
+  computeOverallHomeWellnessScore,
   getTodayCalendarLoad,
   deliverNotification,
   sendProactiveInsight,
@@ -235,16 +238,34 @@ for (const userId of userIds) {
       totalSent++;
     }
 
+    // Fetched once and reused by both home-environment checks below —
+    // the sleep-range check needs individual room temperatures, the
+    // recovery/environment conjunction needs the one overall score.
+    const homeSnapshot = await homeSnapshotRepository.getForUser(userId);
+
     // Check 2: Bedroom temperature vs. sleep preference.
     const sleepRange = await userPreferencesRepository.getSleepTempRangeC(userId);
     if (sleepRange) {
-      const snapshot = await homeSnapshotRepository.getForUser(userId);
-      const rooms = (snapshot?.rooms ?? [])
+      const rooms = (homeSnapshot?.rooms ?? [])
         .filter((r) => r.temperatureC !== null)
         .map((r) => ({ roomName: r.name, temperatureC: r.temperatureC! }));
       if (await deliverIfNotRecentlySent(userId, checkRoomTemperatureOutsideSleepRange(rooms, sleepRange))) {
         totalSent++;
       }
+    }
+
+    // Check 2b: recovery + home environment + calendar load, combined.
+    // The first checker in this file to cross all three domains —
+    // see checkRecoveryEnvironmentConjunction's doc comment for why
+    // none of the single-domain checks above catch this situation.
+    if (scores) {
+      const homeEnvironmentScore = homeSnapshot ? computeOverallHomeWellnessScore(homeSnapshot.rooms).value : null;
+      const conjunctionCandidate = checkRecoveryEnvironmentConjunction({
+        recoveryScore: scores.recovery.value,
+        homeEnvironmentScore,
+        calendarBookedHoursToday: calendarLoad?.bookedHours ?? null,
+      });
+      if (await deliverIfNotRecentlySent(userId, conjunctionCandidate)) totalSent++;
     }
 
     // Check 3: "Your scene usually helps at this time of day."

@@ -51,6 +51,13 @@ out of scope — see the Alexa and diffuser sections below:
 
 Anything proposing a new integration has to clear this section first.
 
+**Exception, August 2026: Apple Calendar.** Explicitly requested despite
+the freeze. Same architecture as Apple Health — no server-side iCloud
+Calendar API exists, so it's the iOS companion app pushing a cache, not
+a new OAuth integration. See docs/APPLE_CALENDAR_ARCHITECTURE.md. This
+does not reopen the freeze for anything else; it's a named, deliberate
+exception, not a precedent.
+
 ---
 
 ### Apple Health — no OAuth flow exists, by design

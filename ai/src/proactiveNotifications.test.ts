@@ -7,6 +7,7 @@ import {
   checkHabitStreakMilestone,
   checkSocialBatteryLow,
   checkRecentStressSpike,
+  checkRecoveryEnvironmentConjunction,
 } from './proactiveNotifications.js';
 
 describe('checkRecoveryUnusuallyHigh', () => {
@@ -191,5 +192,57 @@ describe('checkRecentStressSpike', () => {
       { at: new Date(now.getTime() - 10 * 60_000), direction: 'drop' as const, context: null },
     ];
     expect(checkRecentStressSpike(entries, now, '5:50 PM')).toBeNull();
+  });
+});
+
+describe('checkRecoveryEnvironmentConjunction', () => {
+  it('stays silent when recovery is unknown', () => {
+    expect(checkRecoveryEnvironmentConjunction({ recoveryScore: null, homeEnvironmentScore: 20, calendarBookedHoursToday: 8 })).toBeNull();
+  });
+
+  it('stays silent when recovery is fine, regardless of the other two', () => {
+    expect(
+      checkRecoveryEnvironmentConjunction({ recoveryScore: 80, homeEnvironmentScore: 10, calendarBookedHoursToday: 10 }),
+    ).toBeNull();
+  });
+
+  it('stays silent on low recovery alone — needs at least one more factor', () => {
+    expect(
+      checkRecoveryEnvironmentConjunction({ recoveryScore: 20, homeEnvironmentScore: null, calendarBookedHoursToday: null }),
+    ).toBeNull();
+  });
+
+  it('stays silent on low recovery with a fine environment and a light calendar', () => {
+    expect(
+      checkRecoveryEnvironmentConjunction({ recoveryScore: 20, homeEnvironmentScore: 90, calendarBookedHoursToday: 1 }),
+    ).toBeNull();
+  });
+
+  it('fires on low recovery + poor environment alone', () => {
+    const result = checkRecoveryEnvironmentConjunction({ recoveryScore: 20, homeEnvironmentScore: 30, calendarBookedHoursToday: null });
+    expect(result).not.toBeNull();
+    expect(result!.body).toContain("home environment isn't helping");
+    expect(result!.body).not.toContain('booked today');
+  });
+
+  it('fires on low recovery + a heavy calendar alone', () => {
+    const result = checkRecoveryEnvironmentConjunction({ recoveryScore: 20, homeEnvironmentScore: null, calendarBookedHoursToday: 7 });
+    expect(result).not.toBeNull();
+    expect(result!.body).toContain('7.0 hours booked today');
+    expect(result!.body).not.toContain("environment isn't helping");
+  });
+
+  it('names both factors when both are true', () => {
+    const result = checkRecoveryEnvironmentConjunction({ recoveryScore: 20, homeEnvironmentScore: 30, calendarBookedHoursToday: 8 });
+    expect(result!.body).toContain("environment isn't helping");
+    expect(result!.body).toContain('8.0 hours booked today');
+  });
+
+  it('treats missing home data as absent, never as poor', () => {
+    // homeEnvironmentScore: null must never itself count as a poor
+    // score — that would misreport "no HomeKit sensor" as "bad room."
+    expect(
+      checkRecoveryEnvironmentConjunction({ recoveryScore: 20, homeEnvironmentScore: null, calendarBookedHoursToday: 1 }),
+    ).toBeNull();
   });
 });

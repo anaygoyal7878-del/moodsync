@@ -52,10 +52,12 @@ export {
   checkHabitStreakMilestone,
   checkSocialBatteryLow,
   checkRecentStressSpike,
+  checkRecoveryEnvironmentConjunction,
   type ProactiveNotificationCandidate,
   type RoomTemperatureCheckInput,
   type SceneRunEvent,
   type BurnoutRiskInput,
+  type RecoveryEnvironmentInput,
 } from './proactiveNotifications.js';
 export {
   recommendMusicCategory,
@@ -180,7 +182,13 @@ export {
 } from './messagingAgent.js';
 export { buildCaffeineLogReply, buildProactiveNudge } from './messagingAgent.js';
 export { sendProactiveInsight } from './messagingDelivery.js';
-export { getTodayCalendarLoad, isInMeetingNow, type TodayCalendarLoad } from './calendarSignal.js';
+export {
+  getTodayCalendarLoad,
+  isInMeetingNow,
+  computeLoadFromWindows,
+  isMeetingAt,
+  type TodayCalendarLoad,
+} from './calendarSignal.js';
 
 // --- Affect model: learning how biometrics relate to self-reported mood ---
 // See docs/AFFECT_MODEL_ARCHITECTURE.md.

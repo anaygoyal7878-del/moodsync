@@ -251,3 +251,60 @@ export function checkRecentStressSpike(
     body: `Your heart rate moved noticeably above today's baseline${contextPart}. A short break, some water, or a few slow breaths might help.`,
   };
 }
+
+/**
+ * A cross-domain conjunction: is *where you are* compounding *how
+ * recovered you are*, on a day that's already booked solid?
+ *
+ * Every other checker in this file looks at one domain — biometrics,
+ * a single room's temperature, calendar count. This is the first to
+ * combine all three sources this product actually has once Apple
+ * Calendar is connected: recovery (Apple Health/WHOOP), home
+ * environment quality (HomeKit's `computeOverallHomeWellnessScore`),
+ * and real calendar load (Google or, now, Apple Calendar — see
+ * `ai/src/calendarSignal.ts`). None of the three alone is unusual
+ * enough to interrupt someone about; together they're a distinct,
+ * actionable situation none of the single-domain checks would catch.
+ *
+ * Same conservative-conjunction shape as `checkBurnoutRisk`: recovery
+ * must actually be low, and it's not enough on its own — at least one
+ * of "your space isn't helping" or "your day is packed" has to also be
+ * true, or this stays silent. Thresholds are MoodSync's own heuristic,
+ * not derived from a study, same disclosure every threshold in this
+ * file carries.
+ */
+export interface RecoveryEnvironmentInput {
+  recoveryScore: number | null;
+  /** 0-100, from `computeOverallHomeWellnessScore` — null when no
+   * HomeKit room has any sensor reporting, distinct from "environment
+   * is fine." */
+  homeEnvironmentScore: number | null;
+  /** Hours of timed events today — null when neither calendar source
+   * has anything (see `getTodayCalendarLoad`'s null-vs-zero contract),
+   * distinct from 0 (a genuinely free day). */
+  calendarBookedHoursToday: number | null;
+}
+
+const RECOVERY_ENV_LOW_RECOVERY_THRESHOLD = 45;
+const RECOVERY_ENV_POOR_ENVIRONMENT_THRESHOLD = 50;
+const RECOVERY_ENV_HEAVY_CALENDAR_HOURS_THRESHOLD = 6;
+
+export function checkRecoveryEnvironmentConjunction(input: RecoveryEnvironmentInput): ProactiveNotificationCandidate | null {
+  if (input.recoveryScore === null) return null;
+  if (input.recoveryScore >= RECOVERY_ENV_LOW_RECOVERY_THRESHOLD) return null;
+
+  const poorEnvironment =
+    input.homeEnvironmentScore !== null && input.homeEnvironmentScore < RECOVERY_ENV_POOR_ENVIRONMENT_THRESHOLD;
+  const heavyCalendar =
+    input.calendarBookedHoursToday !== null && input.calendarBookedHoursToday >= RECOVERY_ENV_HEAVY_CALENDAR_HOURS_THRESHOLD;
+  if (!poorEnvironment && !heavyCalendar) return null;
+
+  const reasons: string[] = [];
+  if (poorEnvironment) reasons.push("your home environment isn't helping right now");
+  if (heavyCalendar) reasons.push(`${input.calendarBookedHoursToday!.toFixed(1)} hours booked today`);
+
+  return {
+    title: 'Your recovery is low, and today is stacked against it',
+    body: `Recovery is low and ${reasons.join(' and ')}. Worth protecting a break where you can, even a short one.`,
+  };
+}

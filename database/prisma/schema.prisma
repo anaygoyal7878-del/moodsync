@@ -55,6 +55,7 @@ model User {
   environmentAutomationSettings EnvironmentAutomationSettings?
   appleMusicConnection AppleMusicConnection?
   calendarConnection   CalendarConnection?
+  appleCalendarSnapshot AppleCalendarSnapshot?
   preferences          UserPreferences?
   homeSnapshot         HomeSnapshot?
 
@@ -238,6 +239,35 @@ model CalendarConnection {
   updatedAt      DateTime         @updatedAt
 
   @@map("calendar_connections")
+}
+
+/// Cached "today" calendar shape pushed from the iOS companion app's
+/// EventKit reader — see docs/APPLE_CALENDAR_ARCHITECTURE.md. Same
+/// architecture reason as Apple Health: Apple publishes no server-side
+/// calendar API (EventKit is on-device only), so the only path is a
+/// native app reading locally and pushing a cache, same shape as
+/// `HomeSnapshot`.
+///
+/// Deliberately event *windows* only — start, end, all-day — never a
+/// title, location, or attendee list. `ai/src/calendarSignal.ts` has
+/// never needed more than "how many hours are booked" and "is a
+/// non-all-day event happening right now", and calendar titles are
+/// often the most sensitive text a person has (medical appointments,
+/// job interviews, therapy). Storing what isn't needed would be a real
+/// privacy cost for zero product benefit.
+///
+/// One row per user, wholesale-replaced on every push — a cache, not a
+/// log, same as `HomeSnapshot`.
+model AppleCalendarSnapshot {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// `CalendarEventWindow[]` — see database/src/repositories/appleCalendarSnapshotRepository.ts.
+  eventsJson Json
+  pushedAt   DateTime @default(now())
+
+  @@map("apple_calendar_snapshots")
 }
 
 model ConnectedDevice {

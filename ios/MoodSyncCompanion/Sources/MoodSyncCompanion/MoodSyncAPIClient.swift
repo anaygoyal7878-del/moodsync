@@ -61,6 +61,11 @@ public protocol MoodSyncAPIClientProtocol: Sendable {
     /// and docs/HOME_SCENES_ARCHITECTURE.md. Same "device pushes,
     /// backend caches" direction as `ingest`, not `fetchPendingDeviceCommands`.
     func pushHomeSnapshot(_ snapshot: HomeSnapshotDTO, accessToken: String) async throws
+    /// Pushes today+tomorrow's event windows to
+    /// `POST /api/calendar/apple/snapshot` — see `EventKitReader` and
+    /// docs/APPLE_CALENDAR_ARCHITECTURE.md. Same "device pushes, backend
+    /// caches" direction as `pushHomeSnapshot`.
+    func pushCalendarSnapshot(events: [CalendarEventWindow], accessToken: String) async throws
 }
 
 /// ARRIVED/DEPARTED — mirrors `LocationEventType` in
@@ -170,6 +175,16 @@ public actor MoodSyncAPIClient: MoodSyncAPIClientProtocol {
         let _: EmptyResponse? = try await postAllowingEmptyResponse(
             path: "/api/home/snapshot",
             body: snapshot,
+            accessToken: accessToken
+        )
+    }
+
+    public func pushCalendarSnapshot(events: [CalendarEventWindow], accessToken: String) async throws {
+        struct Request: Encodable { let events: [CalendarEventWindow] }
+        struct EmptyResponse: Decodable {}
+        let _: EmptyResponse? = try await postAllowingEmptyResponse(
+            path: "/api/calendar/apple/snapshot",
+            body: Request(events: events),
             accessToken: accessToken
         )
     }

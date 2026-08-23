@@ -49,6 +49,14 @@ private final class FakeAPIClient: MoodSyncAPIClientProtocol, @unchecked Sendabl
     func postLocationEvent(type: LocationEventType, occurredAt: Date, accessToken: String) async throws {}
 
     func pushHomeSnapshot(_ snapshot: HomeSnapshotDTO, accessToken: String) async throws {}
+
+    private(set) var lastPushedCalendarEvents: [CalendarEventWindow] = []
+    var pushCalendarError: MoodSyncAPIError?
+
+    func pushCalendarSnapshot(events: [CalendarEventWindow], accessToken: String) async throws {
+        if let pushCalendarError { throw pushCalendarError }
+        lastPushedCalendarEvents = events
+    }
 }
 
 final class SyncCoordinatorTests: XCTestCase {
