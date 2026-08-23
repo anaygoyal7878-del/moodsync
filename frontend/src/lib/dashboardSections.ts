@@ -19,6 +19,7 @@ import {
   Moon,
   HeartPulse,
   Repeat,
+  Brain,
   type LucideIcon,
 } from "lucide-react";
 
@@ -43,6 +44,7 @@ export const NAV_GROUPS = [
       { href: "/dashboard/focus", label: "Focus", icon: Timer },
       { href: "/dashboard/sleep", label: "Sleep", icon: Moon },
       { href: "/dashboard/recovery", label: "Recovery", icon: HeartPulse },
+      { href: "/dashboard/mood", label: "Mood", icon: Brain },
     ],
   },
   {

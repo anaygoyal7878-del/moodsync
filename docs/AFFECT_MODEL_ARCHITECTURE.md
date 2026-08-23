@@ -190,10 +190,23 @@ available, so the migration and repository are unexecuted.
 
 ## Known gaps
 
-- **No UI yet.** The API exists (`POST/GET/DELETE /affect/check-ins`,
-  `GET /affect/model`) but nothing in the frontend calls it, so in
-  practice no labels can be collected through the app today. This is the
-  next piece.
+- **UI built.** `/dashboard/mood` — a tappable 5x5 circumplex grid
+  (`MoodCheckInGrid.tsx`) rather than a slider or a mood-word picker,
+  because the grid *is* the storage format: `valence`/`arousal` are each
+  an integer -2..+2, so a slider would invent precision the label
+  doesn't have, and a word picker would need a mapping table this
+  project has avoided everywhere else. Quadrant colouring follows the
+  standard circumplex "mood meter" convention, not a MoodSync
+  invention. Below it: `AffectInsights.tsx` renders `learningStatus`'s
+  four distinct situations, and the top association per usable axis via
+  the same `EffectBar` diverging-bar primitive `EnvironmentAnalytics`
+  uses — reused rather than reinvented. A free-text note is stored for
+  the person's own reading only; the schema comment and the placeholder
+  copy both say plainly it is never fed to the model.
+  **Still not rendered logged-in** — no Postgres in this environment;
+  confirmed only that the route compiles, serves, and sits behind the
+  auth guard (307 to `/login`), same limitation as every other screen
+  built this way this project.
 - **The learned model doesn't feed `stateEngine.ts` yet.** It is
   computed and explained but does not yet override the hand-written
   rules — `userDeclaredState` is still `null` at its call site. Wiring
