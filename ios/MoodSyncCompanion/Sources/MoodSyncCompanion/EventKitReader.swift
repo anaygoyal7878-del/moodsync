@@ -2,6 +2,12 @@ import Foundation
 
 public enum EventKitReaderError: Error, Sendable {
     case authorizationFailed(String)
+    /// EventKit has no calendar to save into — genuinely rare (it means
+    /// the user has zero writable calendars configured at all), but
+    /// distinct from an authorization failure, so the two aren't
+    /// conflated in what gets reported back to the person.
+    case noWritableCalendar
+    case saveFailed(String)
 }
 
 /// One event window, no title/location/attendees — see
@@ -10,6 +16,12 @@ public enum EventKitReaderError: Error, Sendable {
 /// needed more than "how many hours are booked" and "is a non-all-day
 /// event happening right now", and a calendar title is often the most
 /// sensitive text a person has.
+///
+/// This is a *read* shape only. A created event (see `CalendarReading.
+/// createEvent`) carries a real title, because that content is
+/// something the person explicitly asked MoodSync to write, typed or
+/// spoken by them through the messaging agent — categorically different
+/// from the passive calendar data this struct represents.
 public struct CalendarEventWindow: Sendable, Codable, Equatable {
     public let startsAt: Date
     public let endsAt: Date
@@ -37,6 +49,12 @@ public protocol CalendarReading: Sendable {
     /// filters to whatever window it actually needs server-side; this
     /// reader's job is just to not have already thrown away the data.
     func readUpcomingEvents(now: Date) -> [CalendarEventWindow]
+    /// Creates a brand-new event on the device's default writable
+    /// calendar. Never moves or edits an existing one — MoodSync's
+    /// server side has no stored identifier for any existing event
+    /// (see `CalendarEventWindow`'s comment on why titles aren't kept),
+    /// so there is nothing to reference. Only ever a fresh create.
+    func createEvent(title: String, startsAt: Date, endsAt: Date) throws
 }
 
 #if canImport(EventKit)
@@ -49,8 +67,13 @@ public final class EventKitReader: CalendarReading, @unchecked Sendable {
 
     public func requestAuthorization() async throws -> Bool {
         do {
-            // Read-only, same privacy stance as every provider in this
-            // product — MoodSync never writes to a user's calendar.
+            // Full access (read AND write) is requested up front rather
+            // than staged, because the messaging agent's
+            // create_calendar_event tool can propose a write at any
+            // point in a conversation — staging it behind a second,
+            // later authorization prompt would mean the confirmation
+            // the person already gave in the text thread stalls on a
+            // permission dialog they weren't expecting.
             if #available(iOS 17.0, *) {
                 return try await store.requestFullAccessToEvents()
             } else {
@@ -76,6 +99,25 @@ public final class EventKitReader: CalendarReading, @unchecked Sendable {
         let predicate = store.predicateForEvents(withStart: startOfToday, end: endOfTomorrow, calendars: nil)
         return store.events(matching: predicate).map {
             CalendarEventWindow(startsAt: $0.startDate, endsAt: $0.endDate, isAllDay: $0.isAllDay)
+        }
+    }
+
+    public func createEvent(title: String, startsAt: Date, endsAt: Date) throws {
+        guard let calendar = store.defaultCalendarForNewEvents else {
+            throw EventKitReaderError.noWritableCalendar
+        }
+        let event = EKEvent(eventStore: store)
+        event.title = title
+        event.startDate = startsAt
+        event.endDate = endsAt
+        event.calendar = calendar
+        do {
+            // `.thisEvent`, not `.futureEvents` — this is always a
+            // brand-new, non-recurring event, so there is no series to
+            // reason about.
+            try store.save(event, span: .thisEvent)
+        } catch {
+            throw EventKitReaderError.saveFailed(error.localizedDescription)
         }
     }
 }

@@ -56,6 +56,7 @@ model User {
   appleMusicConnection AppleMusicConnection?
   calendarConnection   CalendarConnection?
   appleCalendarSnapshot AppleCalendarSnapshot?
+  pendingCalendarWrites  PendingCalendarWrite[]
   preferences          UserPreferences?
   homeSnapshot         HomeSnapshot?
 
@@ -268,6 +269,39 @@ model AppleCalendarSnapshot {
   pushedAt   DateTime @default(now())
 
   @@map("apple_calendar_snapshots")
+}
+
+/// A calendar write MoodSync wants EventKit to perform — mirrors
+/// `PendingDeviceCommand`'s "device pushes read, backend queues write"
+/// shape exactly, for the same reason: EventKit has no server-side
+/// write path either. Scoped to creating a new event only, not moving
+/// an existing one — `AppleCalendarSnapshot` deliberately stores no
+/// event identifiers or titles (see that model's comment), so there is
+/// nothing server-side to reference when asking to move "the 3pm
+/// thing." A title exists on THIS model because it's content the user
+/// is explicitly asking to be created, typed or spoken by them through
+/// the messaging agent — categorically different from the passive
+/// calendar data `AppleCalendarSnapshot` intentionally avoids storing.
+enum PendingCalendarWriteStatus {
+  PENDING
+  EXECUTED
+  FAILED
+}
+
+model PendingCalendarWrite {
+  id            String                     @id @default(uuid())
+  userId        String
+  user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  startsAt      DateTime
+  endsAt        DateTime
+  status        PendingCalendarWriteStatus @default(PENDING)
+  failureReason String?
+  createdAt     DateTime                   @default(now())
+  completedAt   DateTime?
+
+  @@index([userId, status, createdAt])
+  @@map("pending_calendar_writes")
 }
 
 model ConnectedDevice {

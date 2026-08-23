@@ -57,6 +57,9 @@ private final class FakeAPIClient: MoodSyncAPIClientProtocol, @unchecked Sendabl
         if let pushCalendarError { throw pushCalendarError }
         lastPushedCalendarEvents = events
     }
+
+    func fetchPendingCalendarWrites(accessToken: String) async throws -> [PendingCalendarWrite] { [] }
+    func completePendingCalendarWrite(id: String, status: PendingCalendarWriteOutcome, accessToken: String) async throws {}
 }
 
 final class SyncCoordinatorTests: XCTestCase {

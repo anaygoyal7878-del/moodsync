@@ -103,13 +103,18 @@ handler. Tools are `kind: 'read'`, `kind: 'action'`, or `kind: 'write'`:
 - **Read tools** (`get_wearable_snapshot`, `list_smart_home_devices`,
   `get_nutrition_guidance`) run immediately and hand data back to the
   model — no side effects, no confirmation needed.
-- **Action tools** (`control_hue_light`, `activate_hue_scene`) are
-  structurally incapable of touching real state in the same turn they're
-  called. The handler resolves the target by name (so a nonexistent
-  light never gets a confirmation prompt) and returns a `confirmPrompt`
-  string — nothing else. The actual Hue API call
-  (`executeConfirmedAction` in the same file) only runs after a second,
-  separate inbound message confirms it.
+- **Action tools** (`control_hue_light`, `activate_hue_scene`,
+  `create_calendar_event`) are structurally incapable of touching real
+  state in the same turn they're called. The handler resolves/validates
+  (so a nonexistent light, or an event further out than the calendar
+  write's own 90-day/24-hour bounds, never gets a confirmation prompt)
+  and returns a `confirmPrompt` string — nothing else. What
+  `executeConfirmedAction` does after a second, separate inbound message
+  confirms it differs by tool: Hue calls the API directly;
+  `create_calendar_event` queues a `PendingCalendarWrite` instead, since
+  EventKit — like HomeKit — has no server-side write path at all (see
+  docs/APPLE_CALENDAR_ARCHITECTURE.md). "Confirmed" means "queued for
+  the device," not "done," and the confirmation prompt says so.
 - **Write tools** (`log_caffeine_intake`, `remember_fact`) sit between
   the two: they do cause a real write, immediately, with no
   confirmation — but the blast radius is a database row the user can

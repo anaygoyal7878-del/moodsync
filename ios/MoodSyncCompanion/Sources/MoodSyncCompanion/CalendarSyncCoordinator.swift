@@ -37,6 +37,12 @@ public final class CalendarSyncCoordinator {
             switch error {
             case .authorizationFailed(let message):
                 return .failure("Couldn't get permission to read your calendar: \(message)")
+            // This coordinator only ever calls requestAuthorization and
+            // readUpcomingEvents, neither of which can throw a write
+            // error — these cases exist only because Swift requires the
+            // switch to be exhaustive over the whole shared error type.
+            case .noWritableCalendar, .saveFailed:
+                return .failure(error.localizedDescription)
             }
         } catch {
             return .failure(error.localizedDescription)

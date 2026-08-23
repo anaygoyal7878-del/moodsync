@@ -2,7 +2,10 @@ import {
   biometricReadingRepository,
   caffeineLogRepository,
   smartHomeConnectionRepository,
+  pendingCalendarWriteRepository,
+  appleCalendarSnapshotRepository,
   messagingMemoryRepository,
+  userTimezoneRepository,
 } from '@moodsync/database';
 import { computeWellnessScores, type WellnessScores } from './wellness.js';
 import { computeLiveEnergyMeter } from './energyMeter.js';
@@ -193,6 +196,66 @@ const activateHueScene: MessagingTool = {
   },
 };
 
+/** Bounds mirrored from `pendingCalendarWriteRepository.create` so a
+ * bad request is rejected here, in the confirmation prompt, rather than
+ * only failing later when the device actually tries to queue it —
+ * catching it earlier means the model gets a chance to ask a better
+ * question instead of proposing something confirmed then thrown away. */
+const MAX_EVENT_DAYS_OUT = 90;
+const MAX_EVENT_DURATION_HOURS = 24;
+
+const createCalendarEvent: MessagingTool = {
+  kind: 'action',
+  declaration: {
+    name: 'create_calendar_event',
+    description:
+      "Creates a new event on the user's Apple Calendar. This does NOT execute immediately — it asks the user to confirm the exact title and time first, and even once confirmed it only runs the next time their phone opens the MoodSync app (EventKit has no server-side write path — see docs/APPLE_CALENDAR_ARCHITECTURE.md). Never call this to move or edit an existing event — MoodSync doesn't store enough about existing events to identify one; only ever propose a brand-new event.",
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: "The event's title, as the user described it" },
+        startsAt: { type: 'string', description: 'ISO 8601 start time' },
+        endsAt: { type: 'string', description: 'ISO 8601 end time, after startsAt' },
+      },
+      required: ['title', 'startsAt', 'endsAt'],
+    },
+  },
+  handler: async (userId, args) => {
+    const title = String(args.title ?? '').trim();
+    const startsAt = new Date(String(args.startsAt ?? ''));
+    const endsAt = new Date(String(args.endsAt ?? ''));
+    if (!title) throw new Error('create_calendar_event requires a title');
+    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+      throw new Error('create_calendar_event requires valid startsAt/endsAt timestamps');
+    }
+    if (endsAt <= startsAt) throw new Error('endsAt must be after startsAt');
+    const daysOut = (startsAt.getTime() - Date.now()) / (24 * 60 * 60_000);
+    if (daysOut > MAX_EVENT_DAYS_OUT || daysOut < -1) {
+      throw new Error(`Can only schedule up to ${MAX_EVENT_DAYS_OUT} days out`);
+    }
+    if ((endsAt.getTime() - startsAt.getTime()) / (60 * 60_000) > MAX_EVENT_DURATION_HOURS) {
+      throw new Error(`Events can't run longer than ${MAX_EVENT_DURATION_HOURS} hours`);
+    }
+
+    // Shown in the user's own timezone — a confirmation prompt that
+    // silently means UTC would let someone confirm a time that isn't
+    // the one they actually asked for.
+    const timeZone = await userTimezoneRepository.getTimezone(userId).catch(() => 'UTC');
+    const timeLabel = new Intl.DateTimeFormat('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone,
+    }).format(startsAt);
+    return {
+      data: { title, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() },
+      confirmPrompt: `Add "${title}" to your calendar for ${timeLabel}? It'll be created next time your phone opens MoodSync. Reply YES to confirm.`,
+    };
+  },
+};
+
 const getNutritionGuidance: MessagingTool = {
   kind: 'read',
   declaration: {
@@ -321,6 +384,7 @@ export const MESSAGING_TOOLS: Record<string, MessagingTool> = {
   list_smart_home_devices: listSmartHomeDevices,
   control_hue_light: controlHueLight,
   activate_hue_scene: activateHueScene,
+  create_calendar_event: createCalendarEvent,
   get_nutrition_guidance: getNutritionGuidance,
   log_caffeine_intake: logCaffeineIntake,
   remember_fact: rememberFact,
@@ -336,10 +400,24 @@ export const MESSAGING_ACTION_TOOL_NAMES = new Set(
  * See `selectMessagingTools`. */
 export interface MessagingCapabilities {
   hueConnected: boolean;
+  /** Whether the iOS companion has ever pushed an Apple Calendar
+   * snapshot — not the same as "recently" or "authorized to write":
+   * this is the cheapest honest signal that the companion app and
+   * EventKit access exist at all. A stricter freshness check belongs
+   * to `calendarSignal.ts`'s reads, not to whether the *tool* is worth
+   * declaring — a slightly stale snapshot still means someone can
+   * plausibly open their phone and pick up a queued write. */
+  appleCalendarConnected: boolean;
 }
 
 /** Tools that only make sense against a live Hue bridge. */
 const HUE_DEPENDENT_TOOLS = new Set(['list_smart_home_devices', 'control_hue_light', 'activate_hue_scene']);
+
+/** Proposing a calendar write when nobody has ever connected Apple
+ * Calendar would queue a write that never gets picked up — an honest
+ * "you haven't connected your calendar yet" beats a confirmation
+ * prompt for something that silently sits forever. */
+const APPLE_CALENDAR_DEPENDENT_TOOLS = new Set(['create_calendar_event']);
 
 /**
  * Builds the tool surface for one conversation.
@@ -370,6 +448,7 @@ export function selectMessagingTools(capabilities: MessagingCapabilities): Recor
   const selected: Record<string, MessagingTool> = {};
   for (const [name, tool] of Object.entries(MESSAGING_TOOLS)) {
     if (HUE_DEPENDENT_TOOLS.has(name) && !capabilities.hueConnected) continue;
+    if (APPLE_CALENDAR_DEPENDENT_TOOLS.has(name) && !capabilities.appleCalendarConnected) continue;
     selected[name] = tool;
   }
   return selected;
@@ -378,15 +457,18 @@ export function selectMessagingTools(capabilities: MessagingCapabilities): Recor
 /** Resolves what this account can do right now. Kept next to the tools
  * it gates so the two can't drift apart. */
 export async function resolveMessagingCapabilities(userId: string): Promise<MessagingCapabilities> {
-  try {
-    const hue = await smartHomeConnectionRepository.findByUserAndProvider(userId, 'HUE');
-    return { hueConnected: hue?.status === 'ACTIVE' };
-  } catch {
-    // A lookup failure must not silently grant capabilities — the safe
-    // direction is the smaller tool surface, which degrades to "I
-    // can't control anything right now", not a broken promise.
-    return { hueConnected: false };
-  }
+  const [hueResult, calendarResult] = await Promise.allSettled([
+    smartHomeConnectionRepository.findByUserAndProvider(userId, 'HUE'),
+    appleCalendarSnapshotRepository.getForUser(userId),
+  ]);
+  // Each capability fails closed independently — a Hue lookup failure
+  // must not also hide the calendar capability, and vice versa. The
+  // safe direction for either is the smaller tool surface, degrading to
+  // "I can't do that right now" rather than a broken promise.
+  return {
+    hueConnected: hueResult.status === 'fulfilled' && hueResult.value?.status === 'ACTIVE',
+    appleCalendarConnected: calendarResult.status === 'fulfilled' && calendarResult.value !== null,
+  };
 }
 
 /** Actually performs a previously-confirmed action tool. Re-resolves
@@ -409,6 +491,16 @@ export async function executeConfirmedAction(userId: string, toolName: string, a
       const sceneName = String(args.sceneName ?? '');
       await activateHueSceneByName(userId, sceneName);
       return `Done — "${sceneName}" activated.`;
+    }
+    case 'create_calendar_event': {
+      // Queues, never executes directly — EventKit has no server-side
+      // write path (see docs/APPLE_CALENDAR_ARCHITECTURE.md), so
+      // "confirmed" means "queued for the device," not "done."
+      const title = String(args.title ?? '');
+      const startsAt = new Date(String(args.startsAt ?? ''));
+      const endsAt = new Date(String(args.endsAt ?? ''));
+      await pendingCalendarWriteRepository.create({ userId, title, startsAt, endsAt });
+      return `Got it — "${title}" will be added to your calendar next time your phone opens MoodSync.`;
     }
     default:
       throw new Error(`"${toolName}" is not a confirmable action tool`);

@@ -51,6 +51,12 @@ public protocol MoodSyncAPIClientProtocol: Sendable {
     func ingest(readings: [NormalizedReading], deviceName: String?, accessToken: String) async throws -> Int
     func fetchPendingDeviceCommands(accessToken: String) async throws -> [PendingDeviceCommand]
     func completePendingDeviceCommand(id: String, status: PendingDeviceCommandOutcome, accessToken: String) async throws
+    /// Polls `GET /api/calendar/apple/pending-writes` — the EventKit
+    /// counterpart to `fetchPendingDeviceCommands`, since EventKit has
+    /// no server-side write path either. See
+    /// docs/APPLE_CALENDAR_ARCHITECTURE.md.
+    func fetchPendingCalendarWrites(accessToken: String) async throws -> [PendingCalendarWrite]
+    func completePendingCalendarWrite(id: String, status: PendingCalendarWriteOutcome, accessToken: String) async throws
     /// Pushed by `LocationController` on a `CLCircularRegion` enter/exit
     /// callback — see docs/GEOFENCING_ARCHITECTURE.md. Matches
     /// `backend/src/api/routes/locationEvents.ts`'s
@@ -77,6 +83,11 @@ public enum LocationEventType: String, Sendable, Codable {
 }
 
 public enum PendingDeviceCommandOutcome: Sendable, Equatable {
+    case executed
+    case failed(reason: String)
+}
+
+public enum PendingCalendarWriteOutcome: Sendable, Equatable {
     case executed
     case failed(reason: String)
 }
@@ -185,6 +196,33 @@ public actor MoodSyncAPIClient: MoodSyncAPIClientProtocol {
         let _: EmptyResponse? = try await postAllowingEmptyResponse(
             path: "/api/calendar/apple/snapshot",
             body: Request(events: events),
+            accessToken: accessToken
+        )
+    }
+
+    public func fetchPendingCalendarWrites(accessToken: String) async throws -> [PendingCalendarWrite] {
+        struct Response: Decodable { let writes: [PendingCalendarWrite] }
+        let response: Response = try await get(path: "/api/calendar/apple/pending-writes", accessToken: accessToken)
+        return response.writes
+    }
+
+    public func completePendingCalendarWrite(id: String, status: PendingCalendarWriteOutcome, accessToken: String) async throws {
+        struct CompleteRequest: Encodable {
+            let status: String
+            let failureReason: String?
+        }
+        let body: CompleteRequest
+        switch status {
+        case .executed:
+            body = CompleteRequest(status: "EXECUTED", failureReason: nil)
+        case .failed(let reason):
+            body = CompleteRequest(status: "FAILED", failureReason: reason)
+        }
+
+        struct EmptyResponse: Decodable {}
+        let _: EmptyResponse? = try await postAllowingEmptyResponse(
+            path: "/api/calendar/apple/pending-writes/\(id)/complete",
+            body: body,
             accessToken: accessToken
         )
     }

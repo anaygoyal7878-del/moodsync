@@ -65,6 +65,9 @@ private final class FakeDeviceCommandAPIClient: MoodSyncAPIClientProtocol, @unch
     func pushHomeSnapshot(_ snapshot: HomeSnapshotDTO, accessToken: String) async throws {}
 
     func pushCalendarSnapshot(events: [CalendarEventWindow], accessToken: String) async throws {}
+
+    func fetchPendingCalendarWrites(accessToken: String) async throws -> [PendingCalendarWrite] { [] }
+    func completePendingCalendarWrite(id: String, status: PendingCalendarWriteOutcome, accessToken: String) async throws {}
 }
 
 private func makeCommand(id: String = "cmd-1", sceneName: String = "MoodSync Relax") -> PendingDeviceCommand {

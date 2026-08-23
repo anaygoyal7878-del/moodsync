@@ -55,6 +55,10 @@ export {
   appleCalendarSnapshotRepository,
   type CalendarEventWindow,
 } from './repositories/appleCalendarSnapshotRepository.js';
+export {
+  pendingCalendarWriteRepository,
+  type CreatePendingCalendarWriteInput,
+} from './repositories/pendingCalendarWriteRepository.js';
 export { messagingPendingActionRepository } from './repositories/messagingPendingActionRepository.js';
 export { messagingMemoryRepository, normalizeFact, MAX_FACTS_PER_USER } from './repositories/messagingMemoryRepository.js';
 export {

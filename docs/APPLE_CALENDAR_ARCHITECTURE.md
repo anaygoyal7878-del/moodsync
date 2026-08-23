@@ -92,30 +92,116 @@ run alongside.
 
 ## Verification
 
-- **Backend + ai + database**: unit-tested. 582 `ai` package tests
-  (16 in `calendarSignal.test.ts` alone, covering precedence, staleness,
-  malformed-timestamp resilience, and the shared pure aggregation).
-  Full monorepo build, lint, and test suite green.
-- **iOS**: `swift build` and `swift test` both pass (36 tests, +5 new —
-  `CalendarSyncCoordinatorTests` covers the push, the declined-vs-failed
-  distinction, and that a genuinely free day still reports success with
-  zero events rather than being confused for "not authorized").
-- **Not verified**: no Postgres, so `POST /api/calendar/apple/snapshot`
-  has never actually been called by a real device; no Xcode/simulator
-  run, so `EventKitReader`'s real `EKEventStore` code path (the part
-  behind `#if canImport(EventKit)`) has never executed against a real
-  calendar — only the protocol-seamed logic around it (`CalendarSyncCoordinator`)
-  is exercised, against a fake.
+- **Backend + ai + database**: unit-tested. 614 `ai` package tests
+  total, including 16 in `calendarSignal.test.ts` (precedence,
+  staleness, malformed-timestamp resilience, the shared pure
+  aggregation) and 10 more in `messagingTools.test.ts` for
+  `create_calendar_event` and its capability gating. Full monorepo
+  build, lint, and test suite green.
+- **iOS**: `swift build` and `swift test` both pass (42 tests, +6 from
+  the write side — `CalendarWriteCoordinatorTests` covers a successful
+  create, a save failure surfaced with its real reason, one failure not
+  stopping the rest of a batch, and a fetch failure).
+  `CalendarSyncCoordinatorTests` (the read side) covers the push, the
+  declined-vs-failed distinction, and that a genuinely free day still
+  reports success with zero events rather than being confused for "not
+  authorized".
+- **Not verified**: no Postgres, so none of the new routes —
+  `POST /api/calendar/apple/snapshot`,
+  `POST/GET /api/calendar/apple/pending-writes`,
+  `POST .../pending-writes/:id/complete` — have ever actually been
+  called by a real device; no Xcode/simulator run, so `EventKitReader`'s
+  real `EKEventStore` code path (the part behind
+  `#if canImport(EventKit)`, both read and write) has never executed
+  against a real calendar — only the protocol-seamed logic around it
+  (`CalendarSyncCoordinator`, `CalendarWriteCoordinator`) is exercised,
+  against fakes.
+
+## Writing back — creating an event, never moving one
+
+Requested to bring over Poke's "reschedule a meeting from the text
+thread" behavior. Built the create half only, and scoped that
+narrowing deliberately rather than silently.
+
+**Why move/reschedule isn't built:** `AppleCalendarSnapshot` stores no
+event identifiers or titles at all (see above — a real privacy
+decision, not an oversight). Without something server-side to point at,
+"move the 3pm thing" has no referent MoodSync can act on. Building a
+fake version of that (guessing which event by time, say) would be worse
+than not having the feature — a wrong guess moves the wrong meeting.
+
+**Creating a new event doesn't have that problem** — the content is
+supplied fresh, by the person, in the conversation. Same "device
+pushes/queues, backend caches" shape as reading, in reverse:
+
+```
+create_calendar_event (messaging tool, kind: 'action')
+      │ confirm-then-queue, same shape as control_hue_light —
+      │ see docs/MESSAGING_AGENTIC_ARCHITECTURE.md
+      ▼
+POST /api/calendar/apple/pending-writes         [validated + bounded again
+      │                                           server-side — a text
+      │                                           confirmation is not a
+      │                                           trust boundary]
+      ▼
+PendingCalendarWrite (queued, PENDING)
+      │
+      ▼
+GET /api/calendar/apple/pending-writes           [companion app polls]
+      │
+      ▼
+CalendarWriteCoordinator.run()                   [EventKitReader.createEvent,
+      │                                            testable against a fake]
+      ▼
+POST .../pending-writes/:id/complete             [EXECUTED or FAILED,
+                                                    with a reason]
+```
+
+Bounded independently in two places — the messaging tool's handler
+*and* `pendingCalendarWriteRepository.create` — because a client-side
+confirmation is not a trust boundary: at most 90 days out, at most a
+24-hour duration. Both numbers are judgment calls, not derived, same as
+every other bound like this in the codebase.
+
+The confirmation prompt is honest about the delay: *"It'll be created
+next time your phone opens MoodSync"* — never implying it happens the
+moment someone replies YES, since it structurally can't (EventKit has
+no server-side write path, so there is no "the moment" until a device
+polls).
+
+**Capability-gated, same mechanism as Hue.** `create_calendar_event` is
+only declared to the model when `resolveMessagingCapabilities` finds an
+`AppleCalendarSnapshot` has ever been pushed — proposing a calendar
+write to someone who's never connected a companion app would queue
+something that sits forever, unpicked-up. Each capability now fails
+closed *independently*: a Hue lookup error no longer hides a working
+calendar capability, and vice versa (`Promise.allSettled`, not a single
+`Promise.all` that would let one rejection erase both).
+
+Full access (read + write) is requested from EventKit up front, not
+staged behind a second later prompt — because the messaging agent's
+proposal can arrive at any point in a conversation, and stalling a
+just-given text confirmation on a fresh permission dialog would be a
+worse experience than asking once, early.
 
 ## Known gaps
 
 - **Not wired into the app's UI or lifecycle.** `EventKitReader`,
-  `MoodSyncAPIClient.pushCalendarSnapshot`, and `CalendarSyncCoordinator`
-  all exist and are tested, but nothing in `MoodSyncCompanionView.swift`
-  or `OnboardingView.swift` calls them yet — the same call-site pattern
-  `HomeKitController.fetchHomeSnapshot()` uses there is the model to
-  follow. Deliberately left undone this round rather than editing those
-  large, unreviewed UI files blind.
+  `MoodSyncAPIClient`'s calendar methods, `CalendarSyncCoordinator`, and
+  `CalendarWriteCoordinator` all exist and are tested, but nothing in
+  `MoodSyncCompanionView.swift` or `OnboardingView.swift` calls any of
+  them yet — the same call-site pattern `HomeKitController.fetchHomeSnapshot()`
+  uses there is the model to follow. Deliberately left undone this round
+  rather than editing those large, unreviewed UI files blind. This is
+  now the single biggest gap in the whole calendar feature: read, write,
+  and the messaging tool are all real and tested, but a real device has
+  no path to actually run either coordinator.
+- **Move/reschedule is not built, on purpose** — see "Writing back"
+  above for why (no stored identifier for an existing event to
+  reference). If this becomes a real need, the honest path is storing
+  *more* per-event state than the privacy-minimizing design here
+  currently allows, which is a real tradeoff to make deliberately, not
+  a small addition.
 - **No connect/disconnect surface in the web app.** Unlike Google
   Calendar (an OAuth connection card) or Apple Health (a companion-app
   pairing flow already has one), there's no dashboard UI showing

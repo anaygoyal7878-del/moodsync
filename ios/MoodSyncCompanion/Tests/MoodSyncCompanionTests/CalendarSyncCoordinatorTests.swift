@@ -12,6 +12,14 @@ private final class FakeCalendarReader: CalendarReading, @unchecked Sendable {
     }
 
     func readUpcomingEvents(now: Date) -> [CalendarEventWindow] { events }
+
+    var createEventError: EventKitReaderError?
+    private(set) var createdEvents: [(title: String, startsAt: Date, endsAt: Date)] = []
+
+    func createEvent(title: String, startsAt: Date, endsAt: Date) throws {
+        if let createEventError { throw createEventError }
+        createdEvents.append((title, startsAt, endsAt))
+    }
 }
 
 private final class FakeAPIClient: MoodSyncAPIClientProtocol, @unchecked Sendable {
@@ -24,6 +32,9 @@ private final class FakeAPIClient: MoodSyncAPIClientProtocol, @unchecked Sendabl
     func completePendingDeviceCommand(id: String, status: PendingDeviceCommandOutcome, accessToken: String) async throws {}
     func postLocationEvent(type: LocationEventType, occurredAt: Date, accessToken: String) async throws {}
     func pushHomeSnapshot(_ snapshot: HomeSnapshotDTO, accessToken: String) async throws {}
+
+    func fetchPendingCalendarWrites(accessToken: String) async throws -> [PendingCalendarWrite] { [] }
+    func completePendingCalendarWrite(id: String, status: PendingCalendarWriteOutcome, accessToken: String) async throws {}
 
     var pushError: MoodSyncAPIError?
     private(set) var lastPushedEvents: [CalendarEventWindow] = []

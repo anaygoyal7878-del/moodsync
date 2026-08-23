@@ -11,6 +11,9 @@ const {
   listRecentForUserMock,
   createCaffeineLogMock,
   addMemoryFactMock,
+  createPendingCalendarWriteMock,
+  getAppleCalendarSnapshotMock,
+  getTimezoneMock,
 } = vi.hoisted(() => ({
   listLightsMock: vi.fn(),
   listScenesMock: vi.fn(),
@@ -22,6 +25,14 @@ const {
   listRecentForUserMock: vi.fn(async () => []),
   createCaffeineLogMock: vi.fn(),
   addMemoryFactMock: vi.fn(),
+  createPendingCalendarWriteMock: vi.fn(),
+  // Explicitly typed: otherwise the literal `null` return narrows the
+  // mock's type to `null`-only, and a test resolving a real snapshot
+  // stops compiling.
+  getAppleCalendarSnapshotMock: vi.fn(
+    async (): Promise<{ events: unknown[]; pushedAt: Date } | null> => null,
+  ),
+  getTimezoneMock: vi.fn(async () => 'UTC'),
 }));
 
 vi.mock('@moodsync/database', () => ({
@@ -32,6 +43,9 @@ vi.mock('@moodsync/database', () => ({
   caffeineLogRepository: { listRecentForUser: listRecentForUserMock, create: createCaffeineLogMock },
   smartHomeConnectionRepository: { findByUserAndProvider: findByUserAndProviderMock },
   messagingMemoryRepository: { add: addMemoryFactMock },
+  pendingCalendarWriteRepository: { create: createPendingCalendarWriteMock },
+  appleCalendarSnapshotRepository: { getForUser: getAppleCalendarSnapshotMock },
+  userTimezoneRepository: { getTimezone: getTimezoneMock },
 }));
 
 vi.mock('./hueActionExecutor.js', () => ({
@@ -189,7 +203,7 @@ describe('get_nutrition_guidance', () => {
 
 describe('selectMessagingTools — the per-conversation tool surface', () => {
   it('withholds every Hue tool from an account with no bridge', () => {
-    const tools = selectMessagingTools({ hueConnected: false });
+    const tools = selectMessagingTools({ hueConnected: false, appleCalendarConnected: false });
 
     expect(tools.control_hue_light).toBeUndefined();
     expect(tools.activate_hue_scene).toBeUndefined();
@@ -197,7 +211,7 @@ describe('selectMessagingTools — the per-conversation tool surface', () => {
   });
 
   it('grants them once a bridge is actually connected', () => {
-    const tools = selectMessagingTools({ hueConnected: true });
+    const tools = selectMessagingTools({ hueConnected: true, appleCalendarConnected: false });
 
     expect(tools.control_hue_light).toBeDefined();
     expect(tools.activate_hue_scene).toBeDefined();
@@ -207,11 +221,11 @@ describe('selectMessagingTools — the per-conversation tool surface', () => {
   it('keeps the wearable snapshot regardless — "nothing has synced" is a real answer', () => {
     // Gating this would leave the model with no grounded way to find
     // out there is no data, which is exactly when it would guess.
-    expect(selectMessagingTools({ hueConnected: false }).get_wearable_snapshot).toBeDefined();
+    expect(selectMessagingTools({ hueConnected: false, appleCalendarConnected: false }).get_wearable_snapshot).toBeDefined();
   });
 
   it('keeps tools with no external dependency available to everyone', () => {
-    const tools = selectMessagingTools({ hueConnected: false });
+    const tools = selectMessagingTools({ hueConnected: false, appleCalendarConnected: false });
 
     expect(tools.log_caffeine_intake).toBeDefined();
     expect(tools.remember_fact).toBeDefined();
@@ -219,7 +233,7 @@ describe('selectMessagingTools — the per-conversation tool surface', () => {
   });
 
   it('never invents a tool that is not in the full registry', () => {
-    for (const name of Object.keys(selectMessagingTools({ hueConnected: true }))) {
+    for (const name of Object.keys(selectMessagingTools({ hueConnected: true, appleCalendarConnected: false }))) {
       expect(MESSAGING_TOOLS[name]).toBeDefined();
     }
   });
@@ -228,16 +242,104 @@ describe('selectMessagingTools — the per-conversation tool surface', () => {
 describe('resolveMessagingCapabilities', () => {
   it('grants Hue only on an ACTIVE connection', async () => {
     findByUserAndProviderMock.mockResolvedValueOnce({ status: 'ACTIVE' });
-    expect(await resolveMessagingCapabilities('u1')).toEqual({ hueConnected: true });
+    expect(await resolveMessagingCapabilities('u1')).toEqual({ hueConnected: true, appleCalendarConnected: false });
   });
 
   it('treats an expired connection as no capability', async () => {
     findByUserAndProviderMock.mockResolvedValueOnce({ status: 'EXPIRED' });
-    expect(await resolveMessagingCapabilities('u1')).toEqual({ hueConnected: false });
+    expect(await resolveMessagingCapabilities('u1')).toEqual({ hueConnected: false, appleCalendarConnected: false });
   });
 
   it('fails closed to the smaller surface rather than granting on a lookup error', async () => {
     findByUserAndProviderMock.mockRejectedValueOnce(new Error('db down'));
-    expect(await resolveMessagingCapabilities('u1')).toEqual({ hueConnected: false });
+    expect(await resolveMessagingCapabilities('u1')).toEqual({ hueConnected: false, appleCalendarConnected: false });
+  });
+
+  it('grants the calendar capability once a snapshot has ever been pushed', async () => {
+    findByUserAndProviderMock.mockResolvedValueOnce(null);
+    getAppleCalendarSnapshotMock.mockResolvedValueOnce({ events: [], pushedAt: new Date() });
+    expect(await resolveMessagingCapabilities('u1')).toEqual({ hueConnected: false, appleCalendarConnected: true });
+  });
+
+  it('fails the calendar capability closed independently of a Hue failure', async () => {
+    // Each capability must fail closed on its own — a Hue lookup error
+    // must not also hide a calendar capability that resolved fine.
+    findByUserAndProviderMock.mockRejectedValueOnce(new Error('hue db down'));
+    getAppleCalendarSnapshotMock.mockResolvedValueOnce({ events: [], pushedAt: new Date() });
+    expect(await resolveMessagingCapabilities('u1')).toEqual({ hueConnected: false, appleCalendarConnected: true });
+  });
+});
+
+describe('selectMessagingTools — Apple Calendar gating', () => {
+  it('withholds create_calendar_event with no snapshot ever pushed', () => {
+    const tools = selectMessagingTools({ hueConnected: false, appleCalendarConnected: false });
+    expect(tools.create_calendar_event).toBeUndefined();
+  });
+
+  it('grants it once a snapshot exists', () => {
+    const tools = selectMessagingTools({ hueConnected: false, appleCalendarConnected: true });
+    expect(tools.create_calendar_event).toBeDefined();
+  });
+});
+
+describe('create_calendar_event — action tool', () => {
+  it('never writes directly — only validates and returns a confirmation prompt', async () => {
+    const result = await MESSAGING_TOOLS.create_calendar_event!.handler('u1', {
+      title: 'Dentist',
+      startsAt: new Date(Date.now() + 24 * 60 * 60_000).toISOString(),
+      endsAt: new Date(Date.now() + 25 * 60 * 60_000).toISOString(),
+    });
+
+    expect(result.confirmPrompt).toContain('Dentist');
+    expect(result.confirmPrompt).toContain('next time your phone opens MoodSync');
+    expect(createPendingCalendarWriteMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an end time before the start time', async () => {
+    const start = new Date(Date.now() + 24 * 60 * 60_000).toISOString();
+    await expect(
+      MESSAGING_TOOLS.create_calendar_event!.handler('u1', { title: 'X', startsAt: start, endsAt: start }),
+    ).rejects.toThrow('endsAt must be after startsAt');
+  });
+
+  it('rejects a start time too far in the future', async () => {
+    const farOut = new Date(Date.now() + 200 * 24 * 60 * 60_000).toISOString();
+    await expect(
+      MESSAGING_TOOLS.create_calendar_event!.handler('u1', {
+        title: 'X',
+        startsAt: farOut,
+        endsAt: new Date(new Date(farOut).getTime() + 60 * 60_000).toISOString(),
+      }),
+    ).rejects.toThrow('90 days');
+  });
+
+  it('rejects an event longer than the duration cap', async () => {
+    const start = new Date(Date.now() + 24 * 60 * 60_000).toISOString();
+    const end = new Date(new Date(start).getTime() + 30 * 60 * 60_000).toISOString();
+    await expect(
+      MESSAGING_TOOLS.create_calendar_event!.handler('u1', { title: 'X', startsAt: start, endsAt: end }),
+    ).rejects.toThrow('24 hours');
+  });
+
+  it('rejects a missing title', async () => {
+    const start = new Date(Date.now() + 24 * 60 * 60_000).toISOString();
+    const end = new Date(new Date(start).getTime() + 60 * 60_000).toISOString();
+    await expect(
+      MESSAGING_TOOLS.create_calendar_event!.handler('u1', { title: '', startsAt: start, endsAt: end }),
+    ).rejects.toThrow('requires a title');
+  });
+});
+
+describe('executeConfirmedAction — create_calendar_event', () => {
+  it('queues the write rather than executing anything itself', async () => {
+    const startsAt = new Date(Date.now() + 24 * 60 * 60_000).toISOString();
+    const endsAt = new Date(new Date(startsAt).getTime() + 60 * 60_000).toISOString();
+
+    const result = await executeConfirmedAction('u1', 'create_calendar_event', { title: 'Dentist', startsAt, endsAt });
+
+    expect(createPendingCalendarWriteMock).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'u1', title: 'Dentist' }),
+    );
+    expect(result).toContain('next time your phone opens MoodSync');
   });
 });

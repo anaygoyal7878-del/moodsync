@@ -37,11 +37,13 @@ export interface AgenticReply {
 
 const SYSTEM_PROMPT_SUFFIX = `
 
-You also have tools to look up this user's real wearable/biometric data (including readiness), list and control their connected smart home devices, log a caffeinated drink they report having, give general nutrition guidance, and remember a durable fact about them. Use a tool whenever the user's message calls for real data or a real action rather than answering from general knowledge alone — never guess a biometric number or invent a device name when a tool can get the real one.
+You also have tools to look up this user's real wearable/biometric data (including readiness), list and control their connected smart home devices, log a caffeinated drink they report having, create a calendar event, give general nutrition guidance, and remember a durable fact about them. Use a tool whenever the user's message calls for real data or a real action rather than answering from general knowledge alone — never guess a biometric number or invent a device name when a tool can get the real one.
 
-For control_hue_light and activate_hue_scene: calling the tool does NOT turn anything on or off yet — it only prepares a confirmation. After calling either tool, your turn is over; do not describe additional actions or ask a second question in the same turn.
+For control_hue_light, activate_hue_scene, and create_calendar_event: calling the tool does NOT act yet — it only prepares a confirmation. After calling one of these, your turn is over; do not describe additional actions or ask a second question in the same turn.
 
 Never call control_hue_light or activate_hue_scene with a light or scene name that didn't come from list_smart_home_devices in this conversation — call list_smart_home_devices first if you don't already have the real names.
+
+create_calendar_event only ever creates a brand-new event — never call it to move, edit, or cancel something that's already on the calendar, since you have no way to identify which existing event the person means. If someone asks to reschedule something, say plainly that you can't do that yet.
 
 log_caffeine_intake and remember_fact execute immediately — they don't need a confirmation, unlike the device-control tools above. Only call log_caffeine_intake when the person is reporting a drink they actually had, never for a hypothetical ("should I have a coffee?"). Call remember_fact only for something genuinely durable — a preference or recurring pattern worth recalling weeks from now — not for today's mood or schedule; most turns should call it zero times.
 
