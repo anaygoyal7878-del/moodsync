@@ -226,6 +226,12 @@ export {
   type CheckInRecord,
 } from './affectTraining.js';
 export {
+  transcribeVoiceMessage,
+  isSupportedAudioMimeType,
+  SUPPORTED_AUDIO_MIME_TYPES,
+  TranscriptionError,
+} from './voiceTranscription.js';
+export {
   nextNudgeKind,
   isRecurringNudgeDue,
   NUDGE_CONTENT,

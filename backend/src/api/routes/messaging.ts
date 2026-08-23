@@ -46,6 +46,14 @@ const settingsSchema = z.object({
  * provider means adding its field name here, not rewriting the
  * pipeline. See docs/MESSAGING_BOT.md.
  */
+const attachmentSchema = z.object({
+  guid: z.string().min(1),
+  // BlueBubbles' documented attachment field name; kept optional and
+  // loosely typed like every other field here for the same reason —
+  // not every bridge provider reports it identically.
+  mimeType: z.string().optional(),
+});
+
 const webhookSchema = z.object({
   channel: z.enum(CHANNELS).optional(),
   from: z.string().min(1).optional(),
@@ -54,6 +62,10 @@ const webhookSchema = z.object({
   text: z.string().max(4000).optional(),
   body: z.string().max(4000).optional(),
   message: z.string().max(4000).optional(),
+  // A voice message arrives with no text body and one audio attachment
+  // — see ai/src/voiceTranscription.ts and
+  // docs/MESSAGING_AGENTIC_ARCHITECTURE.md's voice-input section.
+  attachments: z.array(attachmentSchema).optional(),
 });
 
 export default async function messagingRoutes(app: FastifyInstance) {
@@ -195,12 +207,20 @@ export default async function messagingRoutes(app: FastifyInstance) {
 
     const from = parsed.data.from ?? parsed.data.sender ?? parsed.data.recipient;
     const body = parsed.data.text ?? parsed.data.body ?? parsed.data.message;
-    if (!from || !body) return reply.code(400).send({ error: 'Missing sender or message body' });
+    // First attachment reported with an audio/* MIME type — a voice
+    // message is the only attachment kind this pipeline understands at
+    // all today; anything else (an image, a video) has nothing to
+    // transcribe and is silently not treated as a voice message.
+    const audioAttachment = parsed.data.attachments?.find((a) => a.mimeType?.toLowerCase().startsWith('audio/'));
+    if (!from || (!body && !audioAttachment)) {
+      return reply.code(400).send({ error: 'Missing sender or message content' });
+    }
 
     const result = await messagingService.handleInbound({
       channel: parsed.data.channel ?? 'IMESSAGE',
       from,
-      body,
+      ...(body ? { body } : {}),
+      ...(audioAttachment ? { audioAttachment: { guid: audioAttachment.guid, mimeType: audioAttachment.mimeType ?? '' } } : {}),
     });
 
     // handleInbound already pushed this through the configured provider

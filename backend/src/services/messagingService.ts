@@ -8,13 +8,19 @@ import {
   sendAgenticMessage,
   executeConfirmedAction,
   AtlasNotConfiguredError,
+  transcribeVoiceMessage,
+  TranscriptionError,
   UNVERIFIED_REPLY,
   OPTED_OUT_REPLY,
   MESSAGING_STYLE_PROMPT,
   type AtlasChatMessage,
 } from '@moodsync/ai';
 import { env } from '../config/env.js';
-import { sendBlueBubblesMessage, MessagingProviderNotConfiguredError } from './messagingProviders/blueBubbles.js';
+import {
+  sendBlueBubblesMessage,
+  downloadBlueBubblesAttachment,
+  MessagingProviderNotConfiguredError,
+} from './messagingProviders/blueBubbles.js';
 
 type MessagingConnectionRecord = NonNullable<Awaited<ReturnType<typeof messagingRepository.findByHandle>>>;
 
@@ -53,7 +59,16 @@ export interface InboundMessage {
   channel: MessagingChannel;
   /** The sender's handle, as the provider reports it. */
   from: string;
-  body: string;
+  /** Absent for a voice-only message — see `audioAttachment`. */
+  body?: string;
+  /** A voice message's audio, downloaded and transcribed into `body`
+   * before anything else in this pipeline runs — see
+   * ai/src/voiceTranscription.ts for why transcription is a mandatory
+   * first step rather than sending audio into the agentic model
+   * directly. Only ever transcribed for a *known* connection — see
+   * `handleInbound`'s comment on why an unrecognized sender's voice
+   * message is never transcribed at all. */
+  audioAttachment?: { guid: string; mimeType: string };
 }
 
 export interface OutboundReply {
@@ -105,9 +120,58 @@ export const messagingService = {
    * a provider that supports a synchronous webhook response can also
    * use it directly.
    */
-  async handleInbound(message: InboundMessage): Promise<OutboundReply> {
+  async handleInbound(rawMessage: InboundMessage): Promise<OutboundReply> {
+    const connection = await messagingRepository.findByHandle(rawMessage.channel, rawMessage.from);
+
+    // Voice messages are never transcribed for an unrecognized number.
+    // Crisis detection over text is a free regex check MoodSync can
+    // afford to run even for strangers; transcription is a paid model
+    // call, and transcribing on demand for anyone who can reach the
+    // webhook would be an open-ended cost/abuse surface. This is a
+    // real, narrower safety guarantee than text messages get from an
+    // unknown sender — disclosed, not silent, see
+    // docs/MESSAGING_AGENTIC_ARCHITECTURE.md's voice-input section.
+    if (!connection && !rawMessage.body && rawMessage.audioAttachment) {
+      return { text: UNVERIFIED_REPLY, intent: 'unknown_handle' };
+    }
+
+    let body = rawMessage.body;
+    if (!body && rawMessage.audioAttachment && connection) {
+      try {
+        const downloaded = await downloadBlueBubblesAttachment(rawMessage.audioAttachment.guid);
+        body = await transcribeVoiceMessage(downloaded);
+      } catch (error) {
+        const text =
+          error instanceof TranscriptionError
+            ? "I couldn't understand that voice message — try sending it as text, or a different format."
+            : "I couldn't process that voice message just now.";
+        // Logged with a placeholder, not the (nonexistent) transcript —
+        // never fabricate what the audit trail says was said.
+        await messagingRepository.logMessage({
+          connectionId: connection.id,
+          userId: connection.userId,
+          direction: 'INBOUND',
+          body: '[voice message — could not transcribe]',
+          intent: 'voice_transcription_failed',
+        });
+        await messagingRepository.touch(connection.id, 'INBOUND');
+        const reply = { text, intent: 'voice_transcription_failed' };
+        await deliverAndRecord(connection, reply);
+        return reply;
+      }
+    }
+
+    // Reachable only for a malformed request the route's own validation
+    // should already have rejected (neither text nor a transcribable
+    // voice message) — handled here too rather than trusting that
+    // upstream check alone.
+    if (!body) return { text: null, intent: 'empty_message' };
+
+    // The transcript (or the original text) now enters the exact same
+    // pipeline a typed message always has — nothing below this line
+    // knows or needs to know a message ever wasn't text.
+    const message: InboundMessage & { body: string } = { ...rawMessage, body };
     const classification = classifyInbound(message.body);
-    const connection = await messagingRepository.findByHandle(message.channel, message.from);
 
     // 1 + 2. Unknown handle. Crisis still answers; nothing else leaks
     // whether this number is associated with an account. There's no
@@ -152,7 +216,7 @@ export const messagingService = {
  * logged — split out purely so `handleInbound` has one epilogue instead
  * of a send+log call duplicated at every return point. */
 async function resolveReply(
-  message: InboundMessage,
+  message: InboundMessage & { body: string },
   connection: MessagingConnectionRecord,
   classification: ReturnType<typeof classifyInbound>,
 ): Promise<OutboundReply> {

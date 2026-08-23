@@ -265,6 +265,63 @@ one mid-sentence, and returns the empty string when there's nothing
 credible to say, so a brand-new conversation costs nothing extra rather
 than carrying a paragraph explaining that MoodSync knows nothing yet.
 
+## Voice messages
+
+Poke accepts a voice memo as input; this closes the same gap.
+Deliberately **not** "send audio straight to the model" — that would
+have skipped `classifyInbound`'s crisis check, which runs on text and
+"must never be improvised by a model, ever" (see the routing table
+above). So a voice message becomes text *first*, through
+`ai/src/voiceTranscription.ts`, and only the resulting transcript ever
+touches the rest of the pipeline — crisis detection, verification,
+classification, the agentic loop, all of it, unmodified and unaware a
+message ever wasn't typed.
+
+```
+inbound webhook, attachments: [{ guid, mimeType: "audio/..." }]
+      │
+      ▼
+messagingService.handleInbound
+      │  connection known?  ──no──▶  UNVERIFIED_REPLY, never transcribed
+      │  yes
+      ▼
+downloadBlueBubblesAttachment(guid)     [GET /api/v1/attachment/:guid/download]
+      │
+      ▼
+transcribeVoiceMessage(bytes, mimeType)  [format allowlist checked first,
+      │                                   then Gemini audio understanding]
+      ▼
+body = transcript  ──▶  classifyInbound(body)  ──▶  everything else, unchanged
+```
+
+**Never transcribed for an unrecognized sender.** Crisis detection over
+text is a free regex check MoodSync can afford to run even for
+strangers (see the doc's "Crisis sits above verification" note above);
+transcription is a paid model call, and doing it on demand for anyone
+who can reach the webhook would be an open, uncapped cost/abuse
+surface. So an unknown number sending a voice message gets the same
+`UNVERIFIED_REPLY` a text would, with no transcription attempted —
+which means, stated plainly, **crisis language spoken (not typed) by an
+unrecognized number is not caught the way typed crisis language is.**
+A real, narrower coverage than the text path, disclosed rather than
+silent.
+
+**A format allowlist gates the transcription call.** Gemini's
+documented supported audio types for inline input
+(`SUPPORTED_AUDIO_MIME_TYPES` in `voiceTranscription.ts`) notably do
+**not** include CAF (Core Audio Format) — which is Apple's own native
+voice-memo format. Whether a BlueBubbles-cached inbound iMessage voice
+memo actually arrives as CAF, or something Gemini accepts, has never
+been confirmed against a live BlueBubbles server in this environment.
+An unsupported format fails with a specific, honest reply ("I couldn't
+understand that voice message... try a different format") rather than
+being silently mangled or guessed at.
+
+A transcription failure is logged with a literal placeholder —
+`[voice message — could not transcribe]` — never a fabricated
+transcript, so the audit trail never claims to know what wasn't
+understood.
+
 ## Persistent memory across conversations
 
 Before this round, `sendAgenticMessage` only ever saw the last
@@ -457,13 +514,22 @@ schema, for no capability or cost gain this workload needs.
   covers `log_caffeine_intake` and `remember_fact` — their write paths
   are unit-tested directly, but never through an actual model turn that
   chose to call them.
-- **Memory has no forget/edit surface yet.** A saved fact can go stale
-  (a preference that changed) with no way to correct it except waiting
-  for the cap to push it out — and reinforcement now makes a
-  *confidently wrong* stale fact harder to evict, not easier. No in-app
-  UI shows a user what MoodSync has remembered about them from texts.
+- ~~Memory has no forget/edit surface~~ — built:
+  `/dashboard/connections/messaging`'s memory panel lists every
+  remembered fact with a delete button. There's still no *edit*, only
+  forget-and-let-it-be-relearned, but "forget" alone closes the real
+  risk (a confidently-wrong fact being un-evictable).
 - **The settings screen has never been rendered with real data.** See
   Verification — auth guard confirmed, everything past it unobserved.
+- **Voice messages haven't been round-tripped against a real
+  BlueBubbles server either.** Whether inbound iMessage voice memos
+  arrive as CAF (unsupported — see "Voice messages" above) or something
+  Gemini accepts is unconfirmed; `downloadBlueBubblesAttachment`'s
+  response shape is best-effort against BlueBubbles' published docs,
+  same caveat `sendBlueBubblesMessage` already carried.
+- **An unrecognized number's spoken crisis language isn't caught.**
+  Deliberate, disclosed in "Voice messages" above — transcription is a
+  paid call and is only ever attempted for a known connection.
 - **Quiet hours and the daily cap are enforced only for
   `sendProactiveInsight`.** They are not consulted by anything else
   that might one day message a user unprompted; a second proactive

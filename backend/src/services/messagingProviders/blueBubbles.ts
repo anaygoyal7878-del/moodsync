@@ -53,3 +53,40 @@ export async function sendBlueBubblesMessage(handle: string, message: string): P
   const payload = (await response.json().catch(() => null)) as { data?: { guid?: string } } | null;
   return { externalId: payload?.data?.guid ?? null };
 }
+
+export interface DownloadedAttachment {
+  data: Buffer;
+  mimeType: string;
+}
+
+/**
+ * Downloads an inbound attachment (a voice message, for
+ * `create_calendar_event`'s sibling feature — see
+ * docs/MESSAGING_AGENTIC_ARCHITECTURE.md's voice-input section) via
+ * BlueBubbles' documented `GET /api/v1/attachment/<guid>/download`
+ * endpoint. Same no-live-server caveat as `sendBlueBubblesMessage`: the
+ * response shape here is best-effort against BlueBubbles' published
+ * docs, not round-tripped against a real instance.
+ *
+ * The `mimeType` returned is whatever the server reports via the
+ * response's `Content-Type` header — trusted, not guessed from the
+ * filename, since a wrong guess here would silently mislabel audio
+ * `transcribeVoiceMessage` then rejects or mishandles.
+ */
+export async function downloadBlueBubblesAttachment(guid: string): Promise<DownloadedAttachment> {
+  if (!env.MESSAGING_SEND_URL || !env.MESSAGING_API_KEY) {
+    throw new MessagingProviderNotConfiguredError('MESSAGING_SEND_URL and MESSAGING_API_KEY must both be set');
+  }
+
+  const url = new URL(`/api/v1/attachment/${guid}/download`, env.MESSAGING_SEND_URL);
+  url.searchParams.set('password', env.MESSAGING_API_KEY);
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error(`BlueBubbles attachment download failed: ${response.status}`);
+  }
+
+  const mimeType = response.headers.get('content-type')?.split(';')[0]?.trim() || 'application/octet-stream';
+  const data = Buffer.from(await response.arrayBuffer());
+  return { data, mimeType };
+}

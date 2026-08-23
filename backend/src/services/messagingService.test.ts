@@ -41,6 +41,7 @@ vi.mock('@moodsync/database', () => ({
 
 const sendAgenticMessage = vi.fn();
 const executeConfirmedAction = vi.fn();
+const transcribeVoiceMessage = vi.fn();
 
 vi.mock('@moodsync/ai', async () => {
   const actual = await vi.importActual<typeof import('@moodsync/ai')>('@moodsync/ai');
@@ -48,10 +49,12 @@ vi.mock('@moodsync/ai', async () => {
     ...actual,
     sendAgenticMessage: (...args: unknown[]) => sendAgenticMessage(...args),
     executeConfirmedAction: (...args: unknown[]) => executeConfirmedAction(...args),
+    transcribeVoiceMessage: (...args: unknown[]) => transcribeVoiceMessage(...args),
   };
 });
 
 const sendBlueBubblesMessage = vi.fn();
+const downloadBlueBubblesAttachment = vi.fn();
 
 vi.mock('./messagingProviders/blueBubbles.js', async () => {
   const actual = await vi.importActual<typeof import('./messagingProviders/blueBubbles.js')>(
@@ -60,6 +63,7 @@ vi.mock('./messagingProviders/blueBubbles.js', async () => {
   return {
     ...actual,
     sendBlueBubblesMessage: (...args: unknown[]) => sendBlueBubblesMessage(...args),
+    downloadBlueBubblesAttachment: (...args: unknown[]) => downloadBlueBubblesAttachment(...args),
   };
 });
 
@@ -220,5 +224,71 @@ describe('messagingService.handleInbound — conversation profile wiring', () =>
     const context = sendAgenticMessage.mock.calls[0]![2];
     expect(context).toMatchObject({ timeZone: 'UTC' });
     expect(Array.isArray(context.inboundHistory)).toBe(true);
+  });
+});
+
+describe('messagingService.handleInbound — voice messages', () => {
+  const audioAttachment = { guid: 'att-1', mimeType: 'audio/mp3' };
+
+  it('transcribes a voice message and routes the transcript through the normal agentic path', async () => {
+    findByHandle.mockResolvedValue(baseConnection);
+    findActivePending.mockResolvedValue(null);
+    downloadBlueBubblesAttachment.mockResolvedValue({ data: Buffer.from('audio-bytes'), mimeType: 'audio/mp3' });
+    transcribeVoiceMessage.mockResolvedValue('how did I sleep last night');
+    sendAgenticMessage.mockResolvedValue({ text: 'You slept 7 hours.', pendingAction: null });
+
+    const { messagingService } = await import('./messagingService.js');
+    const result = await messagingService.handleInbound({ channel: 'IMESSAGE', from: '+15551234567', audioAttachment });
+
+    expect(downloadBlueBubblesAttachment).toHaveBeenCalledWith('att-1');
+    expect(transcribeVoiceMessage).toHaveBeenCalledWith({ data: Buffer.from('audio-bytes'), mimeType: 'audio/mp3' });
+    // The real transcript is what gets logged as the inbound message and
+    // sent into the agent — nothing downstream should ever see raw audio.
+    const inboundLog = logMessage.mock.calls.find((call) => call[0].direction === 'INBOUND');
+    expect(inboundLog![0].body).toBe('how did I sleep last night');
+    expect(result.text).toBe('You slept 7 hours.');
+  });
+
+  it('never transcribes a voice message from an unrecognized number', async () => {
+    findByHandle.mockResolvedValue(null);
+
+    const { messagingService } = await import('./messagingService.js');
+    const result = await messagingService.handleInbound({ channel: 'IMESSAGE', from: '+19995551234', audioAttachment });
+
+    expect(downloadBlueBubblesAttachment).not.toHaveBeenCalled();
+    expect(transcribeVoiceMessage).not.toHaveBeenCalled();
+    expect(result.intent).toBe('unknown_handle');
+  });
+
+  it('replies plainly and logs a placeholder when transcription fails, without fabricating a transcript', async () => {
+    findByHandle.mockResolvedValue(baseConnection);
+    findActivePending.mockResolvedValue(null);
+    downloadBlueBubblesAttachment.mockResolvedValue({ data: Buffer.from('x'), mimeType: 'audio/caf' });
+    transcribeVoiceMessage.mockRejectedValue(new Error('Unsupported audio format: audio/caf'));
+
+    const { messagingService } = await import('./messagingService.js');
+    const result = await messagingService.handleInbound({ channel: 'IMESSAGE', from: '+15551234567', audioAttachment });
+
+    expect(result.intent).toBe('voice_transcription_failed');
+    expect(result.text).toBeTruthy();
+    expect(sendAgenticMessage).not.toHaveBeenCalled();
+    const inboundLog = logMessage.mock.calls.find((call) => call[0].direction === 'INBOUND');
+    expect(inboundLog![0].body).toBe('[voice message — could not transcribe]');
+    expect(inboundLog![0].intent).toBe('voice_transcription_failed');
+  });
+
+  it('still delivers the failure reply through the configured provider', async () => {
+    process.env.MESSAGING_SEND_URL = 'https://bluebubbles.example.com';
+    process.env.MESSAGING_API_KEY = 'server-password';
+    findByHandle.mockResolvedValue(baseConnection);
+    findActivePending.mockResolvedValue(null);
+    downloadBlueBubblesAttachment.mockResolvedValue({ data: Buffer.from('x'), mimeType: 'audio/caf' });
+    transcribeVoiceMessage.mockRejectedValue(new Error('nope'));
+    sendBlueBubblesMessage.mockResolvedValue({ externalId: 'bb-1' });
+
+    const { messagingService } = await import('./messagingService.js');
+    await messagingService.handleInbound({ channel: 'IMESSAGE', from: '+15551234567', audioAttachment });
+
+    expect(sendBlueBubblesMessage).toHaveBeenCalled();
   });
 });
