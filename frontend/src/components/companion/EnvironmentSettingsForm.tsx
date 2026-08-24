@@ -69,8 +69,7 @@ export function EnvironmentSettingsForm({ initial }: { initial: Settings }) {
   const [saved, setSaved] = useState(false);
 
   async function patch(update: Partial<Settings>) {
-    const next = { ...settings, ...update };
-    setSettings(next);
+    setSettings((prev) => ({ ...prev, ...update }));
     setSaving(true);
     setSaved(false);
     try {
@@ -83,6 +82,17 @@ export function EnvironmentSettingsForm({ initial }: { initial: Settings }) {
     } finally {
       setSaving(false);
     }
+  }
+
+  // Sliders update the on-screen value on every drag frame (setLocal) but
+  // only PATCH once the drag/keypress settles (commitRange) — otherwise
+  // dragging across the track fires one network request per pixel.
+  function setLocal(update: Partial<Settings>) {
+    setSettings((prev) => ({ ...prev, ...update }));
+  }
+
+  function commitRange(update: Partial<Settings>) {
+    void patch(update);
   }
 
   return (
@@ -107,6 +117,7 @@ export function EnvironmentSettingsForm({ initial }: { initial: Settings }) {
                 checked={settings.level === level.value}
                 onChange={() => patch({ level: level.value })}
                 className="mt-1"
+                style={{ accentColor: "var(--lux-sage)" }}
               />
               <span>
                 <span className="block text-sm font-medium" style={{ color: "var(--lux-ink)" }}>
@@ -137,7 +148,7 @@ export function EnvironmentSettingsForm({ initial }: { initial: Settings }) {
                 checked={Boolean(settings[channel.key])}
                 onChange={(e) => patch({ [channel.key]: e.target.checked } as Partial<Settings>)}
                 className="mt-1"
-                style={{ minWidth: 16, minHeight: 16 }}
+                style={{ minWidth: 16, minHeight: 16, accentColor: "var(--lux-sage)" }}
               />
               <span>
                 <span className="block text-sm" style={{ color: "var(--lux-ink)" }}>
@@ -168,8 +179,12 @@ export function EnvironmentSettingsForm({ initial }: { initial: Settings }) {
               max={60}
               step={5}
               value={settings.maxLightingDeltaPct}
-              onChange={(e) => patch({ maxLightingDeltaPct: Number(e.target.value) })}
+              onChange={(e) => setLocal({ maxLightingDeltaPct: Number(e.target.value) })}
+              onMouseUp={(e) => commitRange({ maxLightingDeltaPct: Number(e.currentTarget.value) })}
+              onTouchEnd={(e) => commitRange({ maxLightingDeltaPct: Number(e.currentTarget.value) })}
+              onKeyUp={(e) => commitRange({ maxLightingDeltaPct: Number(e.currentTarget.value) })}
               className="mt-2 w-full"
+              style={{ accentColor: "var(--lux-sage)" }}
             />
             <span className="mt-1 block text-xs" style={{ color: "var(--lux-muted)" }}>
               The most MoodSync will dim or brighten in one step.
@@ -187,8 +202,12 @@ export function EnvironmentSettingsForm({ initial }: { initial: Settings }) {
               max={3}
               step={0.5}
               value={settings.maxTemperatureDeltaC}
-              onChange={(e) => patch({ maxTemperatureDeltaC: Number(e.target.value) })}
+              onChange={(e) => setLocal({ maxTemperatureDeltaC: Number(e.target.value) })}
+              onMouseUp={(e) => commitRange({ maxTemperatureDeltaC: Number(e.currentTarget.value) })}
+              onTouchEnd={(e) => commitRange({ maxTemperatureDeltaC: Number(e.currentTarget.value) })}
+              onKeyUp={(e) => commitRange({ maxTemperatureDeltaC: Number(e.currentTarget.value) })}
               className="mt-2 w-full"
+              style={{ accentColor: "var(--lux-sage)" }}
             />
             <span className="mt-1 block text-xs" style={{ color: "var(--lux-muted)" }}>
               The largest temperature change MoodSync will recommend.

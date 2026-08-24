@@ -34,6 +34,12 @@
   cursor: grabbing;
 }
 
+.elastic-slider-root:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 4px;
+  border-radius: 9999px;
+}
+
 .elastic-slider-track-wrapper {
   display: flex;
   flex-grow: 1;

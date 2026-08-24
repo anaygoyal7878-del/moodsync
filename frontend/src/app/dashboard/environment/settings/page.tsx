@@ -9,7 +9,7 @@ export default async function EnvironmentSettingsPage() {
   const result = await backendFetch<Settings>("/api/environment/settings");
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 pb-24 pt-6 sm:px-6">
+    <div className="flex flex-col gap-1">
       <Link
         href="/dashboard/environment"
         className="mb-4 inline-flex items-center gap-1 text-sm"

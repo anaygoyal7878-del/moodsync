@@ -17,6 +17,12 @@ interface ElasticSliderProps {
   stepSize?: number;
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;
+  /** Accessible name for the slider (screen readers, since there's no
+   * visible <label>). Defaults to "Value". */
+  ariaLabel?: string;
+  /** Formats the live readout below the track and the `aria-valuetext`.
+   * Defaults to a bare rounded number. */
+  formatValue?: (value: number) => string;
   /** Fires on every drag frame with the live value. */
   onChange?: (value: number) => void;
   /** Fires once, with the settled value, when the drag ends — the right
@@ -41,6 +47,8 @@ export default function ElasticSlider({
   stepSize = 1,
   leftIcon = <Minus size={14} aria-hidden="true" />,
   rightIcon = <Plus size={14} aria-hidden="true" />,
+  ariaLabel = "Value",
+  formatValue,
   onChange,
   onChangeCommitted,
 }: ElasticSliderProps) {
@@ -54,6 +62,8 @@ export default function ElasticSlider({
         stepSize={stepSize}
         leftIcon={leftIcon}
         rightIcon={rightIcon}
+        ariaLabel={ariaLabel}
+        formatValue={formatValue}
         onChange={onChange}
         onChangeCommitted={onChangeCommitted}
       />
@@ -69,6 +79,8 @@ interface SliderProps {
   stepSize: number;
   leftIcon: ReactNode;
   rightIcon: ReactNode;
+  ariaLabel: string;
+  formatValue?: (value: number) => string;
   onChange?: (value: number) => void;
   onChangeCommitted?: (value: number) => void;
 }
@@ -81,6 +93,8 @@ function Slider({
   stepSize,
   leftIcon,
   rightIcon,
+  ariaLabel,
+  formatValue = (v) => `${Math.round(v)}`,
   onChange,
   onChangeCommitted,
 }: SliderProps) {
@@ -146,6 +160,43 @@ function Slider({
     onChangeCommitted?.(value);
   };
 
+  // Keyboard equivalent of dragging — this is a custom widget (a <div>,
+  // not a native <input type="range">) so without this the control is
+  // unreachable by keyboard/screen-reader users entirely.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = isStepped ? stepSize : (maxValue - startingValue) / 100;
+    let newValue: number;
+    switch (e.key) {
+      case "ArrowRight":
+      case "ArrowUp":
+        newValue = value + step;
+        break;
+      case "ArrowLeft":
+      case "ArrowDown":
+        newValue = value - step;
+        break;
+      case "PageUp":
+        newValue = value + step * 10;
+        break;
+      case "PageDown":
+        newValue = value - step * 10;
+        break;
+      case "Home":
+        newValue = startingValue;
+        break;
+      case "End":
+        newValue = maxValue;
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+    newValue = Math.min(Math.max(newValue, startingValue), maxValue);
+    setValue(newValue);
+    onChange?.(newValue);
+    onChangeCommitted?.(newValue);
+  };
+
   const getRangePercentage = () => {
     const totalRange = maxValue - startingValue;
     if (totalRange === 0) return 0;
@@ -181,6 +232,14 @@ function Slider({
         <div
           ref={sliderRef}
           className="elastic-slider-root"
+          role="slider"
+          tabIndex={0}
+          aria-label={ariaLabel}
+          aria-valuemin={startingValue}
+          aria-valuemax={maxValue}
+          aria-valuenow={value}
+          aria-valuetext={formatValue(value)}
+          onKeyDown={handleKeyDown}
           onPointerMove={handlePointerMove}
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
@@ -228,7 +287,7 @@ function Slider({
           {rightIcon}
         </motion.div>
       </motion.div>
-      <p className="elastic-slider-value">{Math.round(value)}</p>
+      <p className="elastic-slider-value">{formatValue(value)}</p>
     </>
   );
 }

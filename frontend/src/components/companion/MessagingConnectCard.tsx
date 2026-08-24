@@ -68,7 +68,16 @@ export function MessagingConnectCard() {
   }
 
   function remove(id: string) {
-    fetch(`/api/messaging/connections/${id}`, { method: "DELETE" }).then(load).catch(() => {});
+    setError(null);
+    fetch(`/api/messaging/connections/${id}`, { method: "DELETE" })
+      .then((res) => {
+        if (!res.ok) {
+          setError("Couldn't remove that number.");
+          return;
+        }
+        load();
+      })
+      .catch(() => setError("Couldn't reach MoodSync just now."));
   }
 
   return (

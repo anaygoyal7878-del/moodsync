@@ -12,7 +12,7 @@ export default async function EnvironmentPage() {
   const result = await backendFetch<Parameters<typeof EnvironmentCard>[0]["snapshot"]>("/api/environment/snapshot");
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pb-24 pt-6 sm:px-6">
+    <div className="flex flex-col gap-1">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-medium" style={{ color: "var(--lux-ink)" }}>

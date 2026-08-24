@@ -89,6 +89,8 @@ export function DeviceCard({ device }: { device: DeviceSummary }) {
             stepSize={5}
             leftIcon={<Sun size={12} aria-hidden="true" />}
             rightIcon={<Sun size={16} aria-hidden="true" />}
+            ariaLabel="Brightness"
+            formatValue={(v) => `${Math.round(v)}%`}
             onChangeCommitted={(brightness) => setLightState({ on: true, brightness: Math.round(brightness) })}
           />
         </div>
