@@ -268,15 +268,20 @@ Devices → MoodSync** directly to see exactly what's granted.
 
 ## Part 7 — Server URL (the "why localhost is wrong" section)
 
-The app doesn't have a live production backend to point at yet — you're
-running MoodSync's own backend locally on your Mac (`npm run dev`, or
-however you've started it in this repo) and pointing your iPhone at it
-over the same Wi-Fi network.
+**You can skip this whole section unless you're developing against your
+own backend.** The app ships pointed at the deployed backend
+(`ServerConfiguration.defaultBaseURL`), so onboarding's Server step is a
+confirmation screen, not a form you have to fill in. Install, sign in,
+sync — that path needs no URL at all.
+
+The rest of this section applies when you *do* want the app talking to
+backend code running on your Mac: tap **"Use a different server"** on
+that step and enter your Mac's LAN IP.
 
 **`http://localhost:3000` — what an earlier version of this app
 hardcoded — is wrong on a physical device.** `localhost` on the iPhone
-means *the iPhone itself*, not your Mac. The fix, now built into
-onboarding: enter your Mac's actual LAN IP address instead.
+means *the iPhone itself*, not your Mac. Enter your Mac's actual LAN IP
+address instead.
 
 **To find your Mac's LAN IP**: System Settings → Wi-Fi → (your connected
 network) → Details… → look for "IP Address" (looks like
@@ -295,11 +300,12 @@ onboarding screen — e.g. `http://192.168.1.23:3000`.
   exception described in Part 5 — this only works for local-network
   addresses, not the public internet.
 
-You can change the Server URL later by deleting and reinstalling the
-app (onboarding runs again), or by extending the settings UI yourself —
-there's currently no in-app "change server URL" control once onboarding
-is complete, since this is a dev-only concern that goes away once a real
-backend is deployed.
+To get back to the hosted backend, tap **"Use the default server"** on
+that same step (or call `ServerConfiguration.resetToDefault()`). You can
+reach the step again by deleting and reinstalling the app, which re-runs
+onboarding — there's still no in-app "change server URL" control after
+onboarding completes, which is now a dev-only inconvenience rather than
+something a real user could get stuck behind.
 
 ---
 

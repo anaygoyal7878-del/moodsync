@@ -82,10 +82,11 @@ depends on it:
 5. Replace the generated `ContentView`/app entry point with a call into
    `MoodSyncCompanionView(baseURL:)` from `MoodSyncCompanionUI` — see
    `ios/MoodSyncCompanion/Sources/MoodSyncCompanionUI/MoodSyncCompanionView.swift`
-   for its signature. `baseURL` should point at your backend
-   (`http://localhost:3000` for local dev against a Mac on the same
-   network — see §7's note on `localhost` and physical devices; a real
-   deployed HTTPS URL for anything beyond local dev).
+   for its signature. Pass `ServerConfiguration.baseURL`, which resolves
+   to the deployed backend unless the user overrode it during onboarding
+   — only hardcode a `baseURL` if you're doing something the override
+   flow doesn't cover (see §7's note on `localhost` and physical
+   devices).
 
 ## 4. Add the HealthKit capability in Xcode
 

@@ -40,4 +40,38 @@ final class ServerConfigurationTests: XCTestCase {
             return XCTFail("expected failure")
         }
     }
+
+    // MARK: - Default resolution
+    //
+    // The app used to require the user to type a server URL before
+    // anything worked; these pin the behavior that replaced it.
+
+    override func tearDown() {
+        ServerConfiguration.resetToDefault()
+        super.tearDown()
+    }
+
+    func testBaseURLFallsBackToTheHostedBackendWhenNothingIsStored() {
+        ServerConfiguration.resetToDefault()
+        XCTAssertNil(ServerConfiguration.storedBaseURL)
+        XCTAssertEqual(ServerConfiguration.baseURL, ServerConfiguration.defaultBaseURL)
+    }
+
+    func testDefaultBaseURLIsAReachableHTTPSOrigin() {
+        XCTAssertEqual(ServerConfiguration.defaultBaseURL.scheme, "https")
+        XCTAssertFalse(ServerConfiguration.defaultBaseURL.host?.isEmpty ?? true)
+    }
+
+    func testAnExplicitOverrideWinsOverTheDefault() {
+        let override = URL(string: "http://192.168.1.23:3000")!
+        ServerConfiguration.storedBaseURL = override
+        XCTAssertEqual(ServerConfiguration.baseURL, override)
+    }
+
+    func testResetToDefaultClearsAnOverride() {
+        ServerConfiguration.storedBaseURL = URL(string: "http://192.168.1.23:3000")!
+        ServerConfiguration.resetToDefault()
+        XCTAssertNil(ServerConfiguration.storedBaseURL)
+        XCTAssertEqual(ServerConfiguration.baseURL, ServerConfiguration.defaultBaseURL)
+    }
 }

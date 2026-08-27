@@ -7,8 +7,10 @@ import MoodSyncCompanion
 /// recommends (request When In Use before ever requesting Always — see
 /// docs/GEOFENCING_ARCHITECTURE.md):
 ///
-/// 1. Server URL — nothing else works without this on a physical device
-///    (see `ServerConfiguration`'s doc comment for why localhost is wrong).
+/// 1. Server — confirmation, not data entry. The app ships pointed at the
+///    hosted backend; this step exists so a developer can override it with
+///    their own Mac's LAN IP (see `ServerConfiguration`). Leaving it alone
+///    is the normal path.
 /// 2. HealthKit — the app's primary purpose; asked first among the real
 ///    permissions since it's the one every feature depends on.
 /// 3. Location, When In Use — required before Always can even be
@@ -35,7 +37,10 @@ public struct OnboardingView: View {
 
     @AppStorage("moodsync.hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var step: Step = .welcome
-    @State private var serverURLText: String = ServerConfiguration.baseURL?.absoluteString ?? ""
+    @State private var serverURLText: String = ServerConfiguration.storedBaseURL?.absoluteString ?? ""
+    /// Starts expanded only for someone who already has an override saved;
+    /// everyone else sees the confirmed default with a way in.
+    @State private var showServerURLField: Bool = ServerConfiguration.storedBaseURL != nil
     @State private var serverURLError: String?
     @State private var healthStatus: String?
     @State private var locationStatus: String?
@@ -74,19 +79,34 @@ public struct OnboardingView: View {
             }
         case .serverURL:
             VStack(alignment: .leading, spacing: 12) {
-                Text("Server URL").font(.title2).fontWeight(.semibold)
-                Text("MoodSync doesn't have a deployed server yet — point this at your Mac's backend on the same Wi-Fi network, e.g. http://192.168.1.23:3000. See the Real Device Setup Guide for how to find your Mac's IP.")
+                Text("Server").font(.title2).fontWeight(.semibold)
+                Text("MoodSync is already connected to its hosted server. You only need to change this if you're running your own backend.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                TextField("http://192.168.1.23:3000", text: $serverURLText)
-                    #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                    #endif
-                    .autocorrectionDisabled()
-                    .textFieldStyle(.roundedBorder)
-                if let serverURLError {
-                    Text(serverURLError).font(.caption).foregroundStyle(.red)
+
+                if showServerURLField {
+                    TextField(ServerConfiguration.defaultBaseURL.absoluteString, text: $serverURLText)
+                        #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.URL)
+                        #endif
+                        .autocorrectionDisabled()
+                        .textFieldStyle(.roundedBorder)
+                    if let serverURLError {
+                        Text(serverURLError).font(.caption).foregroundStyle(.red)
+                    }
+                    Button("Use the default server") {
+                        serverURLText = ""
+                        serverURLError = nil
+                        showServerURLField = false
+                    }
+                    .font(.caption)
+                } else {
+                    Label(ServerConfiguration.baseURL.absoluteString, systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Use a different server") { showServerURLField = true }
+                        .font(.caption)
                 }
             }
         case .health:
@@ -198,11 +218,21 @@ public struct OnboardingView: View {
         step = next
     }
 
+    /// An empty field means "stay on the hosted default" — the common
+    /// case, and the reason this step no longer blocks anyone who has no
+    /// backend of their own to point at.
     private func saveServerURL() {
-        switch ServerConfiguration.validate(serverURLText) {
+        let trimmed = serverURLText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            serverURLError = nil
+            ServerConfiguration.resetToDefault()
+            advance()
+            return
+        }
+        switch ServerConfiguration.validate(trimmed) {
         case .valid(let url):
             serverURLError = nil
-            ServerConfiguration.baseURL = url
+            ServerConfiguration.storedBaseURL = url
             advance()
         case .invalid(let message):
             serverURLError = message
