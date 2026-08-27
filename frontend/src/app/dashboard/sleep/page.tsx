@@ -129,7 +129,7 @@ export default async function SleepPage() {
         </Section>
       </div>
 
-      <div className="lux-stagger-4 grid gap-4 lg:grid-cols-2">
+      <div className="lux-stagger-4">
         <Section title="Recent sleep" subtitle={quality ? `${quality.nightsMeasured} night${quality.nightsMeasured === 1 ? "" : "s"} measured` : undefined} icon={Moon}>
           {quality && quality.nightsMeasured > 0 ? (
             <>
@@ -168,18 +168,6 @@ export default async function SleepPage() {
               icon={Moon}
               title="No nights measured yet"
               body="Sleep quality appears once a connected wearable has recorded a full night."
-            />
-          )}
-        </Section>
-
-        <Section title="Bedroom" subtitle="From your HomeKit sensors." icon={Thermometer}>
-          {data?.bedroomTemperatureC !== null && data?.bedroomTemperatureC !== undefined ? (
-            <Stat label="Temperature" value={`${Math.round(data.bedroomTemperatureC)}°C`} hint="Right now" />
-          ) : (
-            <EmptyState
-              icon={Thermometer}
-              title="No bedroom sensor"
-              body="With a HomeKit temperature sensor in a room named 'bedroom', MoodSync checks it against your sleep range each evening."
             />
           )}
         </Section>
