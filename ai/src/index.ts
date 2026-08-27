@@ -73,7 +73,7 @@ export {
   type RoomWellnessResult,
   type HomeScore,
 } from './homeWellness.js';
-export { sendAtlasMessage, buildAtlasSystemPrompt, AtlasNotConfiguredError, type AtlasChatMessage } from './atlasChat.js';
+export { sendClaraMessage, buildClaraSystemPrompt, ClaraNotConfiguredError, type ClaraChatMessage } from './claraChat.js';
 export { computeLiveEnergyMeter, type CaffeineLogInput, type LiveEnergyMeter } from './energyMeter.js';
 export { computeFocusSessionScore } from './focusScore.js';
 export {

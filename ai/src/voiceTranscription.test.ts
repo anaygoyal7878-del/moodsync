@@ -1,10 +1,10 @@
 import { describe, expect, it, beforeEach, afterAll } from 'vitest';
 import { transcribeVoiceMessage, isSupportedAudioMimeType, TranscriptionError, SUPPORTED_AUDIO_MIME_TYPES } from './voiceTranscription.js';
-import { AtlasNotConfiguredError } from './atlasChat.js';
+import { ClaraNotConfiguredError } from './claraChat.js';
 
 /**
  * No live Gemini key in this environment, so — same convention as
- * `atlasChat.ts`/`agenticMessaging.ts`, neither of which has a test
+ * `claraChat.ts`/`agenticMessaging.ts`, neither of which has a test
  * file — the actual model call is not unit-tested here. What's fully
  * testable without a network call: the format allowlist, and that the
  * format check runs *before* the API-key check (so an unsupported
@@ -50,7 +50,7 @@ describe('transcribeVoiceMessage', () => {
 
   it('rejects an unsupported format before ever checking for an API key', async () => {
     // No GEMINI_API_KEY is set in this test on purpose — if this threw
-    // AtlasNotConfiguredError instead of TranscriptionError, that would
+    // ClaraNotConfiguredError instead of TranscriptionError, that would
     // mean the format check ran after the key check, which is the
     // wrong order (an unsupported format should never even reach the
     // "is this configured" question).
@@ -61,7 +61,7 @@ describe('transcribeVoiceMessage', () => {
 
   it('reports not-configured for a supported format with no API key set', async () => {
     await expect(transcribeVoiceMessage({ data: Buffer.from('x'), mimeType: 'audio/mp3' })).rejects.toBeInstanceOf(
-      AtlasNotConfiguredError,
+      ClaraNotConfiguredError,
     );
   });
 });

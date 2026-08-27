@@ -7,13 +7,13 @@ import {
   shapeReply,
   sendAgenticMessage,
   executeConfirmedAction,
-  AtlasNotConfiguredError,
+  ClaraNotConfiguredError,
   transcribeVoiceMessage,
   TranscriptionError,
   UNVERIFIED_REPLY,
   OPTED_OUT_REPLY,
   MESSAGING_STYLE_PROMPT,
-  type AtlasChatMessage,
+  type ClaraChatMessage,
 } from '@moodsync/ai';
 import { env } from '../config/env.js';
 import {
@@ -35,7 +35,7 @@ type MessagingConnectionRecord = NonNullable<Awaited<ReturnType<typeof messaging
  *   3. Unverified      → prompt for the code, still reveal nothing.
  *   4. Opted out       → only START gets a response.
  *   5. Rate limit      → cheap refusal before any model call.
- *   6. Everything else → deterministic command, or grounded Atlas.
+ *   6. Everything else → deterministic command, or grounded Clara.
  *
  * Crisis sits above verification on purpose. Someone in distress
  * texting an unrecognized number should still get a crisis line, not
@@ -47,7 +47,7 @@ type MessagingConnectionRecord = NonNullable<Awaited<ReturnType<typeof messaging
  * on a verified user's account. */
 const RATE_WINDOW_MINUTES = 10;
 const RATE_MAX_INBOUND = 15;
-/** Conversation turns replayed to Atlas. Enough for a follow-up
+/** Conversation turns replayed to Clara. Enough for a follow-up
  * question to make sense, short enough to stay cheap. */
 const HISTORY_TURNS = 10;
 /** How far back the conversation profile counts. Much wider than the
@@ -292,7 +292,7 @@ async function resolveReply(
   const canned = deterministicReply(classification);
   if (canned) return { text: canned, intent: classification.intent };
 
-  // 6b. Everything else — the agentic Atlas path (real tool calls for
+  // 6b. Everything else — the agentic Clara path (real tool calls for
   // wearable data + readiness, smart home, caffeine logging, durable
   // memory, and nutrition guidance — see
   // docs/MESSAGING_AGENTIC_ARCHITECTURE.md), with conversation history
@@ -308,7 +308,7 @@ async function resolveReply(
       messagingRepository.listInboundForProfile(connection.id, PROFILE_WINDOW_MESSAGES),
       userTimezoneRepository.getTimezone(connection.userId).catch(() => 'UTC'),
     ]);
-    const messages: AtlasChatMessage[] = history.map((row) => ({
+    const messages: ClaraChatMessage[] = history.map((row) => ({
       role: row.direction === 'INBOUND' ? 'user' : 'assistant',
       content: row.body,
     }));
@@ -333,7 +333,7 @@ async function resolveReply(
     }
     return { text: shapeReply(reply.text), intent: 'question' };
   } catch (error) {
-    if (error instanceof AtlasNotConfiguredError) {
+    if (error instanceof ClaraNotConfiguredError) {
       return { text: "I can't answer questions right now — my AI isn't configured yet.", intent: 'not_configured' };
     }
     return { text: "I couldn't work that out just now. Try again in a moment.", intent: 'error' };

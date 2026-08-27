@@ -10,7 +10,6 @@ import {
   Wand2,
   CalendarClock,
   Settings,
-  Bot,
   Music,
   DoorOpen,
   BatteryMedium,
@@ -39,11 +38,9 @@ export const NAV_GROUPS = [
     label: "Today",
     items: [
       { href: "/dashboard", label: "Today", icon: Home, exact: true },
-      // Leads the group, right after the home summary — Atlas is the
-      // conversational front door to the whole intelligence engine
-      // (same tool-calling engine the iMessage bot runs on, see
-      // backend/src/api/routes/atlas.ts), not one routine among many.
-      { href: "/dashboard/atlas", label: "Atlas", icon: Bot },
+      // No conversational tab: Clara, the assistant over this app's
+      // intelligence engine, lives in the messaging channel rather than
+      // in a web chat panel — see docs/CLARA_ARCHITECTURE.md.
       { href: "/dashboard/energy", label: "Energy", icon: BatteryMedium },
       { href: "/dashboard/focus", label: "Focus", icon: Timer },
       { href: "/dashboard/sleep", label: "Sleep", icon: Moon },

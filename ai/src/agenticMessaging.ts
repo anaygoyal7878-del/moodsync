@@ -1,6 +1,6 @@
 import { GoogleGenAI, createPartFromFunctionResponse, type Content } from '@google/genai';
 import { messagingMemoryRepository } from '@moodsync/database';
-import { AtlasNotConfiguredError, buildAtlasSystemPrompt, type AtlasChatMessage } from './atlasChat.js';
+import { ClaraNotConfiguredError, buildClaraSystemPrompt, type ClaraChatMessage } from './claraChat.js';
 import {
   MESSAGING_ACTION_TOOL_NAMES,
   selectMessagingTools,
@@ -9,7 +9,7 @@ import {
 } from './messagingTools.js';
 import { compileConversationProfile, renderProfileBlock, type InboundRecord } from './messagingProfile.js';
 
-/** Same alias rationale as atlasChat.ts — see that file's comment. */
+/** Same alias rationale as claraChat.ts — see that file's comment. */
 const MODEL = 'gemini-flash-latest';
 
 /** Hard ceiling on tool-call round trips in one turn. A well-behaved
@@ -76,18 +76,18 @@ export interface AgenticContext {
 }
 
 /**
- * The messaging channel's agentic counterpart to `sendAtlasMessage` —
+ * The messaging channel's agentic counterpart to `sendClaraMessage` —
  * same grounded-in-real-data philosophy, extended with real tool calls
  * so a text can complete a task, not just describe one. See
  * docs/MESSAGING_AGENTIC_ARCHITECTURE.md.
  */
 export async function sendAgenticMessage(
   userId: string,
-  messages: AtlasChatMessage[],
+  messages: ClaraChatMessage[],
   context?: AgenticContext,
 ): Promise<AgenticReply> {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new AtlasNotConfiguredError();
+  if (!apiKey) throw new ClaraNotConfiguredError();
 
   const client = new GoogleGenAI({ apiKey });
   // Every lookup here is best-effort: a failure should cost this turn
@@ -95,7 +95,7 @@ export async function sendAgenticMessage(
   // *smaller* claim — no facts, no capabilities — so a degraded turn
   // under-promises rather than over-promises.
   const [systemInstruction, facts, capabilities] = await Promise.all([
-    buildAtlasSystemPrompt(userId),
+    buildClaraSystemPrompt(userId),
     messagingMemoryRepository.listForUser(userId).catch(() => []),
     resolveMessagingCapabilities(userId),
   ]);

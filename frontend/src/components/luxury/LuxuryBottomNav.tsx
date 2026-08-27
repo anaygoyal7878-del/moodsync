@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Disc3, Timer, Moon, User, Bot } from "lucide-react";
+import { Home, Disc3, Timer, Moon, User, HeartPulse } from "lucide-react";
 import { MagnificationDock, type DockItemData } from "./MagnificationDock";
 import { useViewMode } from "@/components/shell/ViewModeContext";
 
@@ -10,7 +10,13 @@ import { useViewMode } from "@/components/shell/ViewModeContext";
  * the desktop sidebar. Phone use is daily and one-handed, so these are
  * the five things a person actually opens the app to do plus the
  * overflow: how am I doing (Today), put something on (Music), get to
- * work (Focus), close the day (Sleep), ask something (Atlas).
+ * work (Focus), close the day (Sleep), check your body (Recovery).
+ *
+ * There is no "ask something" tab. Clara — the assistant over this
+ * app's intelligence engine — answers by text message instead of in a
+ * web chat panel, so the tab that used to open one was replaced by
+ * Recovery rather than left pointing at a page that no longer exists.
+ * See docs/CLARA_ARCHITECTURE.md.
  *
  * Music is a primary tab because the listening journey — press play,
  * watch your body respond, learn what works — is a flagship feature,
@@ -38,7 +44,7 @@ export const BOTTOM_NAV_TABS = [
   { href: "/dashboard/music", label: "Music", icon: Disc3, exact: false },
   { href: "/dashboard/focus", label: "Focus", icon: Timer, exact: false },
   { href: "/dashboard/sleep", label: "Sleep", icon: Moon, exact: false },
-  { href: "/dashboard/atlas", label: "Atlas", icon: Bot, exact: false },
+  { href: "/dashboard/recovery", label: "Recovery", icon: HeartPulse, exact: false },
   { href: "/dashboard/profile", label: "More", icon: User, exact: false },
 ] as const;
 

@@ -18,7 +18,7 @@ import { GoogleCalendarClient, refreshGoogleCalendarToken, type GoogleCalendarOA
  * token-refresh logic is a small, deliberate duplicate of
  * `backend/src/services/calendarService.ts` rather than an import from
  * it. Config is read directly from `process.env` — same pattern
- * `atlasChat.ts` already uses for `GEMINI_API_KEY` in this package,
+ * `claraChat.ts` already uses for `GEMINI_API_KEY` in this package,
  * since zod-validated env is a backend-app concern only. See
  * docs/HEALTH_INSIGHTS_TEXTING_ARCHITECTURE.md.
  */

@@ -13,7 +13,7 @@ in MoodSync or what's a proportionate new build:
 
 | Ability | Backing | Scope this round |
 |---|---|---|
-| Wearable / smartwatch info | `biometricReadingRepository` + `computeWellnessScores` — the exact data the dashboard and Atlas's in-app chat already use | Full — same data, no new domain |
+| Wearable / smartwatch info | `biometricReadingRepository` + `computeWellnessScores` — the exact data the dashboard already uses | Full — same data, no new domain |
 | Smart home control | `ai/src/hueActionExecutor.ts` — already existed for automation rules | **Hue only.** HomeKit has no synchronous cloud execution (it's queue-based — see docs/HOMEKIT_ARCHITECTURE.md) and Spotify control-by-text wasn't in scope this round. Extending to those is adding entries to the tool registry, not a redesign. |
 | Nutrition guidance | Nothing — MoodSync has no food-logging or calorie-tracking feature | **General, not personalized.** Grounded in real caffeine/energy data where relevant, otherwise standard nutrition knowledge. Explicitly not a diet plan — see "Nutrition guidance, honestly" below. |
 
@@ -153,8 +153,8 @@ three messages later; it just expires on its own TTL.
 
 `sendAgenticMessage(userId, messages)`:
 
-1. Builds the same grounded system prompt Atlas's in-app chat uses
-   (`buildAtlasSystemPrompt`, exported from `atlasChat.ts` for reuse)
+1. Builds Clara's grounded system prompt
+   (`buildClaraSystemPrompt`, exported from `claraChat.ts` for reuse)
    plus a messaging-specific suffix describing the tools and the
    "action tools don't execute yet" rule.
 2. Calls Gemini with `tools: [{ functionDeclarations: [...] }]`.
@@ -186,7 +186,7 @@ well-established nutrition knowledge — grounding the answer in the real
 data *only* where it's actually relevant (caffeine timing, hydration,
 pre/post-workout eating tied to current recovery), never inventing a
 calorie count or macro target, and stating plainly that this is general
-guidance, not a personalized plan. This mirrors how Atlas's in-app chat
+guidance, not a personalized plan. This mirrors how Clara's HTTP surface
 already handles workout suggestions — general knowledge, explicitly
 labeled as general, grounded in real data where real data exists.
 
@@ -339,7 +339,7 @@ small, explicit long-term memory on top of that short-term replay:
 - **Facts are scoped to `userId`, not the messaging connection** — this
   agent is deliberately channel-agnostic (see this file's header, and
   `ai/src/messagingAgent.ts`'s), so a fact learned by text is available
-  if the same account later reaches the in-app chat, and vice versa.
+  if the same account later reaches Clara's HTTP surface, and vice versa.
 - **Every call to `sendAgenticMessage` fetches the most recent facts
   and injects them into the system prompt** as a "what you remember
   about this person" block, before the model sees the current message.
@@ -467,7 +467,7 @@ docs/MESSAGING_BOT.md.
 
 ## Model choice: cost and adaptivity
 
-Both call sites (`atlasChat.ts`, `agenticMessaging.ts`) run
+Both call sites (`claraChat.ts`, `agenticMessaging.ts`) run
 `gemini-flash-latest` — Google's maintained "latest flash" alias rather
 than a dated model name, chosen because a dated name (`gemini-2.5-flash`)
 was confirmed to 404 with "no longer available to new users" while still

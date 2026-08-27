@@ -76,7 +76,7 @@ function startOfLocalDay(timeZone: string, now: Date): Date {
  * comment — so the BlueBubbles send call is duplicated in miniature
  * here rather than imported from `backend/src/services/messagingProviders/blueBubbles.ts`.
  * Config is read directly from `process.env`, matching how
- * `atlasChat.ts` already reads `GEMINI_API_KEY` in this package rather
+ * `claraChat.ts` already reads `GEMINI_API_KEY` in this package rather
  * than through a zod schema (that validation lives in the backend app
  * only). See docs/HEALTH_INSIGHTS_TEXTING_ARCHITECTURE.md.
  */

@@ -114,13 +114,14 @@ export const TOUR_STEPS: TourStep[] = [
     href: "/dashboard",
   },
   {
-    id: "atlas",
+    id: "clara",
     kind: "feature",
-    title: "Atlas answers in plain language",
+    title: "Clara answers in plain language",
     body:
-      "A wellness assistant with your real biometric context — ask why your recovery dropped, or what to change, and get a grounded answer.",
-    detail: "Powered by Gemini, reading the same data the rest of the app does.",
-    href: "/dashboard/atlas",
+      "A wellness assistant with your real biometric context — text her why your recovery dropped, or what to change, and get a grounded answer back.",
+    detail:
+      "Clara lives in your messages rather than in a chat panel here, so she reaches you where you already are. Connect a number under Connections.",
+    href: "/dashboard/connections",
   },
   {
     id: "roadmap",

@@ -84,7 +84,7 @@ provider webhook ──► POST /api/messaging/webhook  (HMAC-verified)
                           │
               ┌───────────┴───────────┐
               ▼                       ▼
-      deterministic reply       Atlas (grounded chat)
+      deterministic reply       Clara (grounded chat)
 ```
 
 `ai/src/messagingAgent.ts` is channel-agnostic and pure — it is the part
@@ -131,7 +131,7 @@ docs but hasn't been confirmed by an actual send.
 3. **Unverified** → prompts for the code, still reveals nothing.
 4. **Opted out** → only START gets a reply.
 5. **Rate limit** → cheap refusal before any model call.
-6. **Everything else** → deterministic command, or grounded Atlas.
+6. **Everything else** → deterministic command, or grounded Clara.
 
 **Crisis sits above verification deliberately.** Someone in distress
 texting an unrecognized number should get a crisis line, not "please
@@ -163,7 +163,7 @@ elsewhere to findahelpline.com rather than implying global coverage.
 Proper per-region resources are real unbuilt work.
 
 **Not medical advice.** HELP says so, and the messaging style prompt
-instructs Atlas not to diagnose.
+instructs Clara not to diagnose.
 
 **Opt-out** honours the carrier-standard words (STOP, UNSUBSCRIBE,
 CANCEL, QUIT, END). Opting out keeps the row so a later START restores
@@ -178,11 +178,11 @@ model call, so neither a loop nor a stranger can drive model spend.
 |---|---|
 | "how am I doing" | Readiness / energy / sleep from the same context loader the dashboard uses — no model, so a text and the app can't disagree |
 | "just had a coffee" | Writes a real `CaffeineLog` (~95mg) and replies with the resulting energy |
-| "what's my heart rate / recovery / sleep score" | Agentic Atlas calls `get_wearable_snapshot` — same wearable data as above, model-composed |
-| "turn off the bedroom light" / "set living room to 40%" | Agentic Atlas resolves the real light via `list_smart_home_devices`, then asks to confirm before anything changes — see docs/MESSAGING_AGENTIC_ARCHITECTURE.md |
+| "what's my heart rate / recovery / sleep score" | Agentic Clara calls `get_wearable_snapshot` — same wearable data as above, model-composed |
+| "turn off the bedroom light" / "set living room to 40%" | Agentic Clara resolves the real light via `list_smart_home_devices`, then asks to confirm before anything changes — see docs/MESSAGING_AGENTIC_ARCHITECTURE.md |
 | "activate the relax scene" | Same confirm-then-execute path, for Hue scenes |
 | "what should I eat before a workout" | General nutrition guidance, grounded in real caffeine/energy data where relevant — not a personalized meal plan (MoodSync has no food-logging feature) |
-| "why am I so tired?" | Atlas, grounded in this account's real data |
+| "why am I so tired?" | Clara, grounded in this account's real data |
 | HELP / STOP / START | Deterministic |
 
 Caffeine logging only fires on a **reporting** verb and not on an

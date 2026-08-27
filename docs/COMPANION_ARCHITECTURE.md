@@ -60,7 +60,7 @@ state — eat something, then do the hard thing).
 Grouped in `frontend/src/lib/dashboardSections.ts` as `NAV_GROUPS`:
 
 - **Today** — Today (Daily Brief), Energy, Focus, Sleep, Recovery
-- **Routines** — Habits, Meditate, Music, Atlas
+- **Routines** — Habits, Meditate, Music
 - **Understand** — Insights, Weekly report, Wellness scores, Biometrics, Recommendations
 - **Environment** — Scenes, Devices, Automations
 - **Account** — Connections, Notifications, Settings
@@ -71,7 +71,7 @@ the mobile overflow list can never drift from the sidebar.
 ### Mobile and web are deliberately different shapes
 
 - **Mobile** (`LuxuryBottomNav.BOTTOM_NAV_TABS`) is the companion: Today,
-  Energy, Focus, Sleep, Atlas, More. Six one-handed daily-use
+  Energy, Focus, Sleep, Recovery, More. Six one-handed daily-use
   destinations. Automations, Devices and Scenes are *not* here — they
   stay reachable through Settings' overflow list, but configuring a
   smart home isn't phone-at-7am work.

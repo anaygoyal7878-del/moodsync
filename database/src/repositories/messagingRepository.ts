@@ -126,7 +126,7 @@ export const messagingRepository = {
     });
   },
 
-  /** Recent turns, oldest-first — what gets replayed to Atlas as
+  /** Recent turns, oldest-first — what gets replayed to Clara as
    * conversation context, since a messaging channel has no client to
    * hold history the way the in-app chat does. */
   async recentHistory(connectionId: string, limit: number) {

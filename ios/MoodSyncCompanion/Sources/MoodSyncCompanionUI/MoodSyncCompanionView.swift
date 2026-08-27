@@ -294,9 +294,9 @@ public struct MoodSyncCompanionView: View {
 
     #if canImport(EventKit)
     /// The write-side counterpart: creates any event MoodSync queued
-    /// via the messaging agent's `create_calendar_event` tool (or the
-    /// in-app Atlas chat, which now shares the same tool — see
-    /// backend/src/api/routes/atlas.ts). Same "next time the app opens"
+    /// via Clara's `create_calendar_event` tool — from a text message,
+    /// or from Clara's HTTP surface, which shares the same tool (see
+    /// backend/src/api/routes/clara.ts). Same "next time the app opens"
     /// wake point as HomeKit commands above.
     private func checkPendingCalendarWrites(accessToken: String) async {
         let coordinator = CalendarWriteCoordinator(calendar: EventKitReader(), apiClient: MoodSyncAPIClient(baseURL: baseURL))

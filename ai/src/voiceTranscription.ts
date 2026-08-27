@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { AtlasNotConfiguredError } from './atlasChat.js';
+import { ClaraNotConfiguredError } from './claraChat.js';
 
 /**
  * Turns a voice message into text, so it can enter the exact same
@@ -64,7 +64,7 @@ export async function transcribeVoiceMessage(audio: { data: Buffer; mimeType: st
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new AtlasNotConfiguredError();
+  if (!apiKey) throw new ClaraNotConfiguredError();
 
   const client = new GoogleGenAI({ apiKey });
   const response = await client.models.generateContent({

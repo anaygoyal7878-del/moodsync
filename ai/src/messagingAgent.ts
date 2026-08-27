@@ -9,8 +9,9 @@
  * public iMessage API (see docs/MESSAGING_BOT.md), a change of provider
  * is likely.
  *
- * Open-ended questions are delegated to Atlas (`ai/src/atlasChat.ts`),
- * which is already grounded in the user's real data. Everything this
+ * Open-ended questions are delegated to Clara — the grounded, tool-
+ * calling assistant in `ai/src/agenticMessaging.ts`, built on the
+ * real-data system prompt in `ai/src/claraChat.ts`. Everything this
  * module answers itself is deterministic — commands, safety, and the
  * unverified/opted-out paths — because those are exactly the answers
  * that must never be improvised by a language model.
@@ -174,7 +175,7 @@ export const STOP_REPLY =
 export const START_REPLY = "You're back on. Text HELP to see what I can do.";
 
 export const HELP_REPLY =
-  'MoodSync here. Things you can text me:\n' +
+  "Clara here — MoodSync's assistant. Things you can text me:\n" +
   '• "how am I doing" — your readiness, energy and sleep right now\n' +
   '• "just had a coffee" — logs it against your energy meter\n' +
   '• any question about your data — "why am I tired?", "should I train today?"\n' +
@@ -190,8 +191,8 @@ export const OPTED_OUT_REPLY = 'You previously unsubscribed. Text START to turn 
 /**
  * Replies MoodSync produces without calling a language model.
  *
- * `null` means "this needs Atlas" — the caller then runs the real
- * grounded chat path. Splitting it this way means the safety-critical
+ * `null` means "this needs Clara" — the caller then runs the real
+ * grounded agentic path. Splitting it this way means the safety-critical
  * and command replies are pure functions with tests, not prompt
  * behavior that could drift between model versions.
  */
@@ -240,7 +241,7 @@ export function buildStatusReply(snapshot: StatusSnapshot): string {
 
 /** Hard ceiling on an outbound reply. Messaging surfaces are not
  * dashboards: a wall of text in a chat thread reads as spam, and most
- * providers segment (and bill) long messages anyway. Atlas is told to
+ * providers segment (and bill) long messages anyway. Clara is told to
  * be brief in the prompt; this is the backstop when it isn't. */
 export const MAX_REPLY_CHARS = 600;
 
@@ -262,7 +263,7 @@ export function shapeReply(reply: string, maxChars: number = MAX_REPLY_CHARS): s
 }
 
 /**
- * The instruction appended to Atlas's system prompt when it's answering
+ * The instruction appended to Clara's system prompt when it's answering
  * over a messaging channel rather than the in-app chat. Same grounding,
  * different register: a text thread is not a dashboard.
  */

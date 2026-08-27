@@ -25,12 +25,12 @@ vi.mock('../../auth/jwt.js', () => ({
 }));
 
 const authenticatePlugin = (await import('../plugins/authenticate.js')).default;
-const atlasRoutes = (await import('./atlas.js')).default;
+const claraRoutes = (await import('./clara.js')).default;
 
 function buildApp() {
   const app = Fastify();
   app.register(authenticatePlugin);
-  app.register(atlasRoutes, { prefix: '/api' });
+  app.register(claraRoutes, { prefix: '/api' });
   return app;
 }
 
@@ -41,14 +41,14 @@ beforeEach(() => {
   verifyAccessTokenMock.mockResolvedValue({ sub: 'user-1' });
 });
 
-describe('POST /atlas/chat', () => {
+describe('POST /clara/chat', () => {
   it('calls the same agentic engine the messaging bot uses, not the old read-only path', async () => {
     sendAgenticMessageMock.mockResolvedValue({ text: 'Your recovery is 72 today.', pendingAction: null });
     const app = buildApp();
 
     const response = await app.inject({
       method: 'POST',
-      url: '/api/atlas/chat',
+      url: '/api/clara/chat',
       payload: { messages: [{ role: 'user', content: 'how am I doing' }] },
       headers: AUTH_HEADERS,
     });
@@ -71,7 +71,7 @@ describe('POST /atlas/chat', () => {
 
     const response = await app.inject({
       method: 'POST',
-      url: '/api/atlas/chat',
+      url: '/api/clara/chat',
       payload: { messages: [{ role: 'user', content: 'turn off the bedroom light' }] },
       headers: AUTH_HEADERS,
     });
@@ -82,14 +82,14 @@ describe('POST /atlas/chat', () => {
     });
   });
 
-  it('reports 503 when Atlas is not configured', async () => {
-    const { AtlasNotConfiguredError } = await vi.importActual<typeof import('@moodsync/ai')>('@moodsync/ai');
-    sendAgenticMessageMock.mockRejectedValue(new AtlasNotConfiguredError());
+  it('reports 503 when Clara is not configured', async () => {
+    const { ClaraNotConfiguredError } = await vi.importActual<typeof import('@moodsync/ai')>('@moodsync/ai');
+    sendAgenticMessageMock.mockRejectedValue(new ClaraNotConfiguredError());
     const app = buildApp();
 
     const response = await app.inject({
       method: 'POST',
-      url: '/api/atlas/chat',
+      url: '/api/clara/chat',
       payload: { messages: [{ role: 'user', content: 'hi' }] },
       headers: AUTH_HEADERS,
     });
@@ -99,20 +99,20 @@ describe('POST /atlas/chat', () => {
 
   it('rejects an empty message list', async () => {
     const app = buildApp();
-    const response = await app.inject({ method: 'POST', url: '/api/atlas/chat', payload: { messages: [] }, headers: AUTH_HEADERS });
+    const response = await app.inject({ method: 'POST', url: '/api/clara/chat', payload: { messages: [] }, headers: AUTH_HEADERS });
     expect(response.statusCode).toBe(400);
     expect(sendAgenticMessageMock).not.toHaveBeenCalled();
   });
 });
 
-describe('POST /atlas/actions/confirm', () => {
+describe('POST /clara/actions/confirm', () => {
   it('re-validates and executes the confirmed action', async () => {
     executeConfirmedActionMock.mockResolvedValue('Done — "Bedroom" updated.');
     const app = buildApp();
 
     const response = await app.inject({
       method: 'POST',
-      url: '/api/atlas/actions/confirm',
+      url: '/api/clara/actions/confirm',
       payload: { toolName: 'control_hue_light', args: { lightName: 'Bedroom', on: false } },
       headers: AUTH_HEADERS,
     });
@@ -128,7 +128,7 @@ describe('POST /atlas/actions/confirm', () => {
 
     const response = await app.inject({
       method: 'POST',
-      url: '/api/atlas/actions/confirm',
+      url: '/api/clara/actions/confirm',
       payload: { toolName: 'control_hue_light', args: { lightName: 'Bedroom' } },
       headers: AUTH_HEADERS,
     });
@@ -139,7 +139,7 @@ describe('POST /atlas/actions/confirm', () => {
 
   it('rejects a request with no toolName', async () => {
     const app = buildApp();
-    const response = await app.inject({ method: 'POST', url: '/api/atlas/actions/confirm', payload: { args: {} }, headers: AUTH_HEADERS });
+    const response = await app.inject({ method: 'POST', url: '/api/clara/actions/confirm', payload: { args: {} }, headers: AUTH_HEADERS });
     expect(response.statusCode).toBe(400);
     expect(executeConfirmedActionMock).not.toHaveBeenCalled();
   });

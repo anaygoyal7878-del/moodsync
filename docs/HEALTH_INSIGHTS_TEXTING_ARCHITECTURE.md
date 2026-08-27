@@ -86,12 +86,12 @@ documents ("this package, like workers, can't reach into the backend
 app's internals"). `ai/src/messagingDelivery.ts` is a small, deliberate
 duplicate of backend's BlueBubbles send call (~15 lines), reading
 `MESSAGING_SEND_URL`/`MESSAGING_API_KEY` directly from `process.env` —
-the same pattern `atlasChat.ts` already uses for `GEMINI_API_KEY` in
+the same pattern `claraChat.ts` already uses for `GEMINI_API_KEY` in
 this same package, rather than a zod-validated env (that validation is
 a backend-app concern only).
 
 `messagingRepository` (connections + message log) is already a
-dependency of `ai/src` — `atlasChat.ts` and `messagingTools.ts` both
+dependency of `ai/src` — `claraChat.ts` and `messagingTools.ts` both
 read from `@moodsync/database` directly — so `messagingDelivery.ts`
 reusing it is consistent, not a new architectural seam.
 
