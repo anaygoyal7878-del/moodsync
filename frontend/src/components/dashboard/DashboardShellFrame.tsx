@@ -63,9 +63,15 @@ function ShellLayout({
         )}
       >
         {sidebar}
+        {/* min-w-0 is load-bearing: as a flex child this column defaults to
+            min-width:auto, so it cannot shrink below its widest content and
+            any one over-wide child (a long unbroken string, a wide table)
+            stretches the column past the viewport and scrolls the whole
+            page sideways. `main`'s overflow-x-hidden can't prevent that —
+            by then the parent is already too wide. */}
         <div
           className={clsx(
-            "flex min-h-screen flex-1 flex-col",
+            "flex min-h-screen min-w-0 flex-1 flex-col",
             mode === "web" && "h-screen overflow-y-auto",
             mode === null && "sm:h-screen sm:overflow-y-auto",
           )}

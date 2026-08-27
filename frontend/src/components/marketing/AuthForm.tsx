@@ -112,10 +112,17 @@ export function AuthForm({ mode }: AuthFormProps) {
             type="password"
             autoComplete={isSignup ? "new-password" : "current-password"}
             required
-            minLength={10}
+            // Both of these are signup-only. The 10-character rule is a
+            // rule for *choosing* a password, so stating it on the login
+            // form describes a decision already made — and enforcing it
+            // there would block anyone whose existing password predates
+            // the rule from submitting the form at all, turning a
+            // server-side "wrong password" into a silent client-side
+            // dead end.
+            minLength={isSignup ? 10 : undefined}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="At least 10 characters"
+            placeholder={isSignup ? "At least 10 characters" : undefined}
           />
         </div>
 
