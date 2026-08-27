@@ -47,7 +47,7 @@ export default async function ScenarioPage({ params }: { params: Promise<{ scena
         <section className="mx-auto max-w-2xl px-6 pb-24 text-center">
           <h2 className="text-2xl font-semibold tracking-tight">Ready to connect your own?</h2>
           <p className="mt-3 text-ink-secondary">
-            Create a free account and connect WHOOP, Fitbit, Philips Hue, or Spotify — every automation you build
+            Create a free account and connect WHOOP, Fitbit, or Spotify — every automation you build
             runs against your real data from here on.
           </p>
           <Link href="/signup" className="mt-6 inline-block">

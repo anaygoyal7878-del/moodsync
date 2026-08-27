@@ -467,10 +467,15 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
       <WhoopCard connection={whoop} />
       <FitbitCard connection={fitbit} />
       <AppleHealthCard connection={appleHealth} />
-      <AmazfitCard connection={amazfit} />
-      <HueCard connection={hue} />
+      {/* Amazfit/Hue/Alexa: no longer offered as something to connect —
+       * the cards only render for an account that already has one, so an
+       * existing connection stays fully visible and manageable (including
+       * Disconnect) while new users never see the option. The backend
+       * routes/services behind all three are untouched. */}
+      {amazfit && <AmazfitCard connection={amazfit} />}
+      {hue && <HueCard connection={hue} />}
       <SpotifyCard connection={spotify} />
-      <AlexaCard connection={alexa} />
+      {alexa && <AlexaCard connection={alexa} />}
       <AppleMusicCard connection={connections.appleMusic} />
       <CalendarCard connection={connections.calendar} />
     </section>

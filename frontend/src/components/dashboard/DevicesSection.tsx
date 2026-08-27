@@ -99,9 +99,7 @@ export function DevicesSection({ smartHome }: { smartHome: SmartHomeConnectionSu
       {!hasAnything ? (
         <Card>
           <p className="text-sm font-medium text-ink">No devices connected yet</p>
-          <p className="mt-1 text-sm text-ink-secondary">
-            Connect Philips Hue, Spotify, or Amazon Alexa from the Connections page to see them here.
-          </p>
+          <p className="mt-1 text-sm text-ink-secondary">Connect Spotify from the Connections page to see it here.</p>
           <LinkButton href="/dashboard/connections" variant="primary" className="mt-3 inline-flex">
             Go to Connections
           </LinkButton>

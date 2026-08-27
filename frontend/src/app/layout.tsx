@@ -35,7 +35,7 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "MoodSync — The intelligence layer for your smart home",
   description:
-    "MoodSync connects your wearable to Philips Hue, Spotify, and more — and automatically adapts your environment to how you're actually doing.",
+    "MoodSync connects your wearable to your smart home — and automatically adapts your environment to how you're actually doing.",
 };
 
 export default function RootLayout({

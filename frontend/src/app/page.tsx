@@ -10,7 +10,6 @@ import { FadeInSection } from "@/components/ui/FadeInSection";
 
 const integrations = [
   { name: "WHOOP", status: "Connect today" },
-  { name: "Philips Hue", status: "Connect today" },
   { name: "Fitbit", status: "Via Google Health" },
   { name: "Spotify", status: "Limited beta" },
   { name: "Garmin", status: "Blocked upstream" },
@@ -110,7 +109,7 @@ export default function Home() {
         <section id="pricing" className="mx-auto max-w-2xl px-6 py-20 text-center">
           <h2 className="text-3xl font-semibold tracking-tight">Free while in beta</h2>
           <p className="mt-3 text-ink-secondary">
-            MoodSync is currently free for early users connecting WHOOP, Fitbit, Philips Hue, and Spotify.
+            MoodSync is currently free for early users connecting WHOOP, Fitbit, and Spotify.
             Pricing will be announced once these integrations leave beta.
           </p>
           <Link href="/signup" className="mt-8 inline-block">

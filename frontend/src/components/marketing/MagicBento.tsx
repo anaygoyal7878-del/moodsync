@@ -11,9 +11,9 @@ const DEFAULT_SPOTLIGHT_RADIUS = 300;
 const DEFAULT_GLOW_COLOR = "53, 84, 63"; // --brand, as an r,g,b triple
 
 /** Real product capabilities, grounded in what's actually built —
- * `docs/ALEXA_ARCHITECTURE.md` for voice control, `RuleForm.tsx`'s
- * `TimeWindow` for scheduled rules, and the backend's encrypted
- * `OAuthToken` storage — not the placeholder Analytics/Dashboard/CRM
+ * `docs/MESSAGING_AGENTIC_ARCHITECTURE.md` for the texting bot,
+ * `RuleForm.tsx`'s `TimeWindow` for scheduled rules, and the backend's
+ * encrypted `OAuthToken` storage — not the placeholder Analytics/Dashboard/CRM
  * copy from the original React Bits demo. Six entries because the
  * 1024px+ grid's span layout (see MagicBento.css) is built for six
  * cards; this project's real landing-page "features" section only had
@@ -36,9 +36,9 @@ const cardData = [
     label: "History",
   },
   {
-    title: "Voice control ready",
-    description: "Ask Alexa to trigger a named MoodSync automation — a real Custom Skill, not a mockup.",
-    label: "Alexa",
+    title: "Texts you back",
+    description: "A real phone number that answers questions about your recovery and can adjust your lights — the same agentic engine as the in-app chat.",
+    label: "Messaging",
   },
   {
     title: "Time-aware rules",
