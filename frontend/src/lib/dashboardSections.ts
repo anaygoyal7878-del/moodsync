@@ -33,9 +33,25 @@ import {
  * LuxuryBottomNav.tsx) is deliberately a much smaller daily-use subset:
  * mobile is the companion, not the console.
  */
+/**
+ * Three groups, not five. The rail carries ~20 destinations either way,
+ * but every extra group header is another heading to read past before
+ * the eye reaches a link — five headers turned one scan into five, which
+ * is what made a control center feel like a directory.
+ *
+ * The three that survive are the three real questions: how am I (Daily),
+ * what have I learned (Understand), and what is my space doing plus how
+ * is it configured (Home & settings — smart-home control and account
+ * settings are both configuration, and splitting them bought nothing).
+ *
+ * Order within each group is unchanged, and no destination was dropped:
+ * DASHBOARD_SECTIONS derives from this, and LuxuryProfile's mobile
+ * overflow lists everything the bottom bar doesn't, so a route missing
+ * here would be unreachable on a phone.
+ */
 export const NAV_GROUPS = [
   {
-    label: "Today",
+    label: "Daily",
     items: [
       { href: "/dashboard", label: "Today", icon: Home, exact: true },
       // No conversational tab: Clara, the assistant over this app's
@@ -46,11 +62,6 @@ export const NAV_GROUPS = [
       { href: "/dashboard/sleep", label: "Sleep", icon: Moon },
       { href: "/dashboard/recovery", label: "Recovery", icon: HeartPulse },
       { href: "/dashboard/mood", label: "Mood", icon: Brain },
-    ],
-  },
-  {
-    label: "Routines",
-    items: [
       { href: "/dashboard/habits", label: "Habits", icon: Repeat },
       { href: "/dashboard/meditation", label: "Meditate", icon: Sparkle },
       { href: "/dashboard/music", label: "Music", icon: Music },
@@ -67,22 +78,16 @@ export const NAV_GROUPS = [
   },
   {
     // Smart home is an output of the intelligence engine, not the
-    // product — grouped here, below everything a user without a single
-    // connected device still gets full value from.
-    label: "Environment",
+    // product — grouped last, below everything a user without a single
+    // connected device still gets full value from. The intelligence
+    // surface leads: it's the "what should my space be doing" answer,
+    // and the ones below it answer "what is it doing".
+    label: "Home & settings",
     items: [
-      // The intelligence surface leads this group: it's the "what
-      // should my space be doing" answer, and the three below it are
-      // the device-level controls that answer "what is it doing".
       { href: "/dashboard/environment", label: "Adaptive", icon: Sparkles },
       { href: "/dashboard/home", label: "Scenes", icon: DoorOpen },
       { href: "/dashboard/devices", label: "Devices", icon: Cpu },
       { href: "/dashboard/automation", label: "Automations", icon: Zap },
-    ],
-  },
-  {
-    label: "Account",
-    items: [
       { href: "/dashboard/connections", label: "Connections", icon: Link2 },
       { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
       { href: "/dashboard/profile", label: "Settings", icon: Settings },

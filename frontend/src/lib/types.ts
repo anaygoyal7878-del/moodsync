@@ -203,9 +203,26 @@ export interface MemoryFinding {
   sentence: string;
 }
 
+export type RecoveryActionKind = "walk" | "breathing" | "hydrate" | "stop_early";
+
+export interface RecoveryAction {
+  kind: RecoveryActionKind;
+  label: string;
+  /** Why this action, for this person, right now — see
+   * ai/src/recoveryActions.ts. Never generic filler. */
+  reason: string;
+  /** True only when `reason` is grounded in the user's own measured
+   * before/after history. Rendered with a distinct badge: a heuristic
+   * must never look as proven as a real personal finding. */
+  personalized: boolean;
+  href?: string;
+}
+
 export interface WellnessMemoryResponse {
   findings: MemoryFinding[];
   bestFocusHours: Array<{ hourOfDay: number; meanScore: number; sampleSize: number }>;
+  /** Ranked server-side for this moment — order and reasons both vary. */
+  recoveryActions: RecoveryAction[];
   windowDays: number;
   historyDays: number;
 }

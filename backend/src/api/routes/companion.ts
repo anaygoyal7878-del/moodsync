@@ -26,6 +26,7 @@ import {
   computeFreeBlocks,
   computeStudyWindowSuggestion,
   computeWellnessScores,
+  rankRecoveryActions,
 } from '@moodsync/ai';
 import { userRepository } from '../../repositories/userRepository.js';
 import {
@@ -273,9 +274,36 @@ export default async function companionRoutes(app: FastifyInstance) {
         .map((s) => ({ hourOfDay: hourInZone(s.startedAt, timezoneContext.timezone), score: s.focusScore! })),
     );
 
+    // Recovery actions are ranked here rather than on the client
+    // because the ranking is real decision logic with its own tests
+    // (ai/src/recoveryActions.ts) — and because it needs the resting
+    // heart rate baseline, which is a server-side derivation the
+    // frontend has no reason to reproduce.
+    const restingRates = readings
+      .map((r) => r.restingHeartRate)
+      .filter((v): v is number => v !== undefined && v !== null);
+    const latestResting = timezoneContext.latest?.restingHeartRate ?? null;
+    // Baseline excludes today's own reading, so a single elevated
+    // morning isn't compared against a mean it just moved.
+    const priorResting = restingRates.slice(1);
+    const restingBaseline =
+      priorResting.length > 0 ? priorResting.reduce((sum, v) => sum + v, 0) / priorResting.length : null;
+
+    const recoveryActions = rankRecoveryActions({
+      recoveryScore: timezoneContext.scores?.recovery.value ?? null,
+      stressScore: timezoneContext.scores?.stress.value ?? null,
+      sleepScore: timezoneContext.scores?.sleep.value ?? null,
+      restingHeartRateDelta:
+        latestResting !== null && restingBaseline !== null ? latestResting - restingBaseline : null,
+      stepsToday: timezoneContext.latest?.steps ?? null,
+      hourOfDay: hourInZone(new Date(), timezoneContext.timezone),
+      memory: findings,
+    });
+
     return reply.send({
       findings: findings.map((f) => ({ ...f, sentence: describeFinding(f, 'recovery', true) })),
       bestFocusHours: bestHours,
+      recoveryActions,
       windowDays: MEMORY_WINDOW_DAYS,
       historyDays: WELLNESS_HISTORY_DAYS,
     });

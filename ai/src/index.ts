@@ -148,6 +148,12 @@ export {
   type TimedOccurrence,
 } from './wellnessMemory.js';
 export {
+  rankRecoveryActions,
+  type RecoveryAction,
+  type RecoveryActionInput,
+  type RecoveryActionKind,
+} from './recoveryActions.js';
+export {
   composeDailyBrief,
   computeOvernightChanges,
   computeReadiness,

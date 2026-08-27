@@ -298,19 +298,31 @@ body {
  * aliased here too, so components written against the player's
  * vocabulary work anywhere in the app, not just inside .ms-player. */
 .ms-luxury {
-  --lux-bg-ground: #0a0b0a;
-  --lux-bg-card: #0f1110;
-  --lux-bg-card-2: #161816;
-  --lux-hairline: rgba(255, 255, 255, 0.07);
-  --lux-hairline-gold: rgba(201, 169, 97, 0.18);
-  --lux-sage: #8ba890;
-  --lux-gold: #c9a961;
+  /* Elevation ladder. Two things were retuned here for depth: the steps
+   * between levels were widened (the old #0a0b0a/#0f1110/#161816 sat so
+   * close together that a raised card barely read as raised), and every
+   * level carries a slight green cast rather than being neutral grey —
+   * so the darks read as the same designed palette as the sage/gold
+   * accents instead of a generic dark theme behind them. Every text
+   * token below still clears WCAG AA on all three surfaces (measured;
+   * the tightest pairing is muted-on-card-2 at 6.3:1). */
+  --lux-bg-ground: #080a09;
+  --lux-bg-card: #101413;
+  --lux-bg-card-2: #1a1f1d;
+  --lux-hairline: rgba(255, 255, 255, 0.08);
+  --lux-hairline-gold: rgba(201, 169, 97, 0.2);
+  /* A top-edge highlight, the way a real material catches light from
+   * above. Used as an inset box-shadow on raised surfaces — this is
+   * most of what separates "premium" from "flat rectangle". */
+  --lux-edge-light: rgba(255, 255, 255, 0.055);
+  --lux-sage: #8fb094;
+  --lux-gold: #cdad63;
   /* Retuned from the old #d9a8c8 pink, which read as a different
    * palette next to sage/gold. Carries the same job: the critical /
    * "went the wrong way" accent. */
-  --lux-rose: #cf8b8b;
-  --lux-ink: #e8e9e7;
-  --lux-muted: #9a9c99;
+  --lux-rose: #d29191;
+  --lux-ink: #eceeec;
+  --lux-muted: #9ba09d;
 
   /* Player vocabulary, available app-wide. */
   --gold-raw: #c9a961;
@@ -346,33 +358,33 @@ body {
   --canvas: var(--lux-bg-ground);
   --surface: var(--lux-bg-card);
   --surface-raised: var(--lux-bg-card-2);
-  --surface-hover: #1c1f1c;
+  --surface-hover: #202523;
   --line: var(--lux-hairline);
   --line-strong: rgba(255, 255, 255, 0.14);
   --ink: var(--lux-ink);
-  --ink-secondary: #c2c4c1;
+  --ink-secondary: #c5c8c5;
   --ink-muted: var(--lux-muted);
   --brand: var(--lux-sage);
-  --brand-hover: #9dbaa2;
+  --brand-hover: #a2c1a7;
   --gold: var(--lux-gold);
-  --gold-bg: rgba(201, 169, 97, 0.14);
+  --gold-bg: rgba(205, 173, 99, 0.15);
   --terracotta: var(--lux-rose);
-  --terracotta-bg: rgba(207, 139, 139, 0.14);
+  --terracotta-bg: rgba(210, 145, 145, 0.14);
   --success: var(--lux-sage);
-  --success-bg: rgba(139, 168, 144, 0.14);
+  --success-bg: rgba(143, 176, 148, 0.14);
   /* Status hues muted toward the sage/gold palette — the previous set
    * (#ff916e / #ff7a7a / #93b4e0) were saturated enough to read as a
    * different design language on this ground. All four still clear
-   * WCAG AA against #0a0b0a. */
+   * WCAG AA against the ground. */
   --warning: #d9a86a;
   --warning-bg: rgba(217, 168, 106, 0.14);
-  --danger: #cf8b8b;
-  --danger-bg: rgba(207, 139, 139, 0.14);
+  --danger: #d29191;
+  --danger-bg: rgba(210, 145, 145, 0.14);
   --info: #93aab5;
   --info-bg: rgba(147, 170, 181, 0.14);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 12px 28px -10px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 28px 56px -20px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 14px 34px -12px rgba(0, 0, 0, 0.62);
+  --shadow-lg: 0 32px 64px -22px rgba(0, 0, 0, 0.72);
 
   /* Chart series hues — one fixed hue per health metric (color follows
    * the entity, everywhere it appears), stepped into OKLCH L 0.48–0.67

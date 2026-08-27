@@ -55,7 +55,15 @@ export function Section({
   return (
     <section
       className={`rounded-[24px] p-5 ${className}`}
-      style={{ background: "var(--lux-bg-card)", border: "1px solid var(--lux-hairline)" }}
+      style={{
+        background: "var(--lux-bg-card)",
+        border: "1px solid var(--lux-hairline)",
+        // A one-pixel lit top edge plus a soft ambient drop. Together
+        // these are what make a card read as a raised material rather
+        // than a filled rectangle — the single cheapest premium cue on
+        // a dark UI, and it costs no extra element.
+        boxShadow: "inset 0 1px 0 var(--lux-edge-light), var(--shadow-md)",
+      }}
     >
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">

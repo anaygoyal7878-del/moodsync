@@ -35,14 +35,14 @@ export function Sidebar({ email }: { email: string }) {
         <span className="text-[15px] font-semibold tracking-tight">MoodSync</span>
       </Link>
 
-      {/* Grouped rather than one flat 18-item list — the groups are the
-          companion flow (Today / Routines / Understand / Environment /
-          Account), which is what makes a control center scannable
-          instead of a menu. */}
-      <div className="flex flex-1 flex-col gap-5">
+      {/* Three groups (see NAV_GROUPS) rather than five — fewer headings
+          to read past before the eye lands on a link. The active row is
+          marked with a sage rail rather than only a fill, so the current
+          page is findable in one glance down the edge. */}
+      <div className="flex flex-1 flex-col gap-4">
         {NAV_GROUPS.map((group) => (
-          <div key={group.label} className="flex flex-col gap-0.5">
-            <h2 className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-muted">{group.label}</h2>
+          <div key={group.label} className="flex flex-col gap-px">
+            <h2 className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-muted">{group.label}</h2>
             {group.items.map((section) => {
               const isActive =
                 "exact" in section && section.exact ? pathname === section.href : pathname.startsWith(section.href);
@@ -52,11 +52,18 @@ export function Sidebar({ email }: { email: string }) {
                   key={section.href}
                   href={section.href}
                   aria-current={isActive ? "page" : undefined}
-                  className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`relative flex items-center gap-2.5 rounded-lg px-3 py-[7px] text-[13.5px] font-medium transition-colors duration-150 ${
                     isActive ? "bg-surface-raised text-ink" : "text-ink-secondary hover:bg-surface-hover hover:text-ink"
                   }`}
                 >
-                  <Icon size={17} aria-hidden="true" className={isActive ? "text-brand" : ""} />
+                  {isActive && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute left-0 top-1/2 h-4 w-[2.5px] -translate-y-1/2 rounded-full"
+                      style={{ background: "var(--brand)" }}
+                    />
+                  )}
+                  <Icon size={16} aria-hidden="true" className={isActive ? "text-brand" : "opacity-80"} />
                   <span>{section.label}</span>
                 </Link>
               );
