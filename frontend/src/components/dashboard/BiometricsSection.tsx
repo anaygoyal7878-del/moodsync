@@ -1,26 +1,147 @@
-import { Card } from "@/components/ui/Card";
-import { TrendChart } from "@/components/ui/charts/TrendChart";
-import { HeartRatePulse } from "./HeartRatePulse";
+import type { ReactNode } from "react";
+import { HeartPulse, Moon, Flame } from "lucide-react";
+import { PageHeader, Section } from "@/components/companion/CompanionPrimitives";
+import { ScoreRing } from "@/components/ui/charts/ScoreRing";
+import { MetricAreaChart, type MetricPoint } from "@/components/ui/charts/MetricAreaChart";
+import { DailyBarChart } from "@/components/ui/charts/DailyBarChart";
+import { SleepStagesChart, type SleepStagesPoint } from "@/components/ui/charts/SleepStagesChart";
 import { WellnessTimeline } from "./WellnessTimeline";
-import { metricLabel, METRIC_UNITS } from "@/lib/metrics";
+import { WEARABLE_LABELS } from "@/lib/providerDisplay";
 import type { NormalizedBiometricReading } from "@moodsync/shared";
 
-const METRIC_ORDER: Array<keyof NormalizedBiometricReading> = [
-  "recoveryScore",
-  "sleepScore",
-  "deepSleepMinutes",
-  "remSleepMinutes",
-  "lightSleepMinutes",
-  "heartRate",
-  "restingHeartRate",
-  "stressLevel",
-  "activityLevel",
-  "steps",
-  "calories",
-];
+/**
+ * The Health page: one hue per metric (see --viz-* in globals.css —
+ * validated as a set for this surface), one labeled panel per metric,
+ * grouped Heart / Sleep / Activity the way a wearable-native health app
+ * lays it out. Every chart is single-series inside its own labeled
+ * panel, so identity never rides on color alone and no legend is needed
+ * anywhere except the sleep-stage stack (which has one).
+ */
+
+type NumericKey =
+  | "heartRate"
+  | "restingHeartRate"
+  | "heartRateVariability"
+  | "respiratoryRate"
+  | "bloodOxygen"
+  | "sleepScore"
+  | "recoveryScore"
+  | "activityLevel"
+  | "steps"
+  | "calories";
 
 function shortTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric" });
+}
+
+function shortDay(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { weekday: "short" });
+}
+
+function dayKey(iso: string): string {
+  return new Date(iso).toDateString();
+}
+
+/** Full-resolution chronological series for one metric. */
+function intradaySeries(chronological: NormalizedBiometricReading[], key: NumericKey): MetricPoint[] {
+  return chronological
+    .filter((r) => r[key] !== undefined)
+    .map((r) => ({ x: shortTime(r.timestamp), value: r[key] as number }));
+}
+
+/** One point per calendar day (the day's last reading that has the
+ * metric) — the right resolution for once-a-day values like resting HR
+ * or sleep score, where plotting every sync would just repeat the same
+ * number. */
+function dailySeries(chronological: NormalizedBiometricReading[], key: NumericKey): MetricPoint[] {
+  const byDay = new Map<string, NormalizedBiometricReading>();
+  for (const reading of chronological) {
+    if (reading[key] !== undefined) byDay.set(dayKey(reading.timestamp), reading);
+  }
+  return [...byDay.values()].map((r) => ({ x: shortDay(r.timestamp), value: r[key] as number }));
+}
+
+function sleepStagesSeries(chronological: NormalizedBiometricReading[]): SleepStagesPoint[] {
+  const byDay = new Map<string, NormalizedBiometricReading>();
+  for (const reading of chronological) {
+    if (
+      reading.deepSleepMinutes !== undefined ||
+      reading.remSleepMinutes !== undefined ||
+      reading.lightSleepMinutes !== undefined
+    ) {
+      byDay.set(dayKey(reading.timestamp), reading);
+    }
+  }
+  return [...byDay.values()].map((r) => ({
+    x: shortDay(r.timestamp),
+    deep: r.deepSleepMinutes ?? 0,
+    rem: r.remSleepMinutes ?? 0,
+    light: r.lightSleepMinutes ?? 0,
+  }));
+}
+
+function formatDelta(series: MetricPoint[], unit?: string): string | null {
+  if (series.length < 2) return null;
+  const delta = series[series.length - 1].value - series[0].value;
+  if (delta === 0) return "flat this week";
+  const magnitude = Math.abs(Math.round(delta * 10) / 10);
+  return `${delta > 0 ? "▲" : "▼"} ${magnitude}${unit ? ` ${unit}` : ""} this week`;
+}
+
+/** One labeled metric panel: colored identity dot + name, the latest
+ * value large, an optional week-over-week delta, and the metric's chart
+ * below. The panel border is a hairline on the section's own surface so
+ * the chart renders on the exact card color the palette was validated
+ * against. */
+function MetricPanel({
+  label,
+  color,
+  value,
+  unit,
+  delta,
+  children,
+  className = "",
+}: {
+  label: string;
+  color: string;
+  value: string | null;
+  unit?: string;
+  delta?: string | null;
+  children?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`rounded-[16px] p-4 ${className}`} style={{ border: "1px solid var(--lux-hairline)" }}>
+      <div className="flex items-center gap-1.5">
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} aria-hidden="true" />
+        <p className="text-[11px] font-medium uppercase tracking-[0.06em]" style={{ color: "var(--lux-muted)" }}>
+          {label}
+        </p>
+      </div>
+      {value !== null && (
+        <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <p className="font-luxury-display tabular text-[26px] font-semibold leading-none" style={{ color: "var(--lux-ink)" }}>
+            {value}
+            {unit && (
+              <span className="ml-1 text-[13px] font-normal" style={{ color: "var(--lux-muted)" }}>
+                {unit}
+              </span>
+            )}
+          </p>
+          {delta && (
+            <p className="text-[11px]" style={{ color: "var(--lux-muted)" }}>
+              {delta}
+            </p>
+          )}
+        </div>
+      )}
+      {children && <div className="mt-3">{children}</div>}
+    </div>
+  );
+}
+
+function providerLabel(provider: string): string {
+  return (WEARABLE_LABELS[provider.toUpperCase()] as string | undefined) ?? provider;
 }
 
 export function BiometricsSection({
@@ -30,50 +151,195 @@ export function BiometricsSection({
   latest: NormalizedBiometricReading | null;
   history: NormalizedBiometricReading[];
 }) {
-  // `history` arrives newest-first (see /api/biometrics/history) —
-  // TrendChart reads left-to-right chronologically, so reverse it.
-  const heartRateSeries = [...history]
-    .reverse()
-    .filter((r) => r.heartRate !== undefined)
-    .map((r) => ({ date: shortTime(r.timestamp), value: r.heartRate as number }));
+  // `history` arrives newest-first (see /api/biometrics/history); every
+  // chart reads left-to-right chronologically.
+  const chronological = [...history].reverse();
+
+  const heartRate = intradaySeries(chronological, "heartRate");
+  const restingHR = dailySeries(chronological, "restingHeartRate");
+  const hrv = dailySeries(chronological, "heartRateVariability");
+  const bloodOxygen = dailySeries(chronological, "bloodOxygen");
+  const sleepScore = dailySeries(chronological, "sleepScore");
+  const sleepStages = sleepStagesSeries(chronological);
+  const steps = dailySeries(chronological, "steps");
+  const calories = dailySeries(chronological, "calories");
+
+  // The newest reading that actually carries the metric — NOT just the
+  // newest reading overall. Intraday syncs are sparse (a midday push has
+  // heart rate and steps but no sleep score), so reading every metric
+  // off `latest` alone would blank the sleep ring the moment any
+  // afternoon sync lands.
+  const latestOf = (key: NumericKey): number | null => {
+    for (let i = chronological.length - 1; i >= 0; i--) {
+      const value = chronological[i][key];
+      if (value !== undefined) return value as number;
+    }
+    const value = latest?.[key];
+    return value === undefined ? null : (value as number);
+  };
+
+  const rings = [
+    { label: "Recovery", value: latestOf("recoveryScore"), color: "var(--viz-recovery)" },
+    { label: "Sleep", value: latestOf("sleepScore"), color: "var(--viz-sleep)" },
+    { label: "Activity", value: latestOf("activityLevel"), color: "var(--viz-activity)" },
+  ].filter((ring) => ring.value !== null);
+
+  if (!latest) {
+    return (
+      <div className="flex flex-col gap-5">
+        <PageHeader title="Health" subtitle="Your body's signals, straight from your wearable." />
+        <Section title="No biometric data yet" subtitle="Connect a wearable and sync to see your health here.">
+          <p className="text-[13px]" style={{ color: "var(--lux-muted)" }}>
+            Once readings arrive, this page shows your heart, sleep, and activity trends — each metric charted in its
+            own color over the last week.
+          </p>
+        </Section>
+      </div>
+    );
+  }
+
+  const hasHeartData = latestOf("heartRate") !== null || restingHR.length > 0 || hrv.length > 0 || bloodOxygen.length > 0;
+  const hasSleepData = sleepScore.length > 0 || sleepStages.length > 0;
+  const hasActivityData = steps.length > 0 || calories.length > 0 || latestOf("activityLevel") !== null;
 
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Today&apos;s biometrics</h2>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="Health"
+        subtitle={`As of ${new Date(latest.timestamp).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · ${providerLabel(latest.provider)}`}
+      />
 
-      {!latest ? (
-        <Card className="flex flex-col items-start gap-1.5 py-6">
-          <p className="text-sm font-medium text-ink">No biometric data yet</p>
-          <p className="text-sm text-ink-secondary">Connect a wearable and sync to see readings here.</p>
-        </Card>
-      ) : (
-        <>
-          <HeartRatePulse latest={latest} />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {METRIC_ORDER.filter((key) => latest[key] !== undefined).map((key) => (
-              <Card key={key} className="py-4 transition-colors hover:bg-surface-hover">
-                <p className="text-xs uppercase tracking-wide text-ink-muted">{metricLabel(key)}</p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums">
-                  {String(latest[key])}
-                  {METRIC_UNITS[key] && <span className="ml-1 text-sm font-normal text-ink-secondary">{METRIC_UNITS[key]}</span>}
-                </p>
-              </Card>
+      {rings.length > 0 && (
+        <Section title="Today" subtitle="Scores out of 100, from your latest sync." className="lux-stagger-1">
+          <div className="flex flex-wrap items-start justify-around gap-x-6 gap-y-4 py-1">
+            {rings.map((ring) => (
+              <ScoreRing key={ring.label} value={ring.value} label={ring.label} color={ring.color} />
             ))}
           </div>
-          <p className="text-xs text-ink-muted">
-            As of {new Date(latest.timestamp).toLocaleString()} · from {latest.provider}
-          </p>
-        </>
+        </Section>
       )}
 
-      {heartRateSeries.length > 1 && (
-        <Card>
-          <p className="mb-3 text-xs uppercase tracking-wide text-ink-muted">Heart rate · last {heartRateSeries.length} readings</p>
-          <TrendChart data={heartRateSeries} label="Heart rate" unit="bpm" color="var(--brand)" />
-        </Card>
+      {hasHeartData && (
+        <Section title="Heart" icon={HeartPulse} className="lux-stagger-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {heartRate.length > 0 && (
+              <MetricPanel
+                label="Heart rate"
+                color="var(--viz-heart)"
+                value={latestOf("heartRate") !== null ? String(Math.round(latestOf("heartRate") as number)) : null}
+                unit="bpm"
+                className="sm:col-span-2"
+              >
+                <MetricAreaChart data={heartRate} color="var(--viz-heart)" label="Heart rate" unit="bpm" />
+              </MetricPanel>
+            )}
+            {restingHR.length > 0 && (
+              <MetricPanel
+                label="Resting heart rate"
+                color="var(--viz-rhr)"
+                value={String(restingHR[restingHR.length - 1].value)}
+                unit="bpm"
+                delta={formatDelta(restingHR, "bpm")}
+              >
+                <MetricAreaChart data={restingHR} color="var(--viz-rhr)" label="Resting HR" unit="bpm" height={120} />
+              </MetricPanel>
+            )}
+            {hrv.length > 0 && (
+              <MetricPanel
+                label="Heart rate variability"
+                color="var(--viz-hrv)"
+                value={String(Math.round(hrv[hrv.length - 1].value))}
+                unit="ms"
+                delta={formatDelta(hrv, "ms")}
+              >
+                <MetricAreaChart data={hrv} color="var(--viz-hrv)" label="HRV" unit="ms" height={120} />
+              </MetricPanel>
+            )}
+            {bloodOxygen.length > 0 && (
+              <MetricPanel
+                label="Blood oxygen"
+                color="var(--viz-oxygen)"
+                value={String(bloodOxygen[bloodOxygen.length - 1].value)}
+                unit="% SpO₂"
+                delta={formatDelta(bloodOxygen, "%")}
+              >
+                <MetricAreaChart data={bloodOxygen} color="var(--viz-oxygen)" label="SpO₂" unit="%" height={120} domain={[85, 100]} />
+              </MetricPanel>
+            )}
+            {latestOf("respiratoryRate") !== null && (
+              <MetricPanel
+                label="Respiratory rate"
+                color="var(--lux-muted)"
+                value={String(latestOf("respiratoryRate"))}
+                unit="breaths/min"
+              />
+            )}
+          </div>
+        </Section>
+      )}
+
+      {hasSleepData && (
+        <Section title="Sleep" icon={Moon} className="lux-stagger-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {sleepScore.length > 0 && (
+              <MetricPanel
+                label="Sleep score"
+                color="var(--viz-sleep)"
+                value={String(sleepScore[sleepScore.length - 1].value)}
+                unit="/100"
+                delta={formatDelta(sleepScore)}
+                className={sleepStages.length === 0 ? "sm:col-span-2" : undefined}
+              >
+                <MetricAreaChart data={sleepScore} color="var(--viz-sleep)" label="Sleep score" height={140} domain={[0, 100]} />
+              </MetricPanel>
+            )}
+            {sleepStages.length > 0 && (
+              <MetricPanel
+                label="Sleep stages"
+                color="var(--viz-sleep-deep)"
+                value={null}
+                className={sleepScore.length === 0 ? "sm:col-span-2" : undefined}
+              >
+                <SleepStagesChart data={sleepStages} height={160} />
+              </MetricPanel>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {hasActivityData && (
+        <Section title="Activity" icon={Flame} className="lux-stagger-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {steps.length > 0 && (
+              <MetricPanel
+                label="Steps"
+                color="var(--viz-activity)"
+                value={steps[steps.length - 1].value.toLocaleString()}
+                delta={formatDelta(steps)}
+                className="sm:col-span-2"
+              >
+                <DailyBarChart data={steps} color="var(--viz-activity)" label="Steps" />
+              </MetricPanel>
+            )}
+            {calories.length > 0 && (
+              <MetricPanel
+                label="Active calories"
+                color="var(--viz-activity)"
+                value={Math.round(calories[calories.length - 1].value).toLocaleString()}
+                unit="kcal"
+                delta={formatDelta(calories, "kcal")}
+              >
+                <MetricAreaChart data={calories} color="var(--viz-activity)" label="Calories" unit="kcal" height={120} />
+              </MetricPanel>
+            )}
+            {latestOf("activityLevel") !== null && (
+              <MetricPanel label="Activity level" color="var(--viz-activity)" value={String(latestOf("activityLevel"))} unit="/100" />
+            )}
+          </div>
+        </Section>
       )}
 
       <WellnessTimeline history={history} />
-    </section>
+    </div>
   );
 }

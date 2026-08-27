@@ -374,6 +374,29 @@ body {
   --shadow-md: 0 12px 28px -10px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 28px 56px -20px rgba(0, 0, 0, 0.6);
 
+  /* Chart series hues — one fixed hue per health metric (color follows
+   * the entity, everywhere it appears), stepped into OKLCH L 0.48–0.67
+   * with C >= 0.10 for the #0f1110 card surface and validated with the
+   * dataviz palette validator: every set that shares one chart passes
+   * adjacent CVD/normal-vision separation and 3:1 surface contrast
+   * (recovery/sleep/stress lines; recovery/sleep/activity rings; the
+   * sleep-stage ordinal ramp). Deliberately more chromatic than the lux
+   * UI tokens — these are data marks, not chrome, and desaturating them
+   * to match the chrome is what made the old charts read as gray. */
+  --viz-heart: #dc5d5f;
+  --viz-rhr: #b48c2b;
+  --viz-hrv: #05a388;
+  --viz-oxygen: #578ed4;
+  --viz-sleep: #8e71d6;
+  /* Ordinal depth ramp (one violet hue, monotone lightness, each step
+   * >= 2:1 on the card surface): deep is the lightest/most prominent. */
+  --viz-sleep-deep: #c9bcf2;
+  --viz-sleep-rem: #9d8cd8;
+  --viz-sleep-light: #6b5da6;
+  --viz-recovery: #429c5a;
+  --viz-activity: #cf7b26;
+  --viz-stress: #ae931d;
+
   background: var(--lux-bg-ground);
   color: var(--lux-ink);
   /* Outfit, matching the player. Space Grotesk still carries display

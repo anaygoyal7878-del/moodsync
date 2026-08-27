@@ -66,7 +66,7 @@ export const NAV_GROUPS = [
       { href: "/dashboard/insights", label: "Insights", icon: TrendingUp },
       { href: "/dashboard/weekly-report", label: "Weekly report", icon: CalendarClock },
       { href: "/dashboard/wellness", label: "Wellness scores", icon: Sparkles },
-      { href: "/dashboard/biometrics", label: "Biometrics", icon: Activity },
+      { href: "/dashboard/biometrics", label: "Health", icon: Activity },
       { href: "/dashboard/recommendations", label: "Recommendations", icon: Wand2 },
     ],
   },

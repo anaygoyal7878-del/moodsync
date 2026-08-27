@@ -3,6 +3,7 @@
 import { LineChart, Line, XAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Card } from "@/components/ui/Card";
 import { usePrefersReducedMotion } from "@/components/ui/charts/usePrefersReducedMotion";
+import { AXIS_TICK, GRID_STROKE, TOOLTIP_CONTENT_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_CURSOR } from "@/components/ui/charts/chartChrome";
 import type { NormalizedBiometricReading } from "@moodsync/shared";
 
 interface SeriesDef {
@@ -11,10 +12,14 @@ interface SeriesDef {
   color: string;
 }
 
+/** Each series wears its metric's own app-wide hue (--viz-*, defined in
+ * globals.css) — this exact triple is one of the validated adjacent
+ * sets, so the three lines stay separable under CVD simulation on the
+ * card surface. */
 const SERIES: SeriesDef[] = [
-  { key: "recoveryScore", label: "Recovery", color: "var(--success)" },
-  { key: "sleepScore", label: "Sleep", color: "var(--info)" },
-  { key: "stressLevel", label: "Stress", color: "var(--warning)" },
+  { key: "recoveryScore", label: "Recovery", color: "var(--viz-recovery)" },
+  { key: "sleepScore", label: "Sleep", color: "var(--viz-sleep)" },
+  { key: "stressLevel", label: "Stress", color: "var(--viz-stress)" },
 ];
 
 function shortTime(iso: string): string {
@@ -46,23 +51,9 @@ export function WellnessTimeline({ history }: { history: NormalizedBiometricRead
       <p className="mb-3 text-xs uppercase tracking-wide text-ink-muted">Wellness timeline · last {data.length} readings</p>
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
-          <XAxis
-            dataKey="date"
-            tick={{ fill: "var(--ink-muted)", fontSize: 11 }}
-            tickLine={false}
-            axisLine={{ stroke: "var(--line)" }}
-          />
-          <Tooltip
-            contentStyle={{
-              background: "var(--surface-raised)",
-              border: "1px solid var(--line)",
-              borderRadius: "var(--radius-md)",
-              fontSize: "0.75rem",
-              color: "var(--ink)",
-            }}
-            labelStyle={{ color: "var(--ink-muted)" }}
-          />
+          <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
+          <XAxis dataKey="date" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: GRID_STROKE }} />
+          <Tooltip contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} cursor={TOOLTIP_CURSOR} />
           <Legend wrapperStyle={{ fontSize: "0.75rem", color: "var(--ink-secondary)" }} />
           {availableSeries.map((s) => (
             <Line
