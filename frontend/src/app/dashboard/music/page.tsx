@@ -9,15 +9,15 @@ import { useMusicKit } from "@/lib/musicKitClient";
 import { artworkUrl } from "@/lib/appleMusicArtwork";
 import { RecommendedForNow } from "@/components/dashboard/RecommendedForNow";
 import { AdaptiveMusic } from "@/components/companion/AdaptiveMusic";
+import { MusicEffectChart } from "@/components/dashboard/music/MusicEffectChart";
 
-/** Real, honest roadmap — every one of these needs either real listening
- * history (which can't exist before a working connection does) or
- * things this session was explicitly told to defer. Shown as a labeled
- * roadmap, not built as dead nav links returning empty pages — see
- * docs/APPLE_MUSIC_ARCHITECTURE.md §5 for why each is deferred. */
+/** Real, honest roadmap — deferred work only (see
+ * docs/APPLE_MUSIC_ARCHITECTURE.md §5). "Listening Analytics" used to
+ * sit here too; it shipped as /dashboard/music/analytics plus the
+ * session-effect chart on this page, so listing it would be claiming
+ * something already true. */
 const ROADMAP_ITEMS = [
   { title: "Automation Music", detail: "Let automations start music client-side when a rule fires." },
-  { title: "Listening Analytics", detail: "Genre/mood breakdowns and wellness correlations." },
 ];
 
 function PlaybackStateLabel({ state }: { state: MusicKit.PlaybackStates | null }) {
@@ -94,33 +94,51 @@ function RecentlyPlayed() {
     };
   }, [instance, status]);
 
+  // Owns its section header so the page never shows a "Recently played"
+  // heading over nothing when Apple Music isn't connected.
   if (status.kind !== "ready" || !status.authorized) return null;
-  if (error) return <p className="text-xs text-ink-muted">{error}</p>;
-  if (!tracks) return <p className="text-xs text-ink-muted">Loading recently played…</p>;
-  if (tracks.length === 0) return <p className="text-xs text-ink-muted">No recently played tracks yet.</p>;
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-      {tracks.slice(0, 8).map((track) => {
-        const art = artworkUrl(track.attributes?.artwork, 200);
-        return (
-          <div key={track.id} className="flex flex-col gap-1.5">
-            {art ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={art} alt="" className="aspect-square w-full rounded-lg object-cover shadow-[var(--shadow-sm)]" />
-            ) : (
-              <div className="aspect-square w-full rounded-lg bg-surface-raised" aria-hidden="true" />
-            )}
-            <p className="truncate text-xs font-medium">{track.attributes?.name}</p>
-            <p className="truncate text-xs text-ink-muted">{track.attributes?.artistName}</p>
-          </div>
-        );
-      })}
-    </div>
+    <section className="flex flex-col gap-3">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Recently played</h2>
+      {error ? (
+        <p className="text-xs text-ink-muted">{error}</p>
+      ) : !tracks ? (
+        <p className="text-xs text-ink-muted">Loading recently played…</p>
+      ) : tracks.length === 0 ? (
+        <p className="text-xs text-ink-muted">No recently played tracks yet.</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+          {tracks.slice(0, 8).map((track) => {
+            const art = artworkUrl(track.attributes?.artwork, 200);
+            return (
+              <div key={track.id} className="flex flex-col gap-1.5">
+                {art ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={art} alt="" className="aspect-square w-full rounded-lg object-cover shadow-[var(--shadow-sm)]" />
+                ) : (
+                  <div className="aspect-square w-full rounded-lg bg-surface-raised" aria-hidden="true" />
+                )}
+                <p className="truncate text-xs font-medium">{track.attributes?.name}</p>
+                <p className="truncate text-xs text-ink-muted">{track.attributes?.artistName}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
-export default function MusicHomePage() {
+/** The playback slot at the top of the page — the player entry when
+ * Apple Music is authorized, otherwise the connect (or not-configured)
+ * card in its place. Split out so an unavailable provider only replaces
+ * this slot: everything below it is MoodSync's own wellness layer
+ * (mood picker, recommendations, measured session effects) and renders
+ * regardless. The page used to early-return the connect card as the
+ * whole page, which hid all of that behind a provider that wasn't even
+ * configured. */
+function PlaybackSlot() {
   const { status, authorize } = useMusicKit();
   const [connecting, setConnecting] = useState(false);
 
@@ -170,7 +188,7 @@ export default function MusicHomePage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
       {/* The player is the headline of this section, so it leads rather
           than sitting in the link grid below. */}
       <Link href="/dashboard/music/player" className="block">
@@ -206,6 +224,14 @@ export default function MusicHomePage() {
       </Link>
 
       <NowPlayingCard />
+    </>
+  );
+}
+
+export default function MusicHomePage() {
+  return (
+    <div className="flex flex-col gap-6">
+      <PlaybackSlot />
 
       {/* One-tap mood picker sits above the single "recommended right
           now" card — the picker is what you use when you already know
@@ -213,6 +239,13 @@ export default function MusicHomePage() {
       <AdaptiveMusic />
 
       <RecommendedForNow />
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">How music moves you</h2>
+        <Card>
+          <MusicEffectChart />
+        </Card>
+      </section>
 
       <div className="grid grid-cols-2 gap-3">
         <Link href="/dashboard/music/search">
@@ -237,10 +270,7 @@ export default function MusicHomePage() {
         </Link>
       </div>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Recently played</h2>
-        <RecentlyPlayed />
-      </section>
+      <RecentlyPlayed />
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Coming next</h2>

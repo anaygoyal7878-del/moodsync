@@ -1,12 +1,15 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { HeartPulse, Moon, Flame } from "lucide-react";
 import { PageHeader, Section } from "@/components/companion/CompanionPrimitives";
 import { ScoreRing } from "@/components/ui/charts/ScoreRing";
 import { MetricAreaChart, type MetricPoint } from "@/components/ui/charts/MetricAreaChart";
 import { DailyBarChart } from "@/components/ui/charts/DailyBarChart";
 import { SleepStagesChart, type SleepStagesPoint } from "@/components/ui/charts/SleepStagesChart";
+import { SampleBadge } from "@/components/ui/SampleBadge";
 import { WellnessTimeline } from "./WellnessTimeline";
 import { WEARABLE_LABELS } from "@/lib/providerDisplay";
+import { sampleBiometricHistory, sampleLatestReading } from "@/lib/sampleData";
 import type { NormalizedBiometricReading } from "@moodsync/shared";
 
 /**
@@ -147,13 +150,25 @@ function providerLabel(provider: string): string {
 export function BiometricsSection({
   latest,
   history,
+  embedded = false,
 }: {
   latest: NormalizedBiometricReading | null;
   history: NormalizedBiometricReading[];
+  /** True when this renders inside another page (the Today home page)
+   * rather than as its own route — drops the page-level header. */
+  embedded?: boolean;
 }) {
+  // With nothing connected, draw the sample week instead of an empty
+  // page — but only ever behind a visible "Sample data" badge (see
+  // lib/sampleData.ts). Real readings always win; there is no way to
+  // reach this fallback while any exist.
+  const isSample = latest === null;
+  const effectiveLatest = latest ?? sampleLatestReading();
+  const effectiveHistory = isSample ? sampleBiometricHistory() : history;
+
   // `history` arrives newest-first (see /api/biometrics/history); every
   // chart reads left-to-right chronologically.
-  const chronological = [...history].reverse();
+  const chronological = [...effectiveHistory].reverse();
 
   const heartRate = intradaySeries(chronological, "heartRate");
   const restingHR = dailySeries(chronological, "restingHeartRate");
@@ -174,7 +189,7 @@ export function BiometricsSection({
       const value = chronological[i][key];
       if (value !== undefined) return value as number;
     }
-    const value = latest?.[key];
+    const value = effectiveLatest[key];
     return value === undefined ? null : (value as number);
   };
 
@@ -184,19 +199,6 @@ export function BiometricsSection({
     { label: "Activity", value: latestOf("activityLevel"), color: "var(--viz-activity)" },
   ].filter((ring) => ring.value !== null);
 
-  if (!latest) {
-    return (
-      <div className="flex flex-col gap-5">
-        <PageHeader title="Health" subtitle="Your body's signals, straight from your wearable." />
-        <Section title="No biometric data yet" subtitle="Connect a wearable and sync to see your health here.">
-          <p className="text-[13px]" style={{ color: "var(--lux-muted)" }}>
-            Once readings arrive, this page shows your heart, sleep, and activity trends — each metric charted in its
-            own color over the last week.
-          </p>
-        </Section>
-      </div>
-    );
-  }
 
   const hasHeartData = latestOf("heartRate") !== null || restingHR.length > 0 || hrv.length > 0 || bloodOxygen.length > 0;
   const hasSleepData = sleepScore.length > 0 || sleepStages.length > 0;
@@ -204,13 +206,43 @@ export function BiometricsSection({
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader
-        title="Health"
-        subtitle={`As of ${new Date(latest.timestamp).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · ${providerLabel(latest.provider)}`}
-      />
+      {!embedded && (
+        <PageHeader
+          title="Health"
+          subtitle={
+            isSample
+              ? "A sample week — connect a wearable to see your own."
+              : `As of ${new Date(effectiveLatest.timestamp).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · ${providerLabel(effectiveLatest.provider)}`
+          }
+        />
+      )}
+
+      {isSample && (
+        <div
+          className="flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-[16px] px-4 py-3"
+          style={{ background: "var(--lux-bg-card)", border: "1px solid var(--lux-hairline-gold)" }}
+        >
+          <SampleBadge />
+          <p className="text-[12.5px]" style={{ color: "var(--lux-muted)" }}>
+            No wearable connected yet — these are example readings, not yours.
+          </p>
+          <Link
+            href="/dashboard/connections"
+            className="text-[12.5px] font-medium underline underline-offset-2"
+            style={{ color: "var(--lux-sage)" }}
+          >
+            Connect one
+          </Link>
+        </div>
+      )}
 
       {rings.length > 0 && (
-        <Section title="Today" subtitle="Scores out of 100, from your latest sync." className="lux-stagger-1">
+        <Section
+          title="Today"
+          subtitle={isSample ? "Example scores out of 100." : "Scores out of 100, from your latest sync."}
+          className="lux-stagger-1"
+          action={isSample ? <SampleBadge /> : undefined}
+        >
           <div className="flex flex-wrap items-start justify-around gap-x-6 gap-y-4 py-1">
             {rings.map((ring) => (
               <ScoreRing key={ring.label} value={ring.value} label={ring.label} color={ring.color} />
@@ -220,7 +252,7 @@ export function BiometricsSection({
       )}
 
       {hasHeartData && (
-        <Section title="Heart" icon={HeartPulse} className="lux-stagger-2">
+        <Section title="Heart" icon={HeartPulse} action={isSample ? <SampleBadge /> : undefined} className="lux-stagger-2">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {heartRate.length > 0 && (
               <MetricPanel
@@ -279,7 +311,7 @@ export function BiometricsSection({
       )}
 
       {hasSleepData && (
-        <Section title="Sleep" icon={Moon} className="lux-stagger-3">
+        <Section title="Sleep" icon={Moon} action={isSample ? <SampleBadge /> : undefined} className="lux-stagger-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {sleepScore.length > 0 && (
               <MetricPanel
@@ -308,7 +340,7 @@ export function BiometricsSection({
       )}
 
       {hasActivityData && (
-        <Section title="Activity" icon={Flame} className="lux-stagger-4">
+        <Section title="Activity" icon={Flame} action={isSample ? <SampleBadge /> : undefined} className="lux-stagger-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {steps.length > 0 && (
               <MetricPanel

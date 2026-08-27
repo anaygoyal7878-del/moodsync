@@ -1,14 +1,7 @@
-import { backendFetch } from "@/lib/api";
-import { BiometricsSection } from "@/components/dashboard/BiometricsSection";
-import type { NormalizedBiometricReading } from "@moodsync/shared";
+import { redirect } from "next/navigation";
 
-export default async function BiometricsPage() {
-  const [latestResult, historyResult] = await Promise.all([
-    backendFetch<{ reading: NormalizedBiometricReading | null }>("/api/biometrics/latest"),
-    backendFetch<{ readings: NormalizedBiometricReading[] }>("/api/biometrics/history?days=7"),
-  ]);
-  const latest = latestResult.ok ? latestResult.data.reading : null;
-  const history = historyResult.ok ? historyResult.data.readings : [];
-
-  return <BiometricsSection latest={latest} history={history} />;
+/** The Health view now lives on the Today home page — this route
+ * survives only so old links and bookmarks land somewhere real. */
+export default function BiometricsPage() {
+  redirect("/dashboard");
 }

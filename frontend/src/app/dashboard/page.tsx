@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { backendFetch } from "@/lib/api";
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { LuxuryWeekBars } from "@/components/luxury/LuxuryWeekBars";
+import { BiometricsSection } from "@/components/dashboard/BiometricsSection";
 import { LuxuryActivityRow } from "@/components/luxury/LuxuryActivityRow";
 import { StudyPlannerCard } from "@/components/luxury/StudyPlannerCard";
 import { DailyBriefHero, OvernightChanges, BriefGuidance, ScoreStrip } from "@/components/companion/DailyBriefHero";
@@ -49,6 +49,7 @@ export default async function DashboardHomePage() {
   const [
     briefResult,
     historyResult,
+    latestResult,
     automationHistoryResult,
     pauseResult,
     meditationSessionsResult,
@@ -57,6 +58,7 @@ export default async function DashboardHomePage() {
   ] = await Promise.all([
     backendFetch<DailyBriefResponse>("/api/daily-brief"),
     backendFetch<{ readings: NormalizedBiometricReading[] }>("/api/biometrics/history?days=7"),
+    backendFetch<{ reading: NormalizedBiometricReading | null }>("/api/biometrics/latest"),
     backendFetch<{ entries: AutomationHistoryEntry[] }>("/api/automation-history?limit=10"),
     backendFetch<{ pausedUntil: string | null; isPaused: boolean }>("/api/preferences/automation-pause"),
     backendFetch<{ sessions: MeditationSessionEntry[] }>("/api/meditation-sessions?limit=5"),
@@ -77,6 +79,7 @@ export default async function DashboardHomePage() {
       };
 
   const history = historyResult.ok ? historyResult.data.readings : [];
+  const latestReading = latestResult.ok ? latestResult.data.reading : null;
   const automationHistory = automationHistoryResult.ok ? automationHistoryResult.data.entries : [];
   const meditationSessions = meditationSessionsResult.ok ? meditationSessionsResult.data.sessions : [];
   const focusSessions = focusSessionsResult.ok ? focusSessionsResult.data.sessions : [];
@@ -140,21 +143,14 @@ export default async function DashboardHomePage() {
         <QuickActions isPaused={isPaused} luxury />
       </div>
 
-      {history.length > 0 && (
-        <section
-          data-tour="recovery-pattern"
-          className="lux-stagger-4 rounded-[24px] p-5"
-          style={{ background: "var(--lux-bg-card)", border: "1px solid var(--lux-hairline)" }}
-        >
-          <h2 className="font-luxury-display text-[15px] font-semibold" style={{ color: "var(--lux-ink)" }}>
-            Recovery pattern
-          </h2>
-          <p className="mb-4 text-[12px]" style={{ color: "var(--lux-muted)" }}>
-            Last 7 days
-          </p>
-          <LuxuryWeekBars history={history} />
-        </section>
-      )}
+      {/* The full Health view — score rings and per-metric colored
+          charts, moved here from its old /dashboard/biometrics route so
+          the day's body signals live on the same screen as the brief.
+          Keeps the old "Recovery pattern" section's tour anchor: the
+          tour step about trends now spotlights these charts. */}
+      <section data-tour="recovery-pattern" className="lux-stagger-4">
+        <BiometricsSection latest={latestReading} history={history} embedded />
+      </section>
 
       {topRecommendation && (
         <Link

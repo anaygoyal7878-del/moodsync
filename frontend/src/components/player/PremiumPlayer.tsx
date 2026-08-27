@@ -7,6 +7,7 @@ import { useMusicKit } from "@/lib/musicKitClient";
 import { artworkUrl } from "@/lib/appleMusicArtwork";
 import { AuroraDisc } from "./AuroraDisc";
 import { EmotionalProgressPanel } from "./EmotionalProgressPanel";
+import { SessionTrendChart, type SessionTrendPoint } from "./SessionTrendChart";
 import { SeekBar } from "./SeekBar";
 import { PlaybackControls } from "./PlaybackControls";
 import type { MusicLiveStateResponse } from "@/lib/types";
@@ -76,6 +77,16 @@ export function PremiumPlayer() {
     return () => clearInterval(interval);
   }, [instance]);
 
+  // Two real points when a session is running (start → now); anything
+  // less and SessionTrendChart draws its sample curve instead.
+  const trendPoints: SessionTrendPoint[] =
+    live.session?.baselineHeartRate != null && live.current.heartRate != null
+      ? [
+          { minute: 0, bpm: live.session.baselineHeartRate },
+          { minute: Math.max(1, Math.round(live.elapsedMinutes ?? 1)), bpm: live.current.heartRate },
+        ]
+      : [];
+
   const art = nowPlayingItem ? artworkUrl(nowPlayingItem.attributes?.artwork, 400) : null;
   const trackTitle = nowPlayingItem?.attributes?.name ?? live.session?.itemName ?? "Nothing playing";
   const artist = nowPlayingItem?.attributes?.artistName ?? null;
@@ -129,6 +140,13 @@ export function PremiumPlayer() {
 
           <main className="flex flex-1 flex-col gap-5 px-6 pt-4">
             <EmotionalProgressPanel live={live} />
+
+            {/* The moving half of the story the panel above tells in
+                numbers. `/music-sessions/live` returns the current
+                reading rather than a series, so a running session plots
+                the two points it can prove — baseline and now — and the
+                chart falls back to its labeled sample curve otherwise. */}
+            <SessionTrendChart data={trendPoints} baseline={live.session?.baselineHeartRate ?? null} />
 
             <div className="flex justify-center py-2">
               <AuroraDisc artworkUrl={art} playing={playing} />
