@@ -354,6 +354,12 @@ async function resolveReply(
     if (/\b429\b|RESOURCE_EXHAUSTED|exceeded your current quota/i.test(message)) {
       return { text: "I've hit my daily question limit — I'll be able to answer again tomorrow.", intent: 'quota_exceeded' };
     }
+    // Ran out of time rather than got refused. Worth its own wording:
+    // "try again in a moment" is right here in a way it isn't for quota,
+    // because the next attempt genuinely may land.
+    if (error instanceof Error && error.name === 'GeminiDeadlineError') {
+      return { text: "That took longer than I could wait on — ask me again and it'll usually go through.", intent: 'timeout' };
+    }
     return { text: "I couldn't work that out just now. Try again in a moment.", intent: 'error' };
   }
 }

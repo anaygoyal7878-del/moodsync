@@ -8,7 +8,7 @@ import {
   type MessagingTool,
 } from './messagingTools.js';
 import { compileConversationProfile, renderProfileBlock, type InboundRecord } from './messagingProfile.js';
-import { withGeminiRetry } from './geminiRetry.js';
+import { withGeminiRetry, geminiCallOptions } from './geminiRetry.js';
 
 /** Same alias rationale as claraChat.ts — see that file's comment. */
 const MODEL = 'gemini-flash-latest';
@@ -130,7 +130,7 @@ export async function sendAgenticMessage(
         client.models.generateContent({
           model: MODEL,
           contents,
-          config: { systemInstruction: systemPrompt, tools: toGeminiTools(tools) },
+          config: { systemInstruction: systemPrompt, tools: toGeminiTools(tools), ...geminiCallOptions() },
         }),
       'clara.agentic',
     );

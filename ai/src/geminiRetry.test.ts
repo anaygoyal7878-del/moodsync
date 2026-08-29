@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ApiError } from '@google/genai';
-import { withGeminiRetry, isRetryableGeminiError } from './geminiRetry.js';
+import { withGeminiRetry, isRetryableGeminiError, geminiCallOptions } from './geminiRetry.js';
 
 /** The real shape the SDK throws — the 503 that started this. */
 function apiError(status: number, message = 'boom'): ApiError {
@@ -36,6 +36,14 @@ describe('isRetryableGeminiError', () => {
     expect(isRetryableGeminiError(new Error('fetch failed'))).toBe(true);
     expect(isRetryableGeminiError(new Error('socket hang up'))).toBe(true);
     expect(isRetryableGeminiError(new Error('ETIMEDOUT'))).toBe(true);
+  });
+
+  it('retries our own per-attempt timeout — "too slow" is transient', () => {
+    // The SDK surfaces an aborted request as AbortError with a message
+    // matching none of the network wording, so this needs its own case.
+    const aborted = new Error('This operation was aborted');
+    aborted.name = 'AbortError';
+    expect(isRetryableGeminiError(aborted)).toBe(true);
   });
 
   it('does not retry an ordinary programming error', () => {
@@ -123,6 +131,28 @@ describe('withGeminiRetry', () => {
 
     await expect(settle(withGeminiRetry(call))).rejects.toBe(quota);
     expect(call).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up on the deadline instead of retrying into a two-minute wait', async () => {
+    // The failure this exists for: an overloaded Gemini took ~30s to
+    // return each 503, so three attempts stacked to 94s and one request
+    // ran past 120s. Failing honestly at the deadline beats that.
+    const call = vi.fn().mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30_000));
+      throw apiError(503, 'The model is overloaded.');
+    });
+
+    const error = await settle(withGeminiRetry(call)).catch((e: unknown) => e);
+
+    expect((error as Error).name).toBe('GeminiDeadlineError');
+    // Stopped early rather than using every attempt.
+    expect(call.mock.calls.length).toBeLessThan(3);
+  });
+
+  it('exposes a per-attempt timeout and abort signal for callers to pass through', () => {
+    const options = geminiCallOptions(1234);
+    expect(options.timeout).toBe(1234);
+    expect(options.abortSignal).toBeInstanceOf(AbortSignal);
   });
 
   it('backs off exponentially rather than hammering an overloaded model', async () => {

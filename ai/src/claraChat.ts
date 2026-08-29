@@ -7,7 +7,7 @@ import {
   meditationSessionRepository,
 } from '@moodsync/database';
 import { computeWellnessScores, type WellnessScores } from './wellness.js';
-import { withGeminiRetry } from './geminiRetry.js';
+import { withGeminiRetry, geminiCallOptions } from './geminiRetry.js';
 
 export interface ClaraChatMessage {
   role: 'user' | 'assistant';
@@ -138,7 +138,7 @@ export async function sendClaraMessage(userId: string, messages: ClaraChatMessag
           role: m.role === 'assistant' ? 'model' : 'user',
           parts: [{ text: m.content }],
         })),
-        config: { systemInstruction },
+        config: { systemInstruction, ...geminiCallOptions() },
       }),
     'clara.chat',
   );

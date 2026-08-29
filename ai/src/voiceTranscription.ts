@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { ClaraNotConfiguredError } from './claraChat.js';
-import { withGeminiRetry } from './geminiRetry.js';
+import { withGeminiRetry, geminiCallOptions } from './geminiRetry.js';
 
 /**
  * Turns a voice message into text, so it can enter the exact same
@@ -83,6 +83,7 @@ export async function transcribeVoiceMessage(audio: { data: Buffer; mimeType: st
             ],
           },
         ],
+        config: { ...geminiCallOptions() },
       }),
     'clara.transcribe',
   );

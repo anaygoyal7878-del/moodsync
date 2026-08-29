@@ -47,9 +47,49 @@ const MAX_ATTEMPTS = 3;
  * second and a half of added wait in the worst case. */
 const BASE_DELAY_MS = 400;
 
+/**
+ * Hard ceiling on the whole retry sequence, backoffs included.
+ *
+ * This is the load-bearing number, and it was added after measuring:
+ * an overloaded Gemini took ~30s to *return* each 503, so three
+ * attempts stacked into a 94-second wait, and one request sat past 120s.
+ * Retrying a slow failure without a deadline doesn't add resilience, it
+ * multiplies the outage. A person staring at a text thread has given up
+ * long before then — failing honestly at 45s beats succeeding at 120s.
+ */
+const TOTAL_DEADLINE_MS = 45_000;
+/** Per-attempt ceiling, enforced by the caller through the SDK's own
+ * `timeout`/`abortSignal` (see `geminiCallOptions`). Bounds a single
+ * hung request so one stall can't eat the whole budget. */
+export const ATTEMPT_TIMEOUT_MS = 20_000;
+
 /** Status codes worth trying again. See the doc comment for why 4xx —
  * 429 very much included — is deliberately absent. */
 const RETRYABLE_STATUS = new Set([500, 503, 504]);
+
+/** Thrown when the whole sequence runs past `TOTAL_DEADLINE_MS`.
+ * Distinct from a Gemini error so callers can tell "the model said no"
+ * apart from "we ran out of time asking". */
+export class GeminiDeadlineError extends Error {
+  constructor(elapsedMs: number) {
+    super(`Gemini call exceeded the ${TOTAL_DEADLINE_MS}ms deadline after ${elapsedMs}ms`);
+    this.name = 'GeminiDeadlineError';
+  }
+}
+
+/**
+ * Per-request options bounding a single attempt, spread into
+ * `generateContent`'s `config`. Both are set: `timeout` is the SDK's own
+ * ceiling, and `abortSignal` actually severs a socket that stops
+ * responding without closing — the case `timeout` alone has been known
+ * to miss.
+ */
+export function geminiCallOptions(timeoutMs: number = ATTEMPT_TIMEOUT_MS): {
+  timeout: number;
+  abortSignal: AbortSignal;
+} {
+  return { timeout: timeoutMs, abortSignal: AbortSignal.timeout(timeoutMs) };
+}
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -70,7 +110,14 @@ export function isRetryableGeminiError(error: unknown): boolean {
     // RETRYABLE_STATUS above.
     if (/\b(500|503|504)\b/.test(error.message)) return true;
     if (/\b429\b|RESOURCE_EXHAUSTED|exceeded your current quota/i.test(error.message)) return false;
-    return /overloaded|unavailable|timeout|timed out|socket hang up|ECONNRESET|ETIMEDOUT|fetch failed/i.test(
+    // Our own per-attempt timeout firing. The SDK surfaces it as
+    // `AbortError: This operation was aborted`, which matches none of
+    // the wording below — so without this an attempt we cancelled for
+    // being slow was treated as a hard failure and never retried, which
+    // defeats the point of bounding it. "Too slow this time" is the
+    // definition of transient.
+    if (error.name === 'AbortError' || error.name === 'TimeoutError') return true;
+    return /overloaded|unavailable|timeout|timed out|aborted|socket hang up|ECONNRESET|ETIMEDOUT|fetch failed/i.test(
       error.message,
     );
   }
@@ -83,6 +130,7 @@ export function isRetryableGeminiError(error: unknown): boolean {
  * and rethrows immediately for anything not worth retrying.
  */
 export async function withGeminiRetry<T>(call: () => Promise<T>, label = 'gemini'): Promise<T> {
+  const startedAt = Date.now();
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -93,10 +141,23 @@ export async function withGeminiRetry<T>(call: () => Promise<T>, label = 'gemini
       if (!isRetryableGeminiError(error) || attempt === MAX_ATTEMPTS) throw error;
 
       const wait = BASE_DELAY_MS * 2 ** (attempt - 1);
+      // Stop if the next attempt plus its backoff can't finish inside
+      // the budget. Checked *before* sleeping, so we never burn the
+      // backoff only to abandon the attempt it was waiting for — and it
+      // budgets the attempt's own worst case (ATTEMPT_TIMEOUT_MS), not
+      // just the sleep. Counting only the sleep let a 20s attempt start
+      // at the 40s mark and blow straight through a 45s deadline, which
+      // is the whole thing this is meant to prevent.
+      const elapsed = Date.now() - startedAt;
+      if (elapsed + wait + ATTEMPT_TIMEOUT_MS > TOTAL_DEADLINE_MS) {
+        console.warn(`${label}: out of time after ${elapsed}ms — giving up rather than retrying into the deadline`);
+        throw new GeminiDeadlineError(elapsed);
+      }
+
       // Logged, not silent: a reply that took three attempts is worth
       // seeing in the logs even though the user never notices.
       console.warn(
-        `${label}: transient failure on attempt ${attempt}/${MAX_ATTEMPTS}, retrying in ${wait}ms —`,
+        `${label}: transient failure on attempt ${attempt}/${MAX_ATTEMPTS} (${elapsed}ms elapsed), retrying in ${wait}ms —`,
         error instanceof Error ? error.message : error,
       );
       await delay(wait);
