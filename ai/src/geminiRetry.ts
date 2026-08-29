@@ -37,6 +37,15 @@ import { ApiError } from '@google/genai';
  * rather than the minutes-long backoff a batch job could afford. If
  * every attempt fails the last error is rethrown unchanged, so callers
  * keep whatever error handling they already had.
+ *
+ * `withGeminiRetry` is single-model: it retries the one model it was
+ * given. `withGeminiFallback` (below) wraps it across a short list of
+ * models sharing one deadline, for the case retry alone can't fix — the
+ * model itself is saturated and every retry lands on the same crowd.
+ * Built from a live measurement, not a guess: during an outage where
+ * every `*-latest` alias and every other 3.x model on this key returned
+ * 503 for several minutes straight, `gemini-3.1-flash-lite` answered
+ * immediately. See `CLARA_MODEL_CANDIDATES`.
  */
 
 /** Total attempts, not retries — 3 means the original call plus two
@@ -94,6 +103,25 @@ export function geminiCallOptions(timeoutMs: number = ATTEMPT_TIMEOUT_MS): {
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+/**
+ * The model fallback chain every Clara call site should pass to
+ * `withGeminiFallback`, in priority order.
+ *
+ * `gemini-flash-latest` leads because it's Google's own
+ * always-current alias — no code change needed as models get
+ * deprecated, which is the whole reason this codebase prefers aliases
+ * over dated names (see the git history of this comment for the 404
+ * that motivated it). `gemini-3.1-flash-lite` is the fallback: a dated
+ * name, so it can itself be deprecated later, but it's what was
+ * actually measured to have spare capacity during a live outage where
+ * every `*-latest` alias and every other 3.x model on this key
+ * returned 503 for several minutes straight. One fallback, not several
+ * — each extra candidate is only reachable after the ones before it
+ * have burned their own retries and backoff, so a long list mostly adds
+ * latency to the failure case rather than real coverage.
+ */
+export const CLARA_MODEL_CANDIDATES = ['gemini-flash-latest', 'gemini-3.1-flash-lite'] as const;
 
 /** The slice of a Gemini response worth recording. Structurally typed
  * rather than importing the SDK's response type, so this stays usable
@@ -175,30 +203,54 @@ export function isRetryableGeminiError(error: unknown): boolean {
  * Runs `call`, retrying transient Gemini failures with exponential
  * backoff. Rethrows the final error unchanged when every attempt fails,
  * and rethrows immediately for anything not worth retrying.
+ *
+ * `deadlineAtMs` is an absolute timestamp, not a duration — internal,
+ * so `withGeminiFallback` can hand every model candidate a *shared*
+ * clock instead of each one getting its own fresh `TOTAL_DEADLINE_MS`
+ * (which would let N candidates cost N times the budget). Callers of
+ * `withGeminiRetry` directly don't pass this; it defaults to "now plus
+ * the normal budget", which is the single-model behavior this had
+ * before fallback existed.
+ *
+ * `maxAttempts` is the other fallback-only knob, and it exists because
+ * of a real measured failure: with the default 3 attempts, a single
+ * saturated model can burn the *entire* 45s deadline before
+ * `withGeminiFallback` ever gets to try the next candidate — an attempt
+ * that genuinely hangs for the full `ATTEMPT_TIMEOUT_MS` costs as much
+ * as the whole point of having a second model. `withGeminiFallback`
+ * passes 1 for every candidate except the last, so breadth (try another
+ * model) wins over depth (retry the same one three times) — the last
+ * candidate has nowhere left to fall back to, so it gets the full
+ * budget instead.
  */
-export async function withGeminiRetry<T>(call: () => Promise<T>, label = 'gemini'): Promise<T> {
+export async function withGeminiRetry<T>(
+  call: () => Promise<T>,
+  label = 'gemini',
+  deadlineAtMs: number = Date.now() + TOTAL_DEADLINE_MS,
+  maxAttempts: number = MAX_ATTEMPTS,
+): Promise<T> {
   const startedAt = Date.now();
   let lastError: unknown;
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const result = await call();
       logGeminiUsage(label, result, Date.now() - startedAt, attempt);
       return result;
     } catch (error) {
       lastError = error;
-      if (!isRetryableGeminiError(error) || attempt === MAX_ATTEMPTS) throw error;
+      if (!isRetryableGeminiError(error) || attempt === maxAttempts) throw error;
 
       const wait = BASE_DELAY_MS * 2 ** (attempt - 1);
-      // Stop if the next attempt plus its backoff can't finish inside
-      // the budget. Checked *before* sleeping, so we never burn the
+      // Stop if the next attempt plus its backoff can't finish before
+      // the deadline. Checked *before* sleeping, so we never burn the
       // backoff only to abandon the attempt it was waiting for — and it
       // budgets the attempt's own worst case (ATTEMPT_TIMEOUT_MS), not
       // just the sleep. Counting only the sleep let a 20s attempt start
-      // at the 40s mark and blow straight through a 45s deadline, which
+      // right before the deadline and blow straight through it, which
       // is the whole thing this is meant to prevent.
       const elapsed = Date.now() - startedAt;
-      if (elapsed + wait + ATTEMPT_TIMEOUT_MS > TOTAL_DEADLINE_MS) {
+      if (Date.now() + wait + ATTEMPT_TIMEOUT_MS > deadlineAtMs) {
         console.warn(`${label}: out of time after ${elapsed}ms — giving up rather than retrying into the deadline`);
         throw new GeminiDeadlineError(elapsed);
       }
@@ -206,10 +258,89 @@ export async function withGeminiRetry<T>(call: () => Promise<T>, label = 'gemini
       // Logged, not silent: a reply that took three attempts is worth
       // seeing in the logs even though the user never notices.
       console.warn(
-        `${label}: transient failure on attempt ${attempt}/${MAX_ATTEMPTS} (${elapsed}ms elapsed), retrying in ${wait}ms —`,
+        `${label}: transient failure on attempt ${attempt}/${maxAttempts} (${elapsed}ms elapsed), retrying in ${wait}ms —`,
         error instanceof Error ? error.message : error,
       );
       await delay(wait);
+    }
+  }
+
+  throw lastError;
+}
+
+/** True for a 404 that means "this model name doesn't exist / isn't
+ * available to this project" — Gemini's own deprecation message shape
+ * ("no longer available to new users", "no longer available", pointing
+ * at a replacement model). Distinct from `isRetryableGeminiError`: a 404
+ * is not worth a same-model retry (the next attempt fails identically),
+ * but it *is* a reason to try the next model candidate in a fallback
+ * list, since the problem is this specific name, not the request. */
+function isModelUnavailable(error: unknown): boolean {
+  if (error instanceof ApiError) return error.status === 404;
+  return error instanceof Error && /\b404\b|NOT_FOUND|no longer available/i.test(error.message);
+}
+
+/**
+ * Tries each model in `models`, in order, sharing one total deadline —
+ * `withGeminiRetry`'s own backoff runs *within* each candidate, so a
+ * flaky-but-not-dead model still gets its fair 3 attempts before
+ * fallback moves on.
+ *
+ * Built from a live, measured gap, not a guess: during an outage where
+ * `gemini-flash-latest` (and every other 3.x model checked) returned
+ * 503 for several minutes straight, `gemini-3.1-flash-lite` on the same
+ * key answered normally and immediately. Model-wide capacity crunches
+ * don't hit every model at once — this is what lets a request survive
+ * one that's currently hot without the caller waiting out the whole
+ * outage on it.
+ *
+ * Falls through to the next candidate on a retryable failure (503-class,
+ * or our own timeout) once THIS model's retries are exhausted, and on a
+ * 404 (`isModelUnavailable`) immediately, since a same-model retry can't
+ * fix a name that doesn't exist. Anything else — a bad key, a malformed
+ * request, quota exhaustion — fails on the first candidate and stops:
+ * every other model would reject it identically, so trying the rest is
+ * pure latency, exactly like `isRetryableGeminiError`'s reasoning for a
+ * single model. A deadline that expires mid-list stops the list too;
+ * one honest timeout beats grinding through the remaining candidates
+ * with no time left to actually call any of them.
+ */
+export async function withGeminiFallback<T>(
+  models: readonly string[],
+  callFactory: (model: string) => Promise<T>,
+  label = 'gemini',
+): Promise<T> {
+  if (models.length === 0) throw new Error('withGeminiFallback needs at least one model candidate');
+
+  const startedAt = Date.now();
+  const deadlineAtMs = startedAt + TOTAL_DEADLINE_MS;
+  let lastError: unknown;
+
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i]!;
+    const isLastCandidate = i === models.length - 1;
+    // Out of time is its own error, not whatever the last real model
+    // happened to say — a caller checking "did the model refuse" vs
+    // "did we run out of time asking" needs that distinction to hold
+    // even when the deadline trips between candidates rather than mid-
+    // attempt (single-attempt non-final candidates skip the in-attempt
+    // deadline check entirely, so this is the only place that catches
+    // "the previous hang already used up the whole budget").
+    if (Date.now() >= deadlineAtMs) throw new GeminiDeadlineError(Date.now() - startedAt);
+
+    try {
+      // Every candidate but the last gets exactly one attempt: a model
+      // that's genuinely down should be left behind fast so there's
+      // still time to reach the next one, rather than spending the
+      // deadline retrying it three times over. The last candidate has
+      // nowhere left to fall back to, so it gets the normal full budget
+      // instead of failing fast for no benefit.
+      return await withGeminiRetry(() => callFactory(model), `${label}[${model}]`, deadlineAtMs, isLastCandidate ? undefined : 1);
+    } catch (error) {
+      lastError = error;
+      if (error instanceof GeminiDeadlineError) throw error;
+      if (!isRetryableGeminiError(error) && !isModelUnavailable(error)) throw error;
+      console.warn(`${label}: ${model} unavailable, trying next candidate —`, error instanceof Error ? error.message : error);
     }
   }
 

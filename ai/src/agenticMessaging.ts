@@ -8,10 +8,7 @@ import {
   type MessagingTool,
 } from './messagingTools.js';
 import { compileConversationProfile, renderProfileBlock, type InboundRecord } from './messagingProfile.js';
-import { withGeminiRetry, geminiCallOptions } from './geminiRetry.js';
-
-/** Same alias rationale as claraChat.ts — see that file's comment. */
-const MODEL = 'gemini-flash-latest';
+import { withGeminiFallback, geminiCallOptions, CLARA_MODEL_CANDIDATES } from './geminiRetry.js';
 
 /** Hard ceiling on tool-call round trips in one turn. A well-behaved
  * conversation needs at most 2-3 (e.g. list devices, then propose an
@@ -122,13 +119,14 @@ export async function sendAgenticMessage(
   const systemPrompt = systemInstruction + SYSTEM_PROMPT_SUFFIX + capabilityBlock + profileBlock;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    // Retried per round rather than around the whole loop: a 503 on
-    // round 2 must not replay round 1's tool call, which may already
-    // have executed something.
-    const response = await withGeminiRetry(
-      () =>
+    // Retried (and, per model, model-fallback'd) per round rather than
+    // around the whole loop: a 503 on round 2 must not replay round 1's
+    // tool call, which may already have executed something.
+    const response = await withGeminiFallback(
+      CLARA_MODEL_CANDIDATES,
+      (model) =>
         client.models.generateContent({
-          model: MODEL,
+          model,
           contents,
           config: { systemInstruction: systemPrompt, tools: toGeminiTools(tools), ...geminiCallOptions() },
         }),

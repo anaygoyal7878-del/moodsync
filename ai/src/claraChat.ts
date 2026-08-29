@@ -7,7 +7,7 @@ import {
   meditationSessionRepository,
 } from '@moodsync/database';
 import { computeWellnessScores, type WellnessScores } from './wellness.js';
-import { withGeminiRetry, geminiCallOptions } from './geminiRetry.js';
+import { withGeminiFallback, geminiCallOptions, CLARA_MODEL_CANDIDATES } from './geminiRetry.js';
 
 export interface ClaraChatMessage {
   role: 'user' | 'assistant';
@@ -20,14 +20,6 @@ export class ClaraNotConfiguredError extends Error {
   }
 }
 
-/** Google's maintained "latest flash" alias rather than a dated model
- * name (e.g. `gemini-2.5-flash`) — confirmed live against this
- * project's real key that a dated name can 404 with "no longer
- * available to new users" even while still listed in `models.list`,
- * so pinning to a specific version is the wrong tradeoff here; the
- * alias is what Google itself repoints as models get deprecated.
- * Free-tier-eligible on Google AI Studio (ai.google.dev/gemini-api/docs/rate-limits). */
-const MODEL = 'gemini-flash-latest';
 
 /** Renders one score for the system prompt, or "no data yet" — Clara
  * must never guess a number the way it must never fabricate anything
@@ -130,10 +122,11 @@ export async function sendClaraMessage(userId: string, messages: ClaraChatMessag
   const client = new GoogleGenAI({ apiKey });
   const systemInstruction = await buildClaraSystemPrompt(userId);
 
-  const response = await withGeminiRetry(
-    () =>
+  const response = await withGeminiFallback(
+    CLARA_MODEL_CANDIDATES,
+    (model) =>
       client.models.generateContent({
-        model: MODEL,
+        model,
         contents: messages.map((m) => ({
           role: m.role === 'assistant' ? 'model' : 'user',
           parts: [{ text: m.content }],

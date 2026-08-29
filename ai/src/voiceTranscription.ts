@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { ClaraNotConfiguredError } from './claraChat.js';
-import { withGeminiRetry, geminiCallOptions } from './geminiRetry.js';
+import { withGeminiFallback, geminiCallOptions, CLARA_MODEL_CANDIDATES } from './geminiRetry.js';
 
 /**
  * Turns a voice message into text, so it can enter the exact same
@@ -21,8 +21,6 @@ import { withGeminiRetry, geminiCallOptions } from './geminiRetry.js';
  * token cost is small relative to the model calls already made per
  * conversation turn.
  */
-
-const MODEL = 'gemini-flash-latest';
 
 export class TranscriptionError extends Error {}
 
@@ -68,10 +66,11 @@ export async function transcribeVoiceMessage(audio: { data: Buffer; mimeType: st
   if (!apiKey) throw new ClaraNotConfiguredError();
 
   const client = new GoogleGenAI({ apiKey });
-  const response = await withGeminiRetry(
-    () =>
+  const response = await withGeminiFallback(
+    CLARA_MODEL_CANDIDATES,
+    (model) =>
       client.models.generateContent({
-        model: MODEL,
+        model,
         contents: [
           {
             role: 'user',

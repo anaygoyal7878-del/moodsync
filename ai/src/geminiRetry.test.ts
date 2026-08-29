@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ApiError } from '@google/genai';
-import { withGeminiRetry, isRetryableGeminiError, geminiCallOptions } from './geminiRetry.js';
+import { withGeminiRetry, withGeminiFallback, isRetryableGeminiError, geminiCallOptions, GeminiDeadlineError } from './geminiRetry.js';
 
 /** The real shape the SDK throws — the 503 that started this. */
 function apiError(status: number, message = 'boom'): ApiError {
@@ -199,5 +199,115 @@ describe('withGeminiRetry', () => {
 
     expect(delays).toEqual([400, 800]);
     setTimeoutSpy.mockRestore();
+  });
+});
+
+describe('withGeminiFallback', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  async function settle<T>(promise: Promise<T>): Promise<T> {
+    const tracked = promise.then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error }),
+    );
+    await vi.runAllTimersAsync();
+    const result = await tracked;
+    if (result.ok) return result.value;
+    throw result.error;
+  }
+
+  it('uses the first model without ever calling the second when it succeeds', async () => {
+    const factory = vi.fn().mockResolvedValue('from primary');
+    const result = await settle(withGeminiFallback(['primary', 'secondary'], factory));
+
+    expect(result).toBe('from primary');
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(factory).toHaveBeenCalledWith('primary');
+  });
+
+  it('falls back to the next model after ONE attempt — the live-measured case', async () => {
+    // The exact scenario this exists for: gemini-flash-latest 503s
+    // solid, gemini-3.1-flash-lite answers immediately on the same key.
+    // Primary gets a single try, not its usual 3 — retrying a saturated
+    // model 3 times would burn the deadline before fallback ever ran,
+    // which is exactly what happened in production before this existed.
+    const factory = vi.fn().mockImplementation((model: string) =>
+      model === 'primary' ? Promise.reject(apiError(503, 'The model is overloaded.')) : Promise.resolve('from secondary'),
+    );
+
+    const result = await settle(withGeminiFallback(['primary', 'secondary'], factory));
+
+    expect(result).toBe('from secondary');
+    expect(factory.mock.calls.filter(([m]) => m === 'primary')).toHaveLength(1);
+    expect(factory.mock.calls.filter(([m]) => m === 'secondary')).toHaveLength(1);
+  });
+
+  it('gives the LAST candidate the full retry budget, since it has nowhere left to fall back to', async () => {
+    const factory = vi
+      .fn()
+      .mockRejectedValueOnce(apiError(503, 'overloaded'))
+      .mockRejectedValueOnce(apiError(503, 'overloaded'))
+      .mockResolvedValue('third attempt on the last model');
+
+    const result = await settle(withGeminiFallback(['only'], factory));
+
+    expect(result).toBe('third attempt on the last model');
+    expect(factory).toHaveBeenCalledTimes(3);
+  });
+
+  it('falls back immediately on a 404 without spending the first model\'s retries', async () => {
+    const notFound = apiError(404, 'This model models/primary is no longer available.');
+    const factory = vi.fn().mockImplementation((model: string) =>
+      model === 'primary' ? Promise.reject(notFound) : Promise.resolve('from secondary'),
+    );
+
+    const result = await settle(withGeminiFallback(['primary', 'secondary'], factory));
+
+    expect(result).toBe('from secondary');
+    // A same-model retry can't fix a name that doesn't exist.
+    expect(factory.mock.calls.filter(([m]) => m === 'primary')).toHaveLength(1);
+  });
+
+  it('does not fall back on a non-retryable, non-404 error — every model would reject it identically', async () => {
+    const badKey = apiError(401, 'API key not valid');
+    const factory = vi.fn().mockRejectedValue(badKey);
+
+    await expect(settle(withGeminiFallback(['primary', 'secondary'], factory))).rejects.toBe(badKey);
+    expect(factory.mock.calls.filter(([m]) => m === 'secondary')).toHaveLength(0);
+  });
+
+  it('does not fall back on quota exhaustion — every model on the project shares the same quota', async () => {
+    const quota = apiError(429, 'You exceeded your current quota');
+    const factory = vi.fn().mockRejectedValue(quota);
+
+    await expect(settle(withGeminiFallback(['primary', 'secondary'], factory))).rejects.toBe(quota);
+    expect(factory.mock.calls.filter(([m]) => m === 'secondary')).toHaveLength(0);
+  });
+
+  it('stops the whole list on a deadline rather than grinding through remaining candidates with no time left', async () => {
+    // Three candidates that each hang for 30s: the first two burn one
+    // attempt each (60s) before the third — which would get the full
+    // retry budget as the last candidate — is refused outright because
+    // the 45s deadline is already gone.
+    const call = vi.fn().mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30_000));
+      throw apiError(503, 'The model is overloaded.');
+    });
+
+    const error = await settle(withGeminiFallback(['primary', 'secondary', 'tertiary'], call)).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(GeminiDeadlineError);
+    expect(call.mock.calls.filter(([m]) => m === 'tertiary')).toHaveLength(0);
+  });
+
+  it('rejects an empty candidate list rather than silently doing nothing', async () => {
+    await expect(withGeminiFallback([], vi.fn())).rejects.toThrow(/at least one model/);
   });
 });
