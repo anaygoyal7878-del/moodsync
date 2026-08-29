@@ -22,7 +22,10 @@ const {
   findByUserAndProviderMock: vi.fn(),
   findLatestNormalizedMock: vi.fn(),
   listRecentNormalizedMock: vi.fn(async () => []),
-  listRecentForUserMock: vi.fn(async () => []),
+  // Explicitly typed for the same reason as getAppleCalendarSnapshotMock
+  // below: a bare `[]` return narrows the mock to `never[]`, and a test
+  // resolving real caffeine logs stops compiling.
+  listRecentForUserMock: vi.fn(async (): Promise<Array<{ mg: number; loggedAt: Date }>> => []),
   createCaffeineLogMock: vi.fn(),
   addMemoryFactMock: vi.fn(),
   createPendingCalendarWriteMock: vi.fn(),
@@ -170,6 +173,28 @@ describe('log_caffeine_intake — write tool', () => {
   it('rejects an unknown drink type with no custom amount rather than logging 0mg', async () => {
     await expect(MESSAGING_TOOLS.log_caffeine_intake!.handler('u1', {})).rejects.toThrow();
     expect(createCaffeineLogMock).not.toHaveBeenCalled();
+  });
+
+  it('returns a deterministic receipt naming the mg, not a model paraphrase', async () => {
+    // The model previously narrated this and replied "Logged your
+    // espresso." — dropping the estimate the user is held to.
+    findLatestNormalizedMock.mockResolvedValueOnce(null);
+    const result = await MESSAGING_TOOLS.log_caffeine_intake!.handler('u1', { drinkType: 'espresso' });
+    expect(result.replyText).toContain('63mg');
+  });
+
+  it('names the resulting energy in the receipt when a wearable can supply one', async () => {
+    findLatestNormalizedMock.mockResolvedValueOnce({
+      reading: { timestamp: '2026-08-29T03:00:00Z', provider: 'apple_health', heartRate: 62, restingHeartRate: 55 },
+    });
+    listRecentNormalizedMock.mockResolvedValueOnce([]);
+    listRecentForUserMock.mockResolvedValueOnce([{ mg: 63, loggedAt: new Date() }]);
+
+    const result = await MESSAGING_TOOLS.log_caffeine_intake!.handler('u1', { drinkType: 'espresso' });
+    expect(result.replyText).toContain('63mg');
+    // Either a real energy figure or the honest "connect a wearable"
+    // fallback — never a silent omission.
+    expect(result.replyText).toMatch(/Energy now \d+\/100|Connect a wearable/);
   });
 });
 

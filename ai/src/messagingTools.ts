@@ -11,7 +11,7 @@ import { computeWellnessScores, type WellnessScores } from './wellness.js';
 import { computeLiveEnergyMeter } from './energyMeter.js';
 import { computeReadiness } from './dailyBrief.js';
 import { listHueLightsForUser, listHueScenesForUser } from './hueActionExecutor.js';
-import { CAFFEINE_DRINK_PRESETS } from './messagingAgent.js';
+import { CAFFEINE_DRINK_PRESETS, buildCaffeineLogReply } from './messagingAgent.js';
 
 /**
  * Task-completing tools for the messaging channel — see
@@ -49,6 +49,25 @@ export interface MessagingToolResult {
   /** Present only for action tools — the sentence shown to the user to
    * confirm before anything actually happens. */
   confirmPrompt?: string;
+  /**
+   * A finished confirmation for a write that already happened, used
+   * **verbatim** — the turn ends here and the model never gets to
+   * paraphrase it.
+   *
+   * This exists because letting the model narrate a completed write
+   * loses the specifics that make the confirmation worth sending.
+   * Logging an espresso returned `{ mg: 63, energyAfter }` and the model
+   * still replied "Logged your espresso." — technically true, and it
+   * threw away both the estimate the user is being held to and its
+   * effect on their energy. A confirmation is a receipt; a receipt with
+   * the numbers filed off is not one.
+   *
+   * Same reasoning the action tools already use for `confirmPrompt`:
+   * where a correct sentence can be composed deterministically, the
+   * model is not the right thing to compose it. It also saves the
+   * second round trip, since there is nothing left to ask.
+   */
+  replyText?: string;
 }
 
 export interface MessagingTool {
@@ -352,7 +371,10 @@ const logCaffeineIntake: MessagingTool = {
       ).value;
     }
 
-    return { data: { logged: true, mg, energyAfter } };
+    // Deterministic receipt rather than a model paraphrase: it names the
+    // mg estimate the user is being held to (they said "espresso", not
+    // "63mg") and what it did to their energy. See `replyText`.
+    return { data: { logged: true, mg, energyAfter }, replyText: buildCaffeineLogReply(mg, energyAfter) };
   },
 };
 

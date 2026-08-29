@@ -172,6 +172,14 @@ export async function sendAgenticMessage(
       };
     }
 
+    // A write tool that already composed its own receipt — used
+    // verbatim, ending the turn without a second model call. See
+    // MessagingToolResult.replyText for why the model doesn't get to
+    // rewrite a confirmation whose exact numbers are the point.
+    if (result.replyText) {
+      return { text: result.replyText, pendingAction: null };
+    }
+
     // Read tool: feed the result back and let the model produce the
     // actual reply, possibly after another tool call (e.g. list devices
     // then propose an action).

@@ -270,7 +270,14 @@ export function shapeReply(reply: string, maxChars: number = MAX_REPLY_CHARS): s
 export const MESSAGING_STYLE_PROMPT =
   'You are replying in a text-message thread, not a web app. Keep it under 4 short sentences. ' +
   'No markdown, no bullet lists, no headings — plain sentences only. ' +
-  'Never invent a number; if the data is missing, say so plainly. ' +
+  // Every rule below this line used to be a prohibition, and the replies
+  // showed it: told only what not to say, the model played safe and said
+  // nothing specific ("take it easy" for a question it had real recovery
+  // and sleep numbers to answer). Grounding has to be an instruction to
+  // cite, not just a ban on inventing.
+  'When a tool gave you real figures, say them: "recovery is 62, sleep 71" lands where "you seem under-recovered" does not. ' +
+  'Answer the question that was actually asked, then stop — no unprompted checklists or follow-up questions. ' +
+  'Never invent a number. If the data is missing, say so plainly and name the one thing that would fix it. ' +
   'Do not give medical advice or diagnose anything.';
 
 /** Confirmation after logging caffeine by text. States the estimate
