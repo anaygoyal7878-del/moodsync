@@ -8,6 +8,7 @@ import {
   type MessagingTool,
 } from './messagingTools.js';
 import { compileConversationProfile, renderProfileBlock, type InboundRecord } from './messagingProfile.js';
+import { withGeminiRetry } from './geminiRetry.js';
 
 /** Same alias rationale as claraChat.ts — see that file's comment. */
 const MODEL = 'gemini-flash-latest';
@@ -121,11 +122,18 @@ export async function sendAgenticMessage(
   const systemPrompt = systemInstruction + SYSTEM_PROMPT_SUFFIX + capabilityBlock + profileBlock;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const response = await client.models.generateContent({
-      model: MODEL,
-      contents,
-      config: { systemInstruction: systemPrompt, tools: toGeminiTools(tools) },
-    });
+    // Retried per round rather than around the whole loop: a 503 on
+    // round 2 must not replay round 1's tool call, which may already
+    // have executed something.
+    const response = await withGeminiRetry(
+      () =>
+        client.models.generateContent({
+          model: MODEL,
+          contents,
+          config: { systemInstruction: systemPrompt, tools: toGeminiTools(tools) },
+        }),
+      'clara.agentic',
+    );
 
     const calls = response.functionCalls ?? [];
     if (calls.length === 0) {
@@ -167,7 +175,21 @@ export async function sendAgenticMessage(
     // Read tool: feed the result back and let the model produce the
     // actual reply, possibly after another tool call (e.g. list devices
     // then propose an action).
-    contents.push({ role: 'model', parts: [{ functionCall: { name, args: call.args ?? {} } }] });
+    //
+    // The model's turn is echoed back *verbatim* — its own `content`
+    // object, not a `{ functionCall: { name, args } }` rebuilt from the
+    // parsed call. `gemini-flash-latest` now resolves to a Gemini 3.x
+    // thinking model, which attaches a `thoughtSignature` to the
+    // functionCall part and requires it back unmodified on the next
+    // turn; Google's thinking guide is explicit that thought blocks
+    // "MUST" be resent exactly as received. Reconstructing the part
+    // dropped that signature and every tool-using turn died with
+    // `400 INVALID_ARGUMENT: Function call is missing a
+    // thought_signature in functionCall parts`. The fallback only
+    // matters for a response with no candidate content, which would
+    // already have returned above.
+    const modelTurn = response.candidates?.[0]?.content;
+    contents.push(modelTurn ?? { role: 'model', parts: [{ functionCall: { name, args: call.args ?? {} } }] });
     contents.push({ role: 'user', parts: [createPartFromFunctionResponse(call.id ?? name, name, result.data)] });
   }
 

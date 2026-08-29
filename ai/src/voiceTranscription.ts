@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { ClaraNotConfiguredError } from './claraChat.js';
+import { withGeminiRetry } from './geminiRetry.js';
 
 /**
  * Turns a voice message into text, so it can enter the exact same
@@ -67,20 +68,24 @@ export async function transcribeVoiceMessage(audio: { data: Buffer; mimeType: st
   if (!apiKey) throw new ClaraNotConfiguredError();
 
   const client = new GoogleGenAI({ apiKey });
-  const response = await client.models.generateContent({
-    model: MODEL,
-    contents: [
-      {
-        role: 'user',
-        parts: [
+  const response = await withGeminiRetry(
+    () =>
+      client.models.generateContent({
+        model: MODEL,
+        contents: [
           {
-            text: 'Transcribe this voice message verbatim, in the language it was spoken. Return only the transcription — no preamble, no description of tone or background noise, no quotation marks around it.',
+            role: 'user',
+            parts: [
+              {
+                text: 'Transcribe this voice message verbatim, in the language it was spoken. Return only the transcription — no preamble, no description of tone or background noise, no quotation marks around it.',
+              },
+              { inlineData: { mimeType: audio.mimeType, data: audio.data.toString('base64') } },
+            ],
           },
-          { inlineData: { mimeType: audio.mimeType, data: audio.data.toString('base64') } },
         ],
-      },
-    ],
-  });
+      }),
+    'clara.transcribe',
+  );
 
   const text = response.text?.trim();
   if (!text) throw new TranscriptionError('Transcription returned no text');

@@ -7,6 +7,7 @@ import {
   meditationSessionRepository,
 } from '@moodsync/database';
 import { computeWellnessScores, type WellnessScores } from './wellness.js';
+import { withGeminiRetry } from './geminiRetry.js';
 
 export interface ClaraChatMessage {
   role: 'user' | 'assistant';
@@ -129,14 +130,18 @@ export async function sendClaraMessage(userId: string, messages: ClaraChatMessag
   const client = new GoogleGenAI({ apiKey });
   const systemInstruction = await buildClaraSystemPrompt(userId);
 
-  const response = await client.models.generateContent({
-    model: MODEL,
-    contents: messages.map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    })),
-    config: { systemInstruction },
-  });
+  const response = await withGeminiRetry(
+    () =>
+      client.models.generateContent({
+        model: MODEL,
+        contents: messages.map((m) => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }],
+        })),
+        config: { systemInstruction },
+      }),
+    'clara.chat',
+  );
 
   return response.text ?? '';
 }

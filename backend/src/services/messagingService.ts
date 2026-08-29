@@ -336,6 +336,24 @@ async function resolveReply(
     if (error instanceof ClaraNotConfiguredError) {
       return { text: "I can't answer questions right now — my AI isn't configured yet.", intent: 'not_configured' };
     }
+    // The user-facing copy is deliberately vague; the log must not be.
+    // This was previously swallowed entirely, so a Gemini outage and a
+    // genuine bug produced the identical silent "couldn't work that
+    // out" and the only way to tell them apart was to call the model by
+    // hand. Never remove this without replacing it.
+    console.error('clara: reply generation failed', {
+      connectionId: connection.id,
+      error: error instanceof Error ? { message: error.message, stack: error.stack } : error,
+    });
+
+    // Quota exhaustion gets its own reply. "Try again in a moment" is
+    // actively wrong for a daily cap — the next attempt fails the same
+    // way until the quota resets, so telling someone to retry sends
+    // them into a loop.
+    const message = error instanceof Error ? error.message : '';
+    if (/\b429\b|RESOURCE_EXHAUSTED|exceeded your current quota/i.test(message)) {
+      return { text: "I've hit my daily question limit — I'll be able to answer again tomorrow.", intent: 'quota_exceeded' };
+    }
     return { text: "I couldn't work that out just now. Try again in a moment.", intent: 'error' };
   }
 }
