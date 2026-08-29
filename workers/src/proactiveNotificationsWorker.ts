@@ -9,13 +9,27 @@
  * plus a second, separate pass at the bottom of this file sending plain
  * time-interval nudges (ai/src/recurringNudge.ts, deliberately NOT
  * deduped the same way — see that pass's own comment) to anyone who
- * opted into those. Run this on a periodic cron cadence
- * (suggested: every 30-60 minutes — frequent enough that "unusually
- * high recovery today" and the time-of-day scene pattern stay timely,
- * infrequent enough not to waste API calls/DB reads) via
+ * opted into those. Run this on a periodic cron cadence via
  * `npm run start:proactive-notifications -w workers`. Same "periodic
  * tick, only touch users with real data" shape as
  * `workers/src/weeklyReportWorker.ts`. See docs/SMART_NOTIFICATIONS.md.
+ *
+ * Cadence: every 5 minutes (`workers/railway.proactive-notifications.json`),
+ * matching `sync-all`'s own cadence — not an arbitrary round number.
+ * The principle (the same one a competing proactive-messaging product,
+ * Poke, uses for its inbox monitor: poll near the rate the underlying
+ * signal actually refreshes, not slower) applies directly here: biometric
+ * readings land at most 5 minutes stale, so a tick that runs any less
+ * often is adding pure latency on top of data that was already there.
+ * This matters most for `checkRecentStressSpike`, whose own 45-minute
+ * staleness window (see that function) meant a stale 30-minute cadence
+ * could still leave a real spike unacknowledged for up to half an hour —
+ * technically inside the window, nowhere near felt-immediate. The other
+ * checks here (recovery, burnout, streaks) are daily-level signals with
+ * no benefit from a faster tick, but the 20h dedupe window
+ * (DEDUPE_WINDOW_HOURS) makes running them 6x more often free of spam
+ * risk either way, so one shared cadence stays simpler than splitting
+ * this into a fast worker and a slow one for no real gain.
  */
 import {
   biometricReadingRepository,

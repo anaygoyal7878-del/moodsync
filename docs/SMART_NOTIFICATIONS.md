@@ -42,16 +42,31 @@ built, not faked.
 
 ## 4. Delivery and dedupe
 
-`workers/src/proactiveNotificationsWorker.ts` — a new periodic worker
-(suggested cadence: every 30 minutes, see
-`workers/railway.proactive-notifications.json`) that runs all three
-checkers per user with recent data, delivering through the existing
-`deliverNotification` pipeline. A new
-`notificationRepository.hasRecentTitle` dedupes by exact title within a
-20-hour window, so a persistent condition (an always-warm bedroom)
-doesn't re-fire every single tick — same title-based dedupe shape
-`recommendationRepository.hasBeenSuggested` already uses for a similar
-problem.
+`workers/src/proactiveNotificationsWorker.ts` — a periodic worker
+(cadence: every 5 minutes, matching `sync-all`'s own cadence — see
+`workers/railway.proactive-notifications.json` and that file's own doc
+comment for why this isn't an arbitrary number) that runs all checkers
+per user with recent data, delivering through the existing
+`deliverNotification` pipeline. A `notificationRepository.hasRecentTitle`
+dedupes by exact title within a 20-hour window, so a persistent
+condition (an always-warm bedroom) doesn't re-fire every single tick —
+same title-based dedupe shape `recommendationRepository.hasBeenSuggested`
+already uses for a similar problem, and what makes the tighter cadence
+safe: running a daily-level check 6x more often costs nothing when
+`hasRecentTitle` already blocks the repeat.
+
+Every candidate that fires goes through `deliverIfNotRecentlySent`,
+which is deliberately layered rather than either/or: it **always**
+creates the in-app `Notification` row first — that's the one guaranteed
+delivery path, works with zero external configuration — and only then
+*best-effort* also texts the same insight via `sendProactiveInsight` if
+a messaging provider is configured. A texting failure (no
+`MESSAGING_SEND_URL`/`MESSAGING_API_KEY` set, or the bridge itself down)
+is caught and logged, and never un-sends or blocks the in-app
+notification that already landed. Concretely: the "Poke, but
+health-focused" behavior degrades gracefully to "the app itself tells
+you" on any setup that hasn't wired up a phone bridge, rather than
+degrading to nothing.
 
 ## 5. Verification
 
