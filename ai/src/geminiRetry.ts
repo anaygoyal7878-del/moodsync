@@ -95,6 +95,53 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** The slice of a Gemini response worth recording. Structurally typed
+ * rather than importing the SDK's response type, so this stays usable
+ * for any call shape passed through `withGeminiRetry`. */
+interface UsageShape {
+  modelVersion?: string;
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    thoughtsTokenCount?: number;
+    totalTokenCount?: number;
+  };
+}
+
+/**
+ * One structured line per successful call: latency, model, and the token
+ * triple.
+ *
+ * This exists because diagnosing Clara meant adding logging mid-outage
+ * and then calling the API by hand — "it feels slow" and "it's broken"
+ * were indistinguishable from the outside. Two things here are not
+ * obvious and are the reason it logs what it logs:
+ *
+ * - **`thoughtsTokenCount` is the real cost driver.** Thinking tokens
+ *   bill at the output rate, and a measured "say hi in 3 words" spent
+ *   311 of them on a 5-token answer. Logging output tokens alone would
+ *   badly understate the bill.
+ * - **`modelVersion` is what the alias actually resolved to.**
+ *   `gemini-flash-latest` silently became a 3.x thinking model and broke
+ *   every tool call; that drift is invisible unless it's recorded.
+ */
+function logGeminiUsage(label: string, result: unknown, elapsedMs: number, attempts: number): void {
+  const usage = (result as UsageShape | null)?.usageMetadata;
+  const modelVersion = (result as UsageShape | null)?.modelVersion;
+  // Not every call passed through here returns a Gemini response shape;
+  // a missing usage block is normal, not an error.
+  if (!usage && !modelVersion) return;
+
+  console.info(`${label}: ok in ${elapsedMs}ms`, {
+    attempts,
+    model: modelVersion ?? 'unknown',
+    promptTokens: usage?.promptTokenCount ?? null,
+    outputTokens: usage?.candidatesTokenCount ?? null,
+    thinkingTokens: usage?.thoughtsTokenCount ?? null,
+    totalTokens: usage?.totalTokenCount ?? null,
+  });
+}
+
 /**
  * True when an error is worth a second attempt.
  *
@@ -135,7 +182,9 @@ export async function withGeminiRetry<T>(call: () => Promise<T>, label = 'gemini
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      return await call();
+      const result = await call();
+      logGeminiUsage(label, result, Date.now() - startedAt, attempt);
+      return result;
     } catch (error) {
       lastError = error;
       if (!isRetryableGeminiError(error) || attempt === MAX_ATTEMPTS) throw error;

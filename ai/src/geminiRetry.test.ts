@@ -149,6 +149,34 @@ describe('withGeminiRetry', () => {
     expect(call.mock.calls.length).toBeLessThan(3);
   });
 
+  it('logs latency, resolved model, and the token triple on success', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const call = vi.fn().mockResolvedValue({
+      modelVersion: 'gemini-3.7-flash',
+      usageMetadata: { promptTokenCount: 2500, candidatesTokenCount: 90, thoughtsTokenCount: 311, totalTokenCount: 2901 },
+    });
+
+    await settle(withGeminiRetry(call, 'clara.test'));
+
+    expect(info).toHaveBeenCalledWith(
+      expect.stringContaining('clara.test: ok in'),
+      expect.objectContaining({
+        model: 'gemini-3.7-flash',
+        // Thinking tokens bill at the output rate and dominate the cost,
+        // so omitting them would understate the bill.
+        thinkingTokens: 311,
+        promptTokens: 2500,
+        outputTokens: 90,
+      }),
+    );
+  });
+
+  it('stays quiet for a result that carries no usage block', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    await settle(withGeminiRetry(vi.fn().mockResolvedValue('plain value')));
+    expect(info).not.toHaveBeenCalled();
+  });
+
   it('exposes a per-attempt timeout and abort signal for callers to pass through', () => {
     const options = geminiCallOptions(1234);
     expect(options.timeout).toBe(1234);
