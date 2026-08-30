@@ -27,6 +27,8 @@ import {
   computeStudyWindowSuggestion,
   computeWellnessScores,
   rankRecoveryActions,
+  detectHealthScenarios,
+  computePersonalBaselines,
 } from '@moodsync/ai';
 import { userRepository } from '../../repositories/userRepository.js';
 import {
@@ -300,10 +302,21 @@ export default async function companionRoutes(app: FastifyInstance) {
       memory: findings,
     });
 
+    // Researched scenarios ride alongside the ranked actions rather
+    // than replacing them: the actions answer "what should I do", these
+    // answer "what is your body actually showing" — with a stated basis
+    // the user can argue with. Computed against readings that exclude
+    // the latest one, so today's value is never compared to a mean it
+    // just contributed to (see computePersonalBaselines' own note).
+    const healthScenarios = timezoneContext.latest
+      ? detectHealthScenarios(computePersonalBaselines(timezoneContext.latest, readings.slice(1)))
+      : [];
+
     return reply.send({
       findings: findings.map((f) => ({ ...f, sentence: describeFinding(f, 'recovery', true) })),
       bestFocusHours: bestHours,
       recoveryActions,
+      healthScenarios,
       windowDays: MEMORY_WINDOW_DAYS,
       historyDays: WELLNESS_HISTORY_DAYS,
     });

@@ -154,6 +154,12 @@ export {
   type RecoveryActionKind,
 } from './recoveryActions.js';
 export {
+  detectHealthScenarios,
+  type HealthScenario,
+  type HealthScenarioId,
+  type ScenarioSeverity,
+} from './healthScenarios.js';
+export {
   composeDailyBrief,
   computeOvernightChanges,
   computeReadiness,

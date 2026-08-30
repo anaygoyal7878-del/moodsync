@@ -218,11 +218,30 @@ export interface RecoveryAction {
   href?: string;
 }
 
+/** A researched physiological pattern currently applying to this user.
+ * Detected server-side in ai/src/healthScenarios.ts, where the
+ * thresholds and their provenance live. `basis` is meant to be shown,
+ * not hidden behind a tooltip — it is what lets someone disagree with a
+ * finding instead of having to trust it. */
+export interface HealthScenario {
+  id: string;
+  severity: "notice" | "caution";
+  title: string;
+  finding: string;
+  guidance: string;
+  basis: string;
+  isDiagnostic: false;
+  sampleSize: number;
+}
+
 export interface WellnessMemoryResponse {
   findings: MemoryFinding[];
   bestFocusHours: Array<{ hourOfDay: number; meanScore: number; sampleSize: number }>;
   /** Ranked server-side for this moment — order and reasons both vary. */
   recoveryActions: RecoveryAction[];
+  /** Empty is the normal, healthy case — render nothing, not an
+   * "all clear" banner that competes with real findings. */
+  healthScenarios: HealthScenario[];
   windowDays: number;
   historyDays: number;
 }

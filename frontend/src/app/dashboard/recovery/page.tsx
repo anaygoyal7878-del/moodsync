@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { backendFetch } from "@/lib/api";
-import { HeartPulse, AlertTriangle, Footprints, Droplets, Wind, Clock, Brain, Sparkles } from "lucide-react";
+import { HeartPulse, AlertTriangle, Footprints, Droplets, Wind, Clock, Brain, Sparkles, Activity } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PageHeader, Section, Meter, EmptyState, toneColor } from "@/components/companion/CompanionPrimitives";
-import type { DailyBriefResponse, WellnessMemoryResponse, RecoveryAction, RecoveryActionKind } from "@/lib/types";
+import type { DailyBriefResponse, WellnessMemoryResponse, RecoveryAction, RecoveryActionKind, HealthScenario } from "@/lib/types";
 
 const ACTION_ICON: Record<RecoveryActionKind, LucideIcon> = {
   walk: Footprints,
@@ -28,6 +28,54 @@ const ACTION_ICON: Record<RecoveryActionKind, LucideIcon> = {
  * history are badged; heuristics are not, so the two never read as
  * equally proven.
  */
+/**
+ * One researched finding.
+ *
+ * Three things are always visible and none of them are optional: what
+ * was measured (`finding`, which carries the user's real numbers), what
+ * to consider doing (`guidance`), and where the threshold came from
+ * (`basis`). The basis is the part that would be easiest to bury in a
+ * tooltip and the most important to keep in the open — a claim about
+ * someone's body that they cannot check is one they can only take on
+ * faith, and this whole feature exists to avoid that.
+ *
+ * "caution" gets the warmer colour and an icon; "notice" stays visually
+ * quiet. The gap between them should be obvious at a glance, because
+ * someone scrolling past should be able to tell the difference between
+ * "two signals at once" and "your sleep score dipped".
+ */
+function ScenarioCard({ scenario }: { scenario: HealthScenario }) {
+  const caution = scenario.severity === "caution";
+  const accent = caution ? "var(--lux-gold)" : "var(--lux-muted)";
+  const Icon = caution ? AlertTriangle : Activity;
+
+  return (
+    <section
+      className="flex items-start gap-3 rounded-[20px] p-4"
+      style={{
+        background: "var(--lux-bg-card)",
+        border: `1px solid ${caution ? "var(--lux-hairline-gold)" : "var(--lux-hairline)"}`,
+      }}
+    >
+      <Icon size={17} style={{ color: accent }} aria-hidden="true" className="mt-0.5 shrink-0" />
+      <div className="min-w-0 flex flex-col gap-1.5">
+        <p className="text-[14px] font-semibold" style={{ color: "var(--lux-ink)" }}>
+          {scenario.title}
+        </p>
+        <p className="text-[13px] leading-snug" style={{ color: "var(--lux-muted)" }}>
+          {scenario.finding}
+        </p>
+        <p className="text-[13px] leading-snug" style={{ color: "var(--lux-ink)" }}>
+          {scenario.guidance}
+        </p>
+        <p className="mt-0.5 text-[11.5px] leading-relaxed" style={{ color: "var(--lux-muted)" }}>
+          {scenario.basis} Based on {scenario.sampleSize} of your readings — a signal to consider, not a diagnosis.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 export default async function RecoveryPage() {
   const [briefResult, memoryResult] = await Promise.all([
     backendFetch<DailyBriefResponse>("/api/daily-brief"),
@@ -39,6 +87,7 @@ export default async function RecoveryPage() {
   const recovery = brief?.scores?.recovery.value ?? null;
   const stress = brief?.scores?.stress.value ?? null;
   const actions = memory?.recoveryActions ?? [];
+  const scenarios = memory?.healthScenarios ?? [];
 
   return (
     <div className="flex flex-col gap-5">
@@ -59,6 +108,19 @@ export default async function RecoveryPage() {
             </p>
           </div>
         </section>
+      )}
+
+      {/* Above "Do this next" on purpose: these say what the body is
+          showing, which is the thing that makes the actions below make
+          sense. Rendered only when something actually applies — an
+          "all clear" card every day would train people to skip this
+          area entirely, and then to miss the day it says something. */}
+      {scenarios.length > 0 && (
+        <div className="lux-stagger-2 flex flex-col gap-2.5">
+          {scenarios.map((scenario) => (
+            <ScenarioCard key={scenario.id} scenario={scenario} />
+          ))}
+        </div>
       )}
 
       {actions.length > 0 && (

@@ -7,6 +7,8 @@ import {
   meditationSessionRepository,
 } from '@moodsync/database';
 import { computeWellnessScores, type WellnessScores } from './wellness.js';
+import { computePersonalBaselines, type BaselineComparison } from './personalBaselines.js';
+import { detectHealthScenarios } from './healthScenarios.js';
 import { withGeminiFallback, geminiCallOptions, CLARA_MODEL_CANDIDATES } from './geminiRetry.js';
 
 export interface ClaraChatMessage {
@@ -47,12 +49,44 @@ export async function buildClaraSystemPrompt(userId: string): Promise<string> {
   ]);
 
   let wellnessSection = 'No wearable data has synced for this user yet.';
+  // Two sections Clara did not previously get, and the reason she could
+  // describe numbers without being able to interpret them: what is
+  // *normal for this user*, and which researched patterns currently
+  // apply. Without a baseline, "resting heart rate 58" is a number with
+  // no meaning — the model has no way to know whether that is this
+  // person's calm or their alarm, so it either says nothing useful or
+  // guesses against a population norm that may not fit them at all.
+  let baselineSection = 'Not enough history yet to know this user’s personal normal ranges.';
+  let scenarioSection = 'No researched physiological scenarios currently apply.';
+
   if (latest) {
     const history = await biometricReadingRepository.listRecentNormalized(userId, 30);
-    const scores = computeWellnessScores(
-      latest.reading,
-      history.filter((r) => r.timestamp !== latest.reading.timestamp),
-    );
+    const priorReadings = history.filter((r) => r.timestamp !== latest.reading.timestamp);
+    const scores = computeWellnessScores(latest.reading, priorReadings);
+
+    const baselines = computePersonalBaselines(latest.reading, priorReadings);
+    if (baselines.hasAnyBaseline) {
+      const line = (label: string, c: BaselineComparison | null, unit: string) =>
+        c === null ? null : `  ${label}: ${c.value.toFixed(0)}${unit} vs personal average ${c.baseline.toFixed(0)}${unit} (${c.z >= 0 ? '+' : ''}${c.z.toFixed(1)} SD, from ${c.sampleSize} readings)`;
+      baselineSection = [
+        `This user's own normal ranges (never compare them to population averages — use these):`,
+        line('restingHeartRate', baselines.restingHeartRate, 'bpm'),
+        line('heartRateVariability', baselines.heartRateVariability, 'ms'),
+        line('heartRate', baselines.heartRate, 'bpm'),
+        line('sleepScore', baselines.sleepScore, ''),
+        line('activityLevel', baselines.activityLevel, ''),
+      ]
+        .filter((l): l is string => l !== null)
+        .join('\n');
+    }
+
+    const scenarios = detectHealthScenarios(baselines);
+    if (scenarios.length > 0) {
+      scenarioSection = scenarios
+        .map((sc) => `- [${sc.severity}] ${sc.title}\n    Finding: ${sc.finding}\n    Suggested: ${sc.guidance}\n    Basis: ${sc.basis}\n    Backed by ${sc.sampleSize} readings. NOT diagnostic.`)
+        .join('\n');
+    }
+
     const r = latest.reading;
     wellnessSection = [
       `Latest reading (${r.timestamp}, provider: ${r.provider}):`,
@@ -90,6 +124,12 @@ CRITICAL: Only reference data given below. If something isn't in this context (e
 
 ${wellnessSection}
 
+--- THIS USER'S PERSONAL BASELINES ---
+${baselineSection}
+
+--- RESEARCHED SCENARIOS CURRENTLY APPLYING ---
+${scenarioSection}
+
 Connected wearables: ${wearableSection}
 Connected smart home: ${smartHomeSection}
 
@@ -101,7 +141,23 @@ ${sessionsSection}
 
 === END DATA ===
 
-Keep replies conversational and reasonably short unless the user asks for detail. When you suggest a workout or exercise, ground it in the recovery/stress/sleep numbers above when they're available (e.g. low recovery -> suggest lighter activity), and say plainly when you're giving general wellness guidance not tied to their specific data.`;
+Keep replies conversational and reasonably short unless the user asks for detail. When you suggest a workout or exercise, ground it in the recovery/stress/sleep numbers above when they're available (e.g. low recovery -> suggest lighter activity), and say plainly when you're giving general wellness guidance not tied to their specific data.
+
+HOW TO REASON WITH THE TWO SECTIONS ABOVE:
+
+1. Compare to THEM, not to averages. A resting heart rate of 58 means nothing on its own — it matters only against their own average. When a personal baseline exists, say where they sit relative to it ("that's about 6bpm above your usual"). When there is no baseline yet, say you don't know their normal yet rather than falling back on a textbook range.
+
+2. Lead with the researched scenarios when any apply. They are the highest-value thing you know: real patterns, with stated thresholds, in this person's own data. Explain what was measured and what it suggests. A "caution" outranks anything else you might have said.
+
+3. Give the basis when you lean on a scenario. The user should be able to disagree with the reasoning, which means they need to see it. Do not present a threshold as your own opinion, and do not inflate it into certainty.
+
+4. Never turn a scenario into a diagnosis. These are statistical signals, not tests. "Two stress signals together, which often means an easy day is the right call" is correct. "You are getting sick" is not, however strong the numbers look. Anything that sounds genuinely medical goes to a clinician.
+
+5. Say when nothing applies. "Nothing in your numbers is standing out today" is a real, useful answer. Do not hunt for something to flag.
+
+6. Respect the sample size. A scenario backed by 6 readings is a hint; one backed by 60 is a pattern. Say which you're looking at when it matters.
+
+7. On music: when suggesting listening, the useful specifics are roughly 60–80 BPM for calming down or recovering (slow tempo is associated with lower heart rate and arousal) and 120–140 BPM for training (associated with longer time to exhaustion). MoodSync matches playlists in their own library by name and cannot read the tempo of their actual tracks, so offer these as what to reach for — never claim to know the BPM of a specific playlist of theirs.`;
 }
 
 /**
