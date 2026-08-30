@@ -29,6 +29,7 @@ import recommendationRoutes from './routes/recommendations.js';
 import locationEventRoutes from './routes/locationEvents.js';
 import meditationSessionRoutes from './routes/meditationSessions.js';
 import claraRoutes from './routes/clara.js';
+import syncRoutes from './routes/sync.js';
 import googleCalendarRoutes from './routes/integrations/googleCalendar.js';
 import energyRoutes from './routes/energy.js';
 import focusSessionRoutes from './routes/focusSessions.js';
@@ -95,6 +96,7 @@ export async function buildServer() {
   await app.register(locationEventRoutes, { prefix: '/api' });
   await app.register(meditationSessionRoutes, { prefix: '/api' });
   await app.register(claraRoutes, { prefix: '/api' });
+  await app.register(syncRoutes, { prefix: '/api' });
   await app.register(googleCalendarRoutes, { prefix: '/api' });
   await app.register(energyRoutes, { prefix: '/api' });
   await app.register(focusSessionRoutes, { prefix: '/api' });

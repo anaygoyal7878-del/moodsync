@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import clsx from "clsx";
 import { ViewModeProvider, useViewMode } from "@/components/shell/ViewModeContext";
 import { ViewModeSwitcher } from "@/components/shell/ViewModeSwitcher";
+import { PullToRefresh } from "@/components/dashboard/PullToRefresh";
 
 /** Client-side layout wrapper for DashboardShell.tsx — split out so the
  * `sm:` breakpoint classes on the outer flex row / content column /
@@ -84,7 +85,11 @@ function ShellLayout({
               mode === null && "sm:mx-auto sm:w-full sm:max-w-3xl sm:px-8 sm:pt-10 sm:pb-10",
             )}
           >
-            {children}
+            {/* Wraps every dashboard page rather than being added per
+                page: pull-to-refresh is a property of the scroll surface,
+                and a gesture that works on Today but not on Sleep would
+                read as a bug. Touch-only, so it's inert on desktop. */}
+            <PullToRefresh>{children}</PullToRefresh>
           </main>
           {bottomNav}
         </div>

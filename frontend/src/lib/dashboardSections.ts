@@ -1,4 +1,5 @@
 import {
+  Bot,
   Home,
   Link2,
   Sparkles,
@@ -6,7 +7,6 @@ import {
   Zap,
   Bell,
   TrendingUp,
-  Cpu,
   Wand2,
   CalendarClock,
   Settings,
@@ -54,9 +54,11 @@ export const NAV_GROUPS = [
     label: "Daily",
     items: [
       { href: "/dashboard", label: "Today", icon: Home, exact: true },
-      // No conversational tab: Clara, the assistant over this app's
-      // intelligence engine, lives in the messaging channel rather than
-      // in a web chat panel — see docs/CLARA_ARCHITECTURE.md.
+      // Leads the group after Today: Clara is the conversational front
+      // door to the whole intelligence engine, not one routine among
+      // many. She runs on the same engine as the messaging channel —
+      // two surfaces, one agent (docs/CLARA_ARCHITECTURE.md).
+      { href: "/dashboard/clara", label: "Clara", icon: Bot },
       { href: "/dashboard/energy", label: "Energy", icon: BatteryMedium },
       { href: "/dashboard/focus", label: "Focus", icon: Timer },
       { href: "/dashboard/sleep", label: "Sleep", icon: Moon },
@@ -84,9 +86,7 @@ export const NAV_GROUPS = [
     // and the ones below it answer "what is it doing".
     label: "Home & settings",
     items: [
-      { href: "/dashboard/environment", label: "Adaptive", icon: Sparkles },
       { href: "/dashboard/home", label: "Scenes", icon: DoorOpen },
-      { href: "/dashboard/devices", label: "Devices", icon: Cpu },
       { href: "/dashboard/automation", label: "Automations", icon: Zap },
       { href: "/dashboard/connections", label: "Connections", icon: Link2 },
       { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
