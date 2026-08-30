@@ -12,14 +12,20 @@ export interface CreateRecommendationInput {
 }
 
 export const recommendationRepository = {
-  async create(input: CreateRecommendationInput) {
-    return prisma.recommendation.create({
-      data: {
+  /** Bulk insert for the batch the recommendation heuristic produces in
+   * one pass. `skipDuplicates` is not set because there's no unique
+   * constraint on (userId, title) to skip on — the caller filters
+   * against `listSuggestedTitles` first, and two concurrent requests
+   * racing to insert the same title was already possible with the
+   * per-candidate `create` this replaced. */
+  async createMany(inputs: CreateRecommendationInput[]) {
+    return prisma.recommendation.createMany({
+      data: inputs.map((input) => ({
         userId: input.userId,
         title: input.title,
         description: input.description,
         suggestedActions: input.suggestedActions as object,
-      },
+      })),
     });
   },
 
@@ -43,12 +49,20 @@ export const recommendationRepository = {
    * is the one status meant to eventually allow a fresh resurfacing,
    * once something sets it (nothing does yet — see
    * docs/DECISION_ENGINE_ROADMAP.md). */
-  async hasBeenSuggested(userId: string, title: string): Promise<boolean> {
-    const existing = await prisma.recommendation.findFirst({
-      where: { userId, title, status: { in: ['PENDING', 'ACCEPTED', 'DISMISSED'] } },
-      select: { id: true },
+  /** Every title already suggested to this user, in one query.
+   *
+   * Exists because the caller checks a whole batch of candidates at
+   * once. This replaced a per-title `hasBeenSuggested` existence check,
+   * which meant one round trip per candidate on an endpoint every
+   * dashboard load hits. All three non-terminal statuses count as
+   * "seen", not just PENDING: a suggestion the user already accepted or
+   * dismissed must not come back. */
+  async listSuggestedTitles(userId: string): Promise<Set<string>> {
+    const rows = await prisma.recommendation.findMany({
+      where: { userId, status: { in: ['PENDING', 'ACCEPTED', 'DISMISSED'] } },
+      select: { title: true },
     });
-    return existing !== null;
+    return new Set(rows.map((r) => r.title));
   },
 
   async findById(id: string, userId: string) {

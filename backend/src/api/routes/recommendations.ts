@@ -25,10 +25,28 @@ const SKIP_STAT_SAMPLE_SIZE = 10;
  * same split as computeWellnessTrends/computeAutomationEffectiveness. */
 async function computePlaylistSkipStats(userId: string, rules: Awaited<ReturnType<typeof automationRuleRepository.listForUser>>): Promise<PlaylistSkipStat[]> {
   const playlistUris = await musicPlayLogRepository.listDistinctPlaylistsForUser(userId);
-  const stats: PlaylistSkipStat[] = [];
 
-  for (const playlistUri of playlistUris) {
-    const recentPlays = await musicPlayLogRepository.listRecentCheckedForPlaylist(userId, playlistUri, SKIP_STAT_SAMPLE_SIZE);
+  // Fetched in parallel rather than in a sequential `for` loop. This is
+  // an N+1 either way — "the most recent N plays *per playlist*" is a
+  // top-per-group query that Prisma can't express without raw SQL, and a
+  // window function felt like the wrong trade for a bounded per-user set
+  // — but N round trips that overlap cost about one round trip instead
+  // of N of them.
+  //
+  // Worth doing rather than leaving: this runs inside `GET
+  // /recommendations`, which every dashboard load hits, and which
+  // `LiveRefresh` now re-requests every five minutes for as long as
+  // someone leaves the app open. A per-request cost that used to be paid
+  // on navigation alone is now paid on a timer.
+  const perPlaylist = await Promise.all(
+    playlistUris.map(async (playlistUri) => ({
+      playlistUri,
+      recentPlays: await musicPlayLogRepository.listRecentCheckedForPlaylist(userId, playlistUri, SKIP_STAT_SAMPLE_SIZE),
+    })),
+  );
+
+  const stats: PlaylistSkipStat[] = [];
+  for (const { playlistUri, recentPlays } of perPlaylist) {
     if (recentPlays.length === 0) continue;
 
     const rule = rules.find((r) => r.id === recentPlays[0]!.ruleId);
@@ -69,19 +87,26 @@ export default async function recommendationRoutes(app: FastifyInstance) {
     const cachedScenes = snapshot?.scenes.map((s) => ({ sceneId: s.sceneId, name: s.name })) ?? [];
     const candidates = generateRecommendations({ wellnessTrends, existingRules: rules, playlistSkipStats, cachedScenes });
 
-    for (const candidate of candidates) {
-      if (await recommendationRepository.hasBeenSuggested(userId, candidate.title)) continue;
-      await recommendationRepository.create({
-        userId,
-        title: candidate.title,
-        description: candidate.description,
-        suggestedActions:
-          candidate.kind === 'edit-rule'
-            ? { kind: 'edit-rule', ruleId: candidate.ruleId }
-            : candidate.kind === 'run-scene'
-              ? { kind: 'run-scene', sceneId: candidate.sceneId, sceneName: candidate.sceneName }
-              : { kind: 'template', templateId: candidate.templateId },
-      });
+    // One read of the titles already seen, then one bulk insert —
+    // previously this was a `hasBeenSuggested` query *and* a `create`
+    // per candidate, all sequential, on an endpoint every dashboard load
+    // hits and that `LiveRefresh` now re-requests every five minutes.
+    const alreadySuggested = await recommendationRepository.listSuggestedTitles(userId);
+    const fresh = candidates.filter((candidate) => !alreadySuggested.has(candidate.title));
+    if (fresh.length > 0) {
+      await recommendationRepository.createMany(
+        fresh.map((candidate) => ({
+          userId,
+          title: candidate.title,
+          description: candidate.description,
+          suggestedActions:
+            candidate.kind === 'edit-rule'
+              ? { kind: 'edit-rule', ruleId: candidate.ruleId }
+              : candidate.kind === 'run-scene'
+                ? { kind: 'run-scene', sceneId: candidate.sceneId, sceneName: candidate.sceneName }
+                : { kind: 'template', templateId: candidate.templateId },
+        })),
+      );
     }
 
     const recommendations = await recommendationRepository.listForUser(userId, 'PENDING');
