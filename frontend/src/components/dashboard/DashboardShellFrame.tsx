@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { ViewModeProvider, useViewMode } from "@/components/shell/ViewModeContext";
 import { ViewModeSwitcher } from "@/components/shell/ViewModeSwitcher";
 import { PullToRefresh } from "@/components/dashboard/PullToRefresh";
+import { LiveRefresh } from "@/components/dashboard/LiveRefresh";
 
 /** Client-side layout wrapper for DashboardShell.tsx — split out so the
  * `sm:` breakpoint classes on the outer flex row / content column /
@@ -89,6 +90,12 @@ function ShellLayout({
                 page: pull-to-refresh is a property of the scroll surface,
                 and a gesture that works on Today but not on Sleep would
                 read as a bug. Touch-only, so it's inert on desktop. */}
+            {/* The automatic counterpart to the gesture above, mounted
+                at the same level and for the same reason: staleness is a
+                property of the whole dashboard, not of one page. Renders
+                nothing. Pull = "go ask my watch"; this = "show me what
+                the server already knows". */}
+            <LiveRefresh />
             <PullToRefresh>{children}</PullToRefresh>
           </main>
           {bottomNav}

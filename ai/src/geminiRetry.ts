@@ -64,13 +64,28 @@ const BASE_DELAY_MS = 400;
  * attempts stacked into a 94-second wait, and one request sat past 120s.
  * Retrying a slow failure without a deadline doesn't add resilience, it
  * multiplies the outage. A person staring at a text thread has given up
- * long before then — failing honestly at 45s beats succeeding at 120s.
+ * long before then — failing honestly beats succeeding at 120s.
+ *
+ * Since tightened 45s -> 25s. The agentic loop spends one of these
+ * budgets *per tool round* (up to `MAX_TOOL_ROUNDS`), so this bound is
+ * multiplied, not shared, across a single turn — 45s each meant one
+ * question could legitimately take three minutes before giving up.
  */
-const TOTAL_DEADLINE_MS = 45_000;
-/** Per-attempt ceiling, enforced by the caller through the SDK's own
+const TOTAL_DEADLINE_MS = 25_000;
+/**
+ * Per-attempt ceiling, enforced by the caller through the SDK's own
  * `timeout`/`abortSignal` (see `geminiCallOptions`). Bounds a single
- * hung request so one stall can't eat the whole budget. */
-export const ATTEMPT_TIMEOUT_MS = 20_000;
+ * hung request so one stall can't eat the whole budget.
+ *
+ * Cut from 20s to 8s once the candidate order below put a model in
+ * front that answers in about a second. This number is only ever paid
+ * on the *failure* path — it's how long a hung socket stalls before the
+ * next candidate is tried — so sizing it against a healthy response is
+ * what makes fallback feel immediate instead of feeling like a freeze.
+ * 8s is still roughly eight times the measured healthy latency, so a
+ * merely slow request is not mistaken for a dead one.
+ */
+export const ATTEMPT_TIMEOUT_MS = 8_000;
 
 /** Status codes worth trying again. See the doc comment for why 4xx —
  * 429 very much included — is deliberately absent. */
@@ -108,20 +123,41 @@ function delay(ms: number): Promise<void> {
  * The model fallback chain every Clara call site should pass to
  * `withGeminiFallback`, in priority order.
  *
- * `gemini-flash-latest` leads because it's Google's own
- * always-current alias — no code change needed as models get
- * deprecated, which is the whole reason this codebase prefers aliases
- * over dated names (see the git history of this comment for the 404
- * that motivated it). `gemini-3.1-flash-lite` is the fallback: a dated
- * name, so it can itself be deprecated later, but it's what was
- * actually measured to have spare capacity during a live outage where
- * every `*-latest` alias and every other 3.x model on this key
- * returned 503 for several minutes straight. One fallback, not several
- * — each extra candidate is only reachable after the ones before it
- * have burned their own retries and backoff, so a long list mostly adds
- * latency to the failure case rather than real coverage.
+ * **The order here is reversed from what it was, and the reversal is
+ * the single biggest thing making Clara feel fast.** `gemini-flash-latest`
+ * used to lead, on the reasonable theory that Google's always-current
+ * alias is the most future-proof choice. Measured on this key, that
+ * theory cost a fallback on every single request:
+ *
+ * - `gemini-flash-latest` — 503 UNAVAILABLE ("high demand"), repeatedly
+ *   and across days; when it did answer, 17.1s. It currently resolves
+ *   to a *thinking* model, which spent 311 thinking tokens on "say hi
+ *   in three words" — tokens that bill at output rate and are pure
+ *   latency for Clara's job.
+ * - `gemini-3.1-flash-lite` — 0.75s / 1.20s / 4.41s over three
+ *   consecutive calls, `thoughtsTokenCount` absent entirely.
+ *
+ * Leading with the unavailable model meant the fast one was only ever
+ * reached *after* a failed attempt, so every reply paid for a round
+ * trip that was never going to succeed. Leading with the fast one makes
+ * the healthy path the first path.
+ *
+ * The alias keeps its place as the fallback rather than being dropped,
+ * and that placement is deliberate in both directions: a dated name
+ * like `gemini-3.1-flash-lite` can be deprecated out from under this
+ * code, and `*-latest` is precisely the thing that cannot 404 (see the
+ * git history of this comment for the 404 that first motivated
+ * preferring aliases). So the list now reads: fastest measured model
+ * first, always-current alias behind it as the thing that catches a
+ * deprecation. Speed on the healthy path, durability on the failure
+ * path.
+ *
+ * One fallback, not several — each extra candidate is only reachable
+ * after the ones before it have burned their own retries and backoff,
+ * so a long list mostly adds latency to the failure case rather than
+ * real coverage.
  */
-export const CLARA_MODEL_CANDIDATES = ['gemini-flash-latest', 'gemini-3.1-flash-lite'] as const;
+export const CLARA_MODEL_CANDIDATES = ['gemini-3.1-flash-lite', 'gemini-flash-latest'] as const;
 
 /** The slice of a Gemini response worth recording. Structurally typed
  * rather than importing the SDK's response type, so this stays usable
