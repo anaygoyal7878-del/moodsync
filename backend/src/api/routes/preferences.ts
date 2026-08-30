@@ -129,19 +129,4 @@ export default async function preferencesRoutes(app: FastifyInstance) {
     return reply.send({ enabled: parsed.data.enabled });
   });
 
-  /** Backs the "bedroom is warmer/cooler than your sleep range" smart
-   * notification — null (never fabricated) until the user sets a real
-   * range. See docs/SMART_NOTIFICATIONS.md. */
-  app.get('/preferences/sleep-temp-range', { preHandler: app.authenticate }, async (request, reply) => {
-    const range = await userPreferencesRepository.getSleepTempRangeC(request.userId!);
-    return reply.send({ range });
-  });
-
-  app.post('/preferences/sleep-temp-range', { preHandler: app.authenticate }, async (request, reply) => {
-    const parsed = z.object({ min: z.number(), max: z.number() }).refine((d) => d.min < d.max, { message: 'min must be less than max' }).safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
-
-    await userPreferencesRepository.setSleepTempRangeC(request.userId!, parsed.data);
-    return reply.send({ range: parsed.data });
-  });
 }

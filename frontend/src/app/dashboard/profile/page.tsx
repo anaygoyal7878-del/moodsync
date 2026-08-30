@@ -14,11 +14,10 @@ interface MeResponse {
  * vs. dropped. Same /api/me the dashboard layout's auth gate already
  * calls, plus /api/connections for the Integrations list. */
 export default async function ProfilePage() {
-  const [meResult, connectionsResult, weatherLocationResult, sleepTempRangeResult] = await Promise.all([
+  const [meResult, connectionsResult, weatherLocationResult] = await Promise.all([
     backendFetch<MeResponse>("/api/me"),
     backendFetch<ConnectionsResponse>("/api/connections"),
     backendFetch<{ location: { name: string; lat: number; lng: number } | null }>("/api/weather/location"),
-    backendFetch<{ range: { min: number; max: number } | null }>("/api/preferences/sleep-temp-range"),
   ]);
 
   if (!meResult.ok) {
@@ -31,14 +30,12 @@ export default async function ProfilePage() {
 
   const connections: ConnectionsResponse = connectionsResult.ok ? connectionsResult.data : { wearables: [], smartHome: [], appleMusic: null, calendar: null };
   const weatherLocationName = weatherLocationResult.ok ? (weatherLocationResult.data.location?.name ?? null) : null;
-  const sleepTempRange = sleepTempRangeResult.ok ? sleepTempRangeResult.data.range : null;
 
   return (
     <LuxuryProfile
       me={meResult.data}
       connections={connections}
       weatherLocationName={weatherLocationName}
-      sleepTempRange={sleepTempRange}
     />
   );
 }

@@ -9,7 +9,6 @@ import { WEARABLE_LABELS, SMART_HOME_LABELS, PROVIDER_ICONS } from "@/lib/provid
 import { DASHBOARD_SECTIONS } from "@/lib/dashboardSections";
 import { BOTTOM_NAV_TABS } from "@/components/luxury/LuxuryBottomNav";
 import { LuxuryWeatherLocationSetting } from "@/components/luxury/LuxuryWeatherLocationSetting";
-import { LuxurySleepTempRangeSetting } from "@/components/luxury/LuxurySleepTempRangeSetting";
 import type { ConnectionsResponse } from "@/lib/types";
 
 /** Every dashboard page the bottom nav has no room for. Derived from the
@@ -40,12 +39,10 @@ export function LuxuryProfile({
   me,
   connections,
   weatherLocationName,
-  sleepTempRange,
 }: {
   me: MeData;
   connections: ConnectionsResponse;
   weatherLocationName: string | null;
-  sleepTempRange: { min: number; max: number } | null;
 }) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -151,7 +148,6 @@ export function LuxuryProfile({
       </section>
 
       <LuxuryWeatherLocationSetting initialLocationName={weatherLocationName} />
-      <LuxurySleepTempRangeSetting initialRange={sleepTempRange} />
 
       {/* Account Settings — real /api/me fields only; no profile-editing
        * feature exists yet, so rows are display-only (matching the
