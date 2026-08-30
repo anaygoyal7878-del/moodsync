@@ -2,12 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lightbulb, Music, Smartphone, Thermometer, Mic, Bell, BellOff, Zap } from "lucide-react";
+import { Music, Smartphone, Bell, BellOff, Zap } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { CONDITION_FIELDS, OPERATOR_LABELS } from "@/lib/conditionFields";
-import { formatKelvin, mirekToKelvin } from "@/lib/colorTemperature";
 import { formatCooldown, formatPriority } from "@/lib/ruleFormPresets";
 import type { AutomationRuleDefinition } from "@/lib/types";
 
@@ -18,19 +17,12 @@ function summarizeCondition(c: AutomationRuleDefinition["conditions"][number]): 
 }
 
 const ACTION_LABELS: Record<string, string> = {
-  "hue.set_scene": "Activate Hue scene",
   "spotify.play_playlist": "Play Spotify playlist",
   "homekit.activate_scene": "Activate HomeKit scene",
   "notification.reduce_intensity": "Send notification",
 };
 
 function summarizeAction(a: AutomationRuleDefinition["actions"][number]): string {
-  if (a.type === "hue.set_brightness" && typeof a.params.brightness === "number") {
-    return `Set brightness to ${a.params.brightness}%`;
-  }
-  if (a.type === "hue.set_color_temperature" && typeof a.params.mirek === "number") {
-    return `Set color to ${formatKelvin(mirekToKelvin(a.params.mirek))}`;
-  }
   return ACTION_LABELS[a.type] ?? a.type;
 }
 
@@ -38,12 +30,9 @@ function summarizeAction(a: AutomationRuleDefinition["actions"][number]): string
  * multiple actions across different providers is rare and this is just
  * a visual hint, not a claim about everything the rule does (the full
  * condition/action text below it is still the source of truth). */
-const PROVIDER_ICONS: Record<string, typeof Lightbulb> = {
-  hue: Lightbulb,
+const PROVIDER_ICONS: Record<string, typeof Music> = {
   spotify: Music,
   homekit: Smartphone,
-  ecobee: Thermometer,
-  alexa: Mic,
   notification: Bell,
 };
 

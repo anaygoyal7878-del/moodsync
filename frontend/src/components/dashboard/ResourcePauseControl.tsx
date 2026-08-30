@@ -7,20 +7,16 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 
 const PROVIDERS = [
-  { value: "hue", label: "Hue" },
   { value: "spotify", label: "Spotify" },
-  { value: "ecobee", label: "Ecobee" },
-  { value: "alexa", label: "Alexa" },
   { value: "homekit", label: "HomeKit" },
 ] as const;
 
 const PROVIDER_LABEL: Record<string, string> = Object.fromEntries(PROVIDERS.map((p) => [p.value, p.label]));
 
 /** Per-provider companion to PauseAutomationsButton's "pause everything"
- * — lets a user pause just one smart-home provider's actions (e.g.
- * "leave my Hue lights alone") while every other rule keeps running.
- * See ResourcePause in schema.prisma and ai/src/dispatch.ts's per-action
- * pause check. */
+ * — lets a user pause just one provider's actions (e.g. "leave Spotify
+ * alone") while every other rule keeps running. See ResourcePause in
+ * schema.prisma and ai/src/dispatch.ts's per-action pause check. */
 export function ResourcePauseControl({ activePauses }: { activePauses: Record<string, string> }) {
   const router = useRouter();
   const [provider, setProvider] = useState<string>(PROVIDERS[0].value);

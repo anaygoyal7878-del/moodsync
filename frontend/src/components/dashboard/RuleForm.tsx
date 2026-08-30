@@ -8,15 +8,12 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Switch } from "@/components/ui/Switch";
-import { LabeledSlider } from "@/components/ui/LabeledSlider";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { CollapsibleSection } from "@/components/dashboard/automation/CollapsibleSection";
 import { ConditionRow, type ConditionDraft } from "@/components/dashboard/automation/ConditionRow";
 import { CONDITION_FIELDS, OPERATOR_LABELS } from "@/lib/conditionFields";
-import { KELVIN_MIN, KELVIN_MAX, kelvinToMirek, mirekToKelvin, formatKelvin } from "@/lib/colorTemperature";
 import { COOLDOWN_PRESETS, formatCooldown, PRIORITY_TIERS, priorityTierFor, formatPriority } from "@/lib/ruleFormPresets";
 import { ACTION_TYPES, TEMPLATES, type ActionType } from "@/lib/ruleTemplates";
-import type { DeviceSummary } from "@/lib/types";
 import type { BiometricField, WellnessField } from "@moodsync/shared";
 
 function newConditionId(): string {
@@ -32,11 +29,9 @@ function formatTime(hhmm: string): string {
 }
 
 export function RuleForm({
-  devices,
   spotifyConnected,
   onCreated,
 }: {
-  devices: DeviceSummary[];
   spotifyConnected: boolean;
   onCreated?: () => void;
 }) {
@@ -44,12 +39,9 @@ export function RuleForm({
   const searchParams = useSearchParams();
   // Lets QuickActions.tsx (the dashboard home's one-tap shortcuts) deep-link
   // straight into a pre-filled form via `?template=<id>` instead of
-  // guessing at a device and submitting blind — see ruleTemplates.ts's
-  // doc comment for why a silent submit isn't honest here (Hue actions
-  // need a real deviceId this page doesn't know without the user picking
-  // one). Read once, directly in render (not an effect calling setState,
-  // which would trigger an avoidable extra render) — every field below
-  // seeds its own initial state from this same lookup.
+  // guessing blind. Read once, directly in render (not an effect calling
+  // setState, which would trigger an avoidable extra render) — every
+  // field below seeds its own initial state from this same lookup.
   const deepLinkedTemplate = TEMPLATES.find((t) => t.id === searchParams.get("template"));
 
   const [name, setName] = useState<string>(deepLinkedTemplate?.name ?? "");
@@ -61,26 +53,11 @@ export function RuleForm({
       value: Number(deepLinkedTemplate?.value ?? "50"),
     },
   ]);
-  const [actionType, setActionType] = useState<ActionType>(deepLinkedTemplate?.actionType ?? "hue.set_brightness");
-  const [deviceId, setDeviceId] = useState(devices[0]?.externalDeviceId ?? "");
-  const [sceneId, setSceneId] = useState("");
-  const [brightness, setBrightness] = useState<number>(
-    Number(deepLinkedTemplate && "brightness" in deepLinkedTemplate ? deepLinkedTemplate.brightness : "40"),
-  );
-  const [kelvin, setKelvin] = useState<number>(
-    mirekToKelvin(Number(deepLinkedTemplate && "mirek" in deepLinkedTemplate ? deepLinkedTemplate.mirek : "370")),
-  );
+  const [actionType, setActionType] = useState<ActionType>(deepLinkedTemplate?.actionType ?? "spotify.play_playlist");
   const [playlistUri, setPlaylistUri] = useState("");
   const [sceneName, setSceneName] = useState<string>(
     deepLinkedTemplate && "sceneName" in deepLinkedTemplate ? deepLinkedTemplate.sceneName : "",
   );
-  // Bluetooth-only Hue bulbs have no server-side device list (unlike
-  // cloud Hue's `devices` prop) — the iOS companion matches by the
-  // bulb's advertised BLE name, so this is free text, same reasoning as
-  // HomeKit's sceneName above.
-  const [blePeripheralName, setBlePeripheralName] = useState("");
-  const [blePower, setBlePower] = useState<"on" | "off">("on");
-  const [bleBrightness, setBleBrightness] = useState<number>(80);
   const [cooldownMinutes, setCooldownMinutes] = useState<number>(Number(deepLinkedTemplate?.cooldownMinutes ?? "30"));
   const [customCooldown, setCustomCooldown] = useState(
     !COOLDOWN_PRESETS.some((p) => p.minutes === Number(deepLinkedTemplate?.cooldownMinutes ?? "30")),
@@ -112,8 +89,6 @@ export function RuleForm({
     setName(template.name);
     setConditions([{ id: newConditionId(), field: template.field, operator: template.operator, value: Number(template.value) }]);
     setActionType(template.actionType);
-    if ("brightness" in template) setBrightness(Number(template.brightness));
-    if ("mirek" in template) setKelvin(mirekToKelvin(Number(template.mirek)));
     if ("sceneName" in template) setSceneName(template.sceneName);
     setCooldownMinutes(Number(template.cooldownMinutes));
     setCustomCooldown(!COOLDOWN_PRESETS.some((p) => p.minutes === Number(template.cooldownMinutes)));
@@ -138,47 +113,24 @@ export function RuleForm({
     setConditions((prev) => (prev.length > 1 ? prev.filter((c) => c.id !== id) : prev));
   }
 
-  const actionProvider = ACTION_TYPES.find((a) => a.value === actionType)?.provider ?? "hue";
-  const needsDevice = actionType === "hue.set_brightness" || actionType === "hue.set_color_temperature";
-  const disabledForMissingConnection = needsDevice ? devices.length === 0 : actionType === "spotify.play_playlist" && !spotifyConnected;
+  const actionProvider = ACTION_TYPES.find((a) => a.value === actionType)?.provider ?? "spotify";
+  const disabledForMissingConnection = actionType === "spotify.play_playlist" && !spotifyConnected;
 
   function buildActionParams(): Record<string, unknown> {
     switch (actionType) {
-      case "hue.set_scene":
-        return { sceneId };
-      case "hue.set_brightness":
-        return { deviceId, brightness };
-      case "hue.set_color_temperature":
-        return { deviceId, mirek: kelvinToMirek(kelvin) };
       case "spotify.play_playlist":
         return { playlistUri };
       case "homekit.activate_scene":
         return { sceneName };
-      case "hue_ble.set_power":
-        return { peripheralName: blePeripheralName, on: blePower === "on" };
-      case "hue_ble.set_brightness":
-        return { peripheralName: blePeripheralName, brightness: bleBrightness };
     }
   }
 
   function actionSummary(): string {
     switch (actionType) {
-      case "hue.set_scene":
-        return sceneId ? `Activate Hue scene "${sceneId}"` : "Activate a Hue scene";
-      case "hue.set_brightness":
-        return `Set brightness to ${brightness}%`;
-      case "hue.set_color_temperature":
-        return `Set color to ${formatKelvin(kelvin)}`;
       case "spotify.play_playlist":
         return playlistUri ? "Play your Spotify playlist" : "Play a Spotify playlist";
       case "homekit.activate_scene":
         return sceneName ? `Activate HomeKit scene "${sceneName}"` : "Activate a HomeKit scene";
-      case "hue_ble.set_power":
-        return blePeripheralName ? `Turn ${blePower} "${blePeripheralName}"` : `Turn a Bluetooth Hue light ${blePower}`;
-      case "hue_ble.set_brightness":
-        return blePeripheralName
-          ? `Set "${blePeripheralName}" to ${bleBrightness}%`
-          : `Set a Bluetooth Hue light to ${bleBrightness}%`;
     }
   }
 
@@ -365,57 +317,6 @@ export function RuleForm({
             ))}
           </Select>
 
-          {(actionType === "hue.set_brightness" || actionType === "hue.set_color_temperature" || actionType === "hue.set_scene") && (
-            <div className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-4">
-              <p className="text-xs font-semibold tracking-wide text-ink-muted uppercase">Lighting</p>
-
-              {actionType === "hue.set_scene" && (
-                <Input placeholder="Scene ID" value={sceneId} onChange={(e) => setSceneId(e.target.value)} required />
-              )}
-
-              {(actionType === "hue.set_brightness" || actionType === "hue.set_color_temperature") &&
-                (devices.length > 0 ? (
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-sm font-medium text-ink">Light</span>
-                    <Select value={deviceId} onChange={(e) => setDeviceId(e.target.value)}>
-                      {devices.map((d) => (
-                        <option key={d.id} value={d.externalDeviceId}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                ) : (
-                  <span className="text-xs text-ink-muted">Connect Hue and sync devices first</span>
-                ))}
-
-              {actionType === "hue.set_brightness" && (
-                <LabeledSlider
-                  label="Brightness"
-                  value={brightness}
-                  min={1}
-                  max={100}
-                  onChange={setBrightness}
-                  formatValue={(v) => `${v}%`}
-                />
-              )}
-
-              {actionType === "hue.set_color_temperature" && (
-                <LabeledSlider
-                  label="Color Temperature"
-                  value={kelvin}
-                  min={KELVIN_MIN}
-                  max={KELVIN_MAX}
-                  step={50}
-                  onChange={setKelvin}
-                  formatValue={formatKelvin}
-                  segments={["Very Warm", "Warm", "Neutral", "Cool", "Daylight"]}
-                  helpText="Turns the light on at this color temperature — separate from brightness."
-                />
-              )}
-            </div>
-          )}
-
           {actionType === "spotify.play_playlist" && (
             <div className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
               <p className="text-xs font-semibold tracking-wide text-ink-muted uppercase">Music</p>
@@ -461,49 +362,6 @@ export function RuleForm({
                 Must exactly match a scene you&apos;ve already created in Apple&apos;s Home app — MoodSync can only
                 activate existing scenes, not create or control individual accessories. Runs the next time you open the
                 MoodSync companion app on your iPhone, not instantly.
-              </p>
-            </div>
-          )}
-
-          {(actionType === "hue_ble.set_power" || actionType === "hue_ble.set_brightness") && (
-            <div className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
-              <p className="text-xs font-semibold tracking-wide text-ink-muted uppercase">Bluetooth Hue (no Bridge)</p>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-ink">Light name</span>
-                <Input
-                  placeholder='The bulb&apos;s Bluetooth name, e.g. "Hue lamp"'
-                  value={blePeripheralName}
-                  onChange={(e) => setBlePeripheralName(e.target.value)}
-                  required
-                />
-              </div>
-
-              {actionType === "hue_ble.set_power" && (
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-ink">Power</span>
-                  <Select value={blePower} onChange={(e) => setBlePower(e.target.value as "on" | "off")}>
-                    <option value="on">Turn on</option>
-                    <option value="off">Turn off</option>
-                  </Select>
-                </div>
-              )}
-
-              {actionType === "hue_ble.set_brightness" && (
-                <LabeledSlider
-                  label="Brightness"
-                  value={bleBrightness}
-                  min={1}
-                  max={100}
-                  onChange={setBleBrightness}
-                  formatValue={(v) => `${v}%`}
-                />
-              )}
-
-              <p className="text-xs text-ink-muted">
-                Uses a reverse-engineered Bluetooth protocol, not Philips&apos; official API — Philips doesn&apos;t
-                document or support direct control of Bluetooth-only bulbs. Best-effort, not guaranteed to keep working
-                across bulb firmware updates. Runs the next time you open the MoodSync companion app while within
-                Bluetooth range of the bulb, not instantly. See docs/HUE_BLE_ARCHITECTURE.md.
               </p>
             </div>
           )}

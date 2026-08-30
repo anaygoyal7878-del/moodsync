@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/Card";
 import { RuleRow } from "./RuleRow";
 import { NewRuleToggle } from "./NewRuleToggle";
-import type { AutomationRuleDefinition, AutomationHistoryEntry, DeviceSummary } from "@/lib/types";
+import type { AutomationRuleDefinition, AutomationHistoryEntry } from "@/lib/types";
 
 const OUTCOME_LABELS: Record<AutomationHistoryEntry["outcome"], string> = {
   EXECUTED: "Executed",
@@ -17,26 +17,24 @@ const OUTCOME_LABELS: Record<AutomationHistoryEntry["outcome"], string> = {
 export function AutomationSection({
   rules,
   history,
-  devices,
   spotifyConnected,
 }: {
   rules: AutomationRuleDefinition[];
   history: AutomationHistoryEntry[];
-  devices: DeviceSummary[];
   spotifyConnected: boolean;
 }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Automation rules</h2>
-        <NewRuleToggle devices={devices} spotifyConnected={spotifyConnected} />
+        <NewRuleToggle spotifyConnected={spotifyConnected} />
       </div>
 
       {rules.length === 0 ? (
         <Card>
           <p className="text-sm text-ink-secondary">
-            No rules yet. Create one to react to your biometrics automatically — e.g. dim the lights when your
-            recovery score is low.
+            No rules yet. Create one to react to your biometrics automatically — e.g. play a Spotify playlist when
+            your recovery score is low.
           </p>
         </Card>
       ) : (

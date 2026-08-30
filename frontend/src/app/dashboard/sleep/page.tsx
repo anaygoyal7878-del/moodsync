@@ -159,7 +159,7 @@ export default async function SleepPage() {
               {quality.averageTotalMinutes === null && (
                 <p className="mt-4 text-[11.5px] leading-relaxed" style={{ color: "var(--lux-muted)" }}>
                   Your provider reports a sleep score but no stage breakdown, so total time asleep isn&apos;t available.
-                  WHOOP and Fitbit report stages; Apple Health and Amazfit report the score alone.
+                  WHOOP and Fitbit report stages; Apple Health reports the score alone.
                 </p>
               )}
             </>

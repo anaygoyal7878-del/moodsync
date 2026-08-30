@@ -57,7 +57,7 @@ export const TOUR_STEPS: TourStep[] = [
     kind: "feature",
     title: "It reads real biometric signals",
     body:
-      "WHOOP, Fitbit, Apple Health and Amazfit stream in heart rate, HRV, sleep stages, recovery and activity — live samples, not a daily average.",
+      "WHOOP, Fitbit and Apple Health stream in heart rate, HRV, sleep stages, recovery and activity — live samples, not a daily average.",
     detail: "This account is showing seeded demo data so every screen is populated. The integrations behind it are real OAuth connections.",
     anchor: "wellness-score",
     href: "/dashboard",
@@ -87,7 +87,7 @@ export const TOUR_STEPS: TourStep[] = [
     kind: "feature",
     title: "Then it acts, on its own",
     body:
-      "When a rule matches, MoodSync executes it — dimming Hue lights, shifting colour temperature, starting a Spotify playlist, triggering an Alexa routine.",
+      "When a rule matches, MoodSync executes it — dimming your lights, shifting colour temperature, starting a Spotify playlist.",
     detail: "This is a real dispatch engine with cooldowns, priority conflict resolution, rate limits and a full audit trail of every decision.",
     anchor: "automations",
     href: "/dashboard/automation",

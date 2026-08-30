@@ -13,13 +13,12 @@ export default async function AutomationPage() {
     : { wearables: [], smartHome: [], appleMusic: null, calendar: null };
   const rules = rulesResult.ok ? rulesResult.data.rules : [];
   const automationHistory = automationHistoryResult.ok ? automationHistoryResult.data.entries : [];
-  const devices = connections.smartHome.flatMap((c) => c.devices);
   const spotifyConnected = connections.smartHome.some((c) => c.provider === "SPOTIFY" && c.status === "ACTIVE");
 
   // Wrapper is a walkthrough anchor only — see tourSteps.ts.
   return (
     <div data-tour="automations">
-      <AutomationSection rules={rules} history={automationHistory} devices={devices} spotifyConnected={spotifyConnected} />
+      <AutomationSection rules={rules} history={automationHistory} spotifyConnected={spotifyConnected} />
     </div>
   );
 }

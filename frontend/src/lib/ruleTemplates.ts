@@ -4,32 +4,21 @@
 // ai/src/notificationExecutor.ts), so surfacing a notification-only
 // action type still isn't useful here.
 export const ACTION_TYPES = [
-  { value: "hue.set_scene", label: "Activate a Hue scene", provider: "hue" },
-  { value: "hue.set_brightness", label: "Set a light's brightness", provider: "hue" },
-  { value: "hue.set_color_temperature", label: "Set a light's color temperature", provider: "hue" },
   { value: "spotify.play_playlist", label: "Play a Spotify playlist", provider: "spotify" },
-  // No OAuth "connection" exists for this the way Hue/Spotify have one —
+  // No OAuth "connection" exists for this the way Spotify has one —
   // HomeKit is device-side only (see docs/HOMEKIT_ARCHITECTURE.md), so
   // this always queues for the iOS companion app rather than needing a
   // connect step first.
   { value: "homekit.activate_scene", label: "Activate a HomeKit scene (via iOS app)", provider: "homekit" },
-  // Bluetooth-only Hue bulbs (no Bridge) — a reverse-engineered protocol,
-  // not Philips' official API, and same "no cloud path" situation as
-  // HomeKit for a different reason (Bluetooth needs the phone physically
-  // near the bulb). See docs/HUE_BLE_ARCHITECTURE.md.
-  { value: "hue_ble.set_power", label: "Turn a Bluetooth Hue light on/off (via iOS app)", provider: "hue_ble" },
-  { value: "hue_ble.set_brightness", label: "Set a Bluetooth Hue light's brightness (via iOS app)", provider: "hue_ble" },
 ] as const;
 
 export type ActionType = (typeof ACTION_TYPES)[number]["value"];
 
-/** Seven of the eight Decision Engine automation scenarios (see
- * docs/DECISION_ENGINE_ARCHITECTURE.md) as selectable starting points —
- * still fully user-editable after applying, not hardcoded system rules.
- * Only Travel/away-mode is absent here (it has its own trigger shape —
- * `locationTrigger`, not a condition — see RuleForm.tsx's separate
- * arrival/departure UI). Sleep Detection is here as a HomeKit scene
- * activation — it can't automatically confirm lock/security state (see
+/** Selectable starting points from the Decision Engine automation
+ * scenarios (see docs/DECISION_ENGINE_ARCHITECTURE.md) — still fully
+ * user-editable after applying, not hardcoded system rules. Sleep
+ * Detection is here as a HomeKit scene activation — it can't
+ * automatically confirm lock/security state (see
  * docs/HOMEKIT_ARCHITECTURE.md and the real CheckSecurityIntent voice
  * command for why), but activating a user-configured "MoodSync Sleep"
  * scene (which can itself include locking a HomeKit-compatible lock, if
@@ -39,95 +28,11 @@ export type ActionType = (typeof ACTION_TYPES)[number]["value"];
  *
  * Each template uses a single condition to fit RuleForm's current
  * single-condition builder, even where the underlying rule shape
- * (`RuleCondition[]`) supports ANDing several — a real simplification,
- * not a claim that e.g. "Elevated Stress" checks HRV too.
+ * (`RuleCondition[]`) supports ANDing several.
  *
  * Shared between RuleForm.tsx (the template picker dropdown) and
- * QuickActions.tsx (the dashboard home's one-tap shortcuts, which
- * navigate to `/dashboard/automation?template=<id>` rather than
- * submitting blind — a Hue action needs a real `deviceId` from the
- * user's actual connected lights, which a home-page tap has no way to
- * know, so the honest "quick action" here is a pre-filled form, not a
- * silently-broken rule). */
+ * QuickActions.tsx (the dashboard home's one-tap shortcuts). */
 export const TEMPLATES = [
-  {
-    id: "elevated-stress",
-    label: "Elevated Stress — dim & calm when heart rate spikes",
-    name: "Elevated Stress",
-    field: "heartRate" as const,
-    operator: "gt" as const,
-    value: "95",
-    actionType: "hue.set_color_temperature" as ActionType,
-    mirek: "450",
-    cooldownMinutes: "30",
-    priority: "70",
-    timeWindow: null as { start: string; end: string } | null,
-  },
-  {
-    id: "focus-mode",
-    label: "Focus Mode — bright & cool during work hours",
-    name: "Focus Mode",
-    field: "heartRate" as const,
-    operator: "gt" as const,
-    value: "0",
-    actionType: "hue.set_color_temperature" as ActionType,
-    mirek: "250",
-    cooldownMinutes: "60",
-    priority: "50",
-    timeWindow: { start: "09:00", end: "17:00" },
-  },
-  {
-    id: "sleep-preparation",
-    label: "Sleep Preparation — dim & warm before bed",
-    name: "Sleep Preparation",
-    field: "heartRate" as const,
-    operator: "gt" as const,
-    value: "0",
-    actionType: "hue.set_color_temperature" as ActionType,
-    mirek: "454",
-    cooldownMinutes: "1440",
-    priority: "80",
-    timeWindow: { start: "21:30", end: "22:30" },
-  },
-  {
-    id: "wake-up",
-    label: "Wake Up — gentle brightness ramp in the morning",
-    name: "Wake Up",
-    field: "heartRate" as const,
-    operator: "gt" as const,
-    value: "0",
-    actionType: "hue.set_brightness" as ActionType,
-    brightness: "20",
-    cooldownMinutes: "1440",
-    priority: "60",
-    timeWindow: { start: "06:00", end: "08:00" },
-  },
-  {
-    id: "workout",
-    label: "Workout — energizing scene when heart rate is high",
-    name: "Workout",
-    field: "heartRate" as const,
-    operator: "gt" as const,
-    value: "120",
-    actionType: "hue.set_brightness" as ActionType,
-    brightness: "100",
-    cooldownMinutes: "20",
-    priority: "70",
-    timeWindow: null,
-  },
-  {
-    id: "recovery",
-    label: "Recovery — lower-intensity scene after activity",
-    name: "Recovery",
-    field: "activityLevel" as const,
-    operator: "gte" as const,
-    value: "60",
-    actionType: "hue.set_brightness" as ActionType,
-    brightness: "35",
-    cooldownMinutes: "60",
-    priority: "60",
-    timeWindow: null,
-  },
   {
     id: "sleep-detected",
     label: "Sleep Detected — activate your bedtime HomeKit scene",
@@ -144,7 +49,7 @@ export const TEMPLATES = [
     sceneName: "MoodSync Sleep",
     cooldownMinutes: "480",
     priority: "80",
-    timeWindow: null,
+    timeWindow: null as { start: string; end: string } | null,
   },
 ] as const;
 

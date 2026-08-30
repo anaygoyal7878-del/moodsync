@@ -4,9 +4,8 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { RuleForm } from "./RuleForm";
-import type { DeviceSummary } from "@/lib/types";
 
-export function NewRuleToggle({ devices, spotifyConnected }: { devices: DeviceSummary[]; spotifyConnected: boolean }) {
+export function NewRuleToggle({ spotifyConnected }: { spotifyConnected: boolean }) {
   // Arriving from QuickActions.tsx's `?template=<id>` deep link should
   // land with the form already open, not require an extra click on top
   // of the one that got here — RuleForm.tsx reads the same param to
@@ -22,5 +21,5 @@ export function NewRuleToggle({ devices, spotifyConnected }: { devices: DeviceSu
     );
   }
 
-  return <RuleForm devices={devices} spotifyConnected={spotifyConnected} onCreated={() => setOpen(false)} />;
+  return <RuleForm spotifyConnected={spotifyConnected} onCreated={() => setOpen(false)} />;
 }

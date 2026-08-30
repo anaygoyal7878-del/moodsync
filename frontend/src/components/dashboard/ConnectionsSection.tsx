@@ -5,7 +5,6 @@ import { DisconnectButton } from "./DisconnectButton";
 import { SyncButton } from "./SyncButton";
 import { AppleMusicConnectButton } from "./AppleMusicConnectButton";
 import { ConnectionStatusBadge, needsReconnect } from "./ConnectionStatusBadge";
-import { ALEXA_VOICE_COMMANDS } from "@/lib/alexaCommands";
 import { WEARABLE_LABELS, SMART_HOME_LABELS, PROVIDER_ICONS } from "@/lib/providerDisplay";
 import type {
   ConnectionsResponse,
@@ -75,7 +74,7 @@ function ConnectAction({
   connection: WearableConnectionSummary | SmartHomeConnectionSummary | undefined;
   connectHref: string;
   connectLabel: string;
-  provider: "whoop" | "hue" | "google-health" | "spotify";
+  provider: "whoop" | "google-health" | "spotify";
   extraActiveActions?: ReactNode;
 }) {
   if (connection?.status === "ACTIVE") {
@@ -271,33 +270,6 @@ function AmazfitCard({ connection }: { connection: WearableConnectionSummary | u
   );
 }
 
-function HueCard({ connection }: { connection: SmartHomeConnectionSummary | undefined }) {
-  return (
-    <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <ProviderIcon provider="HUE" />
-          <p className="text-sm font-medium">{SMART_HOME_LABELS.HUE}</p>
-        </div>
-        {connection ? (
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <ConnectionStatusBadge status={connection.status} />
-            {connection.status === "ACTIVE" && (
-              <span className="text-xs text-ink-muted" title={formatLastSynced(connection.lastSyncedAt)}>
-                · {formatRelativeSync(connection.lastSyncedAt)} · {connection.devices.length} device
-                {connection.devices.length === 1 ? "" : "s"}
-              </span>
-            )}
-          </div>
-        ) : (
-          <p className="mt-1 text-xs text-ink-muted">Not connected</p>
-        )}
-      </div>
-      <ConnectAction connection={connection} connectHref="/api/integrations/hue/connect" connectLabel="Connect Hue" provider="hue" />
-    </Card>
-  );
-}
-
 function SpotifyCard({ connection }: { connection: SmartHomeConnectionSummary | undefined }) {
   return (
     <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
@@ -321,52 +293,6 @@ function SpotifyCard({ connection }: { connection: SmartHomeConnectionSummary | 
         connectLabel="Connect Spotify"
         provider="spotify"
       />
-    </Card>
-  );
-}
-
-function AlexaCard({ connection }: { connection: SmartHomeConnectionSummary | undefined }) {
-  const isActive = connection?.status === "ACTIVE";
-
-  return (
-    <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 transition-colors hover:bg-surface-hover">
-      <div className="min-w-0 flex-1">
-        <ConnectionHeader provider="ALEXA" label={SMART_HOME_LABELS.ALEXA as string} connection={connection} />
-
-        {isActive ? (
-          <div className="mt-2 space-y-1">
-            <p className="text-xs text-ink-muted">
-              <span className="font-medium text-ink">Linked account:</span> this MoodSync account. MoodSync
-              doesn&apos;t request your Amazon profile — only enough to identify you when the skill calls in.
-            </p>
-            <p className="text-xs text-ink-muted">
-              <span className="font-medium text-ink">Skill status:</span> account linked and ready. If a
-              command stops working, try unlinking and relinking from the Alexa app.
-            </p>
-            <p className="text-xs text-ink-muted">
-              <span className="font-medium text-ink">Try saying:</span> &quot;Alexa, ask MoodSync{" "}
-              {ALEXA_VOICE_COMMANDS.map((c, i) => (
-                <span key={c}>
-                  {i > 0 && (i === ALEXA_VOICE_COMMANDS.length - 1 ? ", or " : ", ")}
-                  {c}
-                </span>
-              ))}
-              .&quot;
-            </p>
-          </div>
-        ) : (
-          <div className="mt-2 space-y-1.5 rounded-lg bg-surface-raised p-2.5 text-xs text-ink-muted">
-            <p className="font-medium text-ink">Link from the Alexa app — MoodSync can&apos;t start this from the dashboard:</p>
-            <ol className="list-decimal space-y-0.5 pl-4">
-              <li>Open the Alexa app and search for the &quot;MoodSync&quot; skill.</li>
-              <li>Enable the skill, then tap &quot;Link account&quot;.</li>
-              <li>Log in with this same MoodSync account and approve access.</li>
-            </ol>
-            <p>Once linked, try: &quot;Alexa, ask MoodSync {ALEXA_VOICE_COMMANDS[0]}.&quot;</p>
-          </div>
-        )}
-      </div>
-      {isActive && <DisconnectButton provider="alexa" />}
     </Card>
   );
 }
@@ -456,9 +382,7 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
   const fitbit = connections.wearables.find((c) => c.provider === "GOOGLE_HEALTH");
   const appleHealth = connections.wearables.find((c) => c.provider === "APPLE_HEALTH");
   const amazfit = connections.wearables.find((c) => c.provider === "AMAZFIT");
-  const hue = connections.smartHome.find((c) => c.provider === "HUE");
   const spotify = connections.smartHome.find((c) => c.provider === "SPOTIFY");
-  const alexa = connections.smartHome.find((c) => c.provider === "ALEXA");
 
   return (
     <section className="flex flex-col gap-3">
@@ -467,15 +391,13 @@ export function ConnectionsSection({ connections }: { connections: ConnectionsRe
       <WhoopCard connection={whoop} />
       <FitbitCard connection={fitbit} />
       <AppleHealthCard connection={appleHealth} />
-      {/* Amazfit/Hue/Alexa: no longer offered as something to connect —
-       * the cards only render for an account that already has one, so an
-       * existing connection stays fully visible and manageable (including
+      {/* Amazfit: no longer offered as something to connect — the card
+       * only renders for an account that already has one, so an existing
+       * connection stays fully visible and manageable (including
        * Disconnect) while new users never see the option. The backend
-       * routes/services behind all three are untouched. */}
+       * route/service behind it is untouched. */}
       {amazfit && <AmazfitCard connection={amazfit} />}
-      {hue && <HueCard connection={hue} />}
       <SpotifyCard connection={spotify} />
-      {alexa && <AlexaCard connection={alexa} />}
       <AppleMusicCard connection={connections.appleMusic} />
       <CalendarCard connection={connections.calendar} />
     </section>

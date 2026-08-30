@@ -3,26 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Wind, Brain, Sunrise, Moon, Dumbbell, Cpu, OctagonPause, Plus, Timer } from "lucide-react";
+import { OctagonPause, Plus, Timer } from "lucide-react";
 
-/** One-tap shortcuts on the dashboard home. The five wellness actions
- * (Relaxation/Focus/Morning/Sleep/Workout) deep-link into RuleForm.tsx
- * pre-filled via `?template=<id>` — see lib/ruleTemplates.ts's doc
- * comment for why this navigates instead of silently creating a rule:
- * the Hue actions these templates use need a real deviceId from the
- * user's own connected lights, which a home-page tap can't know.
- * "Manage Devices" and "New rule" are plain navigation. "Emergency Stop"
- * is the one action that's genuinely instant — it's the same real
- * pause-all-automations call PauseAutomationsButton.tsx already makes
- * (POST /api/preferences/automation-pause, 60 minutes), not a fabricated
+/** One-tap shortcuts on the dashboard home. "Start Focus" and "New rule"
+ * are plain navigation. "Emergency Stop" is the one action that's
+ * genuinely instant — it's the same real pause-all-automations call
+ * PauseAutomationsButton.tsx already makes (POST
+ * /api/preferences/automation-pause, 60 minutes), not a fabricated
  * capability. */
-const TEMPLATE_ACTIONS = [
-  { templateId: "elevated-stress", label: "Relaxation", icon: Wind },
-  { templateId: "focus-mode", label: "Focus", icon: Brain },
-  { templateId: "wake-up", label: "Morning", icon: Sunrise },
-  { templateId: "sleep-preparation", label: "Sleep", icon: Moon },
-  { templateId: "workout", label: "Workout", icon: Dumbbell },
-] as const;
 
 function CircleButton({
   icon: Icon,
@@ -32,7 +20,7 @@ function CircleButton({
   disabled,
   luxury,
 }: {
-  icon: typeof Wind;
+  icon: typeof Timer;
   label: string;
   onClick?: () => void;
   href?: string;
@@ -100,17 +88,7 @@ export function QuickActions({ isPaused, luxury }: { isPaused: boolean; luxury?:
         Quick actions
       </h2>
       <div className="flex gap-5 overflow-x-auto pb-1">
-        {TEMPLATE_ACTIONS.map((action) => (
-          <CircleButton
-            key={action.templateId}
-            icon={action.icon}
-            label={action.label}
-            href={`/dashboard/automation?template=${action.templateId}`}
-            luxury={luxury}
-          />
-        ))}
         <CircleButton icon={Timer} label="Start Focus" href="/dashboard/focus" luxury={luxury} />
-        <CircleButton icon={Cpu} label="Devices" href="/dashboard/devices" luxury={luxury} />
         <CircleButton icon={Plus} label="New rule" href="/dashboard/automation" luxury={luxury} />
         <CircleButton
           icon={OctagonPause}

@@ -19,7 +19,6 @@ import { Wrench, Check, Minus } from "lucide-react";
  */
 
 interface Capabilities {
-  hueConnected: boolean;
   tools: string[];
 }
 
@@ -29,12 +28,7 @@ const TOOL_COPY: Record<string, string> = {
   get_nutrition_guidance: "Answer general nutrition questions, grounded in your caffeine and energy data",
   log_caffeine_intake: "Log a coffee when you mention having one",
   remember_fact: "Remember a preference for future conversations",
-  list_smart_home_devices: "List your lights and scenes",
-  control_hue_light: "Turn a light on or off, or dim it (after you confirm)",
-  activate_hue_scene: "Run one of your Hue scenes (after you confirm)",
 };
-
-const HUE_TOOLS = ["list_smart_home_devices", "control_hue_light", "activate_hue_scene"];
 
 export function MessagingCapabilities() {
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
@@ -76,9 +70,6 @@ export function MessagingCapabilities() {
               )}
               <span className="text-sm" style={{ color: on ? "var(--lux-ink)" : "var(--lux-muted)" }}>
                 {TOOL_COPY[tool]}
-                {!on && HUE_TOOLS.includes(tool) && (
-                  <span className="block text-xs">Needs a connected Hue bridge.</span>
-                )}
               </span>
             </li>
           );
