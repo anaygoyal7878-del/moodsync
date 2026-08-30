@@ -160,6 +160,21 @@ export {
   type ScenarioSeverity,
 } from './healthScenarios.js';
 export {
+  buildIntelligenceStack,
+  describeStackForPrompt,
+  type IntelligenceStackResult,
+  type IntelligenceLayer,
+  type LayerId,
+} from './intelligenceStack.js';
+export { loadIntelligenceStack } from './intelligenceContext.js';
+export {
+  CLARA_GENERATION_CONFIG,
+  CLARA_SAFETY_SETTINGS,
+  interpretGeminiResponse,
+  outcomeToText,
+  type GeminiOutcome,
+} from './geminiConfig.js';
+export {
   composeDailyBrief,
   computeOvernightChanges,
   computeReadiness,

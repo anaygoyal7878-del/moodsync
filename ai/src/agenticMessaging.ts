@@ -1,6 +1,7 @@
 import { GoogleGenAI, createPartFromFunctionResponse, type Content } from '@google/genai';
 import { messagingMemoryRepository } from '@moodsync/database';
 import { ClaraNotConfiguredError, buildClaraSystemPrompt, type ClaraChatMessage } from './claraChat.js';
+import { CLARA_GENERATION_CONFIG, interpretGeminiResponse, outcomeToText } from './geminiConfig.js';
 import {
   MESSAGING_ACTION_TOOL_NAMES,
   selectMessagingTools,
@@ -128,14 +129,18 @@ export async function sendAgenticMessage(
         client.models.generateContent({
           model,
           contents,
-          config: { systemInstruction: systemPrompt, tools: toGeminiTools(tools), ...geminiCallOptions() },
+          config: { systemInstruction: systemPrompt, tools: toGeminiTools(tools), ...CLARA_GENERATION_CONFIG, ...geminiCallOptions() },
         }),
       'clara.agentic',
     );
 
     const calls = response.functionCalls ?? [];
     if (calls.length === 0) {
-      return { text: response.text ?? '', pendingAction: null };
+      // Was `response.text ?? ''`. An empty string here is what a
+      // safety-blocked response looks like, and ClaraChat only renders a
+      // bubble for a truthy reply — so a block used to produce no
+      // assistant message at all. Now it produces an explanation.
+      return { text: outcomeToText(interpretGeminiResponse(response)), pendingAction: null };
     }
 
     // Only the first call is honored per round — see the "your turn is

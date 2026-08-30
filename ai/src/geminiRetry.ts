@@ -66,26 +66,40 @@ const BASE_DELAY_MS = 400;
  * multiplies the outage. A person staring at a text thread has given up
  * long before then — failing honestly beats succeeding at 120s.
  *
- * Since tightened 45s -> 25s. The agentic loop spends one of these
- * budgets *per tool round* (up to `MAX_TOOL_ROUNDS`), so this bound is
- * multiplied, not shared, across a single turn — 45s each meant one
- * question could legitimately take three minutes before giving up.
+ * Held at 45s, alongside `ATTEMPT_TIMEOUT_MS`. The agentic loop spends
+ * one of these budgets *per tool round*, so it is multiplied rather
+ * than shared across a turn, which argues for keeping it small. But it
+ * has to leave room for an attempt *plus* a fallback: with a 20s
+ * attempt ceiling, a 25s deadline meant the second candidate could
+ * never be tried, because the deadline check correctly refuses to start
+ * an attempt it cannot finish. A budget that structurally excludes the
+ * fallback is worse than a longer one, since the fallback is the whole
+ * reason there is a candidate list.
  */
-const TOTAL_DEADLINE_MS = 25_000;
+const TOTAL_DEADLINE_MS = 45_000;
 /**
  * Per-attempt ceiling, enforced by the caller through the SDK's own
  * `timeout`/`abortSignal` (see `geminiCallOptions`). Bounds a single
  * hung request so one stall can't eat the whole budget.
  *
- * Cut from 20s to 8s once the candidate order below put a model in
- * front that answers in about a second. This number is only ever paid
- * on the *failure* path — it's how long a hung socket stalls before the
- * next candidate is tried — so sizing it against a healthy response is
- * what makes fallback feel immediate instead of feeling like a freeze.
- * 8s is still roughly eight times the measured healthy latency, so a
- * merely slow request is not mistaken for a dead one.
+ * Held at 20s, and the history is worth keeping because the mistake is
+ * easy to repeat. This was briefly cut to 8s on the reasoning that the
+ * healthy path now answers in about a second, so a shorter fuse would
+ * make fallback feel immediate. That reasoning was wrong in one
+ * specific way: it sized the timeout against the *median* when the
+ * timeout only ever interacts with the *tail*. Healthy calls measured
+ * 0.6–2s, but a real agentic turn was observed taking past 8s, and the
+ * short fuse turned that slow success into a failure — then spent the
+ * whole deadline retrying it, producing a 22s error where a ~10s answer
+ * was available.
+ *
+ * What actually made Clara fast was putting the responsive model first
+ * in `CLARA_MODEL_CANDIDATES`, not this number. This one is a hang
+ * detector: it should sit far enough above the tail that only a
+ * genuinely stuck socket reaches it. Reaching it should be rare, which
+ * is exactly why it can afford to be generous.
  */
-export const ATTEMPT_TIMEOUT_MS = 8_000;
+export const ATTEMPT_TIMEOUT_MS = 20_000;
 
 /** Status codes worth trying again. See the doc comment for why 4xx —
  * 429 very much included — is deliberately absent. */

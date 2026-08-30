@@ -9,7 +9,10 @@ import {
 import { computeWellnessScores, type WellnessScores } from './wellness.js';
 import { computePersonalBaselines, type BaselineComparison } from './personalBaselines.js';
 import { detectHealthScenarios } from './healthScenarios.js';
+import { loadIntelligenceStack } from './intelligenceContext.js';
+import { describeStackForPrompt } from './intelligenceStack.js';
 import { withGeminiFallback, geminiCallOptions, CLARA_MODEL_CANDIDATES } from './geminiRetry.js';
+import { CLARA_GENERATION_CONFIG, interpretGeminiResponse, outcomeToText } from './geminiConfig.js';
 
 export interface ClaraChatMessage {
   role: 'user' | 'assistant';
@@ -40,12 +43,16 @@ function formatScore(score: WellnessScores[keyof WellnessScores]): string {
  * than a plausible-sounding guess.
  */
 export async function buildClaraSystemPrompt(userId: string): Promise<string> {
-  const [latest, rules, wearables, smartHome, sessions] = await Promise.all([
+  const [latest, rules, wearables, smartHome, sessions, stack] = await Promise.all([
     biometricReadingRepository.findLatestNormalized(userId),
     automationRuleRepository.listForUser(userId),
     wearableConnectionRepository.listForUser(userId),
     smartHomeConnectionRepository.listForUser(userId),
     meditationSessionRepository.listForUser(userId, 5),
+    // The layered view of everything MoodSync has learned about this
+    // person, plus — the part that matters most for answering honestly
+    // — what it has *not* learned yet and what would change that.
+    loadIntelligenceStack(userId),
   ]);
 
   let wellnessSection = 'No wearable data has synced for this user yet.';
@@ -130,6 +137,9 @@ ${baselineSection}
 --- RESEARCHED SCENARIOS CURRENTLY APPLYING ---
 ${scenarioSection}
 
+--- INTELLIGENCE STACK: WHAT YOU KNOW, AND WHAT YOU DO NOT ---
+${describeStackForPrompt(stack)}
+
 Connected wearables: ${wearableSection}
 Connected smart home: ${smartHomeSection}
 
@@ -157,7 +167,23 @@ HOW TO REASON WITH THE TWO SECTIONS ABOVE:
 
 6. Respect the sample size. A scenario backed by 6 readings is a hint; one backed by 60 is a pattern. Say which you're looking at when it matters.
 
-7. On music: when suggesting listening, the useful specifics are roughly 60–80 BPM for calming down or recovering (slow tempo is associated with lower heart rate and arousal) and 120–140 BPM for training (associated with longer time to exhaustion). MoodSync matches playlists in their own library by name and cannot read the tempo of their actual tracks, so offer these as what to reach for — never claim to know the BPM of a specific playlist of theirs.`;
+7. On music: when suggesting listening, the useful specifics are roughly 60–80 BPM for calming down or recovering (slow tempo is associated with lower heart rate and arousal) and 120–140 BPM for training (associated with longer time to exhaustion). MoodSync matches playlists in their own library by name and cannot read the tempo of their actual tracks, so offer these as what to reach for — never claim to know the BPM of a specific playlist of theirs.
+
+ANSWERING HEALTH QUESTIONS — WHAT TO ANSWER AND WHAT TO DECLINE:
+
+Answer freely, and in real detail, when the question is about: their own synced data; general wellness and exercise principles; sleep hygiene; stress and recovery; how any MoodSync feature works; what a metric like HRV or resting heart rate means in general. Being useful is the default, and hedging a question you can answer is its own kind of failure — do not water down a good general answer just because it is health-adjacent.
+
+The INTELLIGENCE STACK section above is authoritative about your limits. Its "You CAN answer" list is grounded in data that actually exists; its "You CANNOT answer" list is not, and every locked layer states what would unlock it.
+
+When a question needs something you do not have:
+
+- Say you cannot help with that one, plainly and in one sentence. Do not pad it with apology or with three paragraphs of adjacent information the user did not ask for.
+- Give the specific reason, not a generic one. "I need about four more nights before your sleep baseline means anything" is useful. "I don't have enough data" is not.
+- If it is a locked layer, say what unlocks it. The user can often act on that.
+- If it is permanently outside MoodSync — anything diagnostic, medication, nutrition targets, blood pressure, glucose, weight — say that plainly and point at a clinician where the question is medical. Do not guess, and do not soften a diagnostic question into a wellness answer you can give; answering a different question than the one asked is worse than declining.
+- Never invent a number. If you catch yourself about to state a value not present above, stop and say you do not have it.
+
+The phrase to reach for is "I can't help with that one right now" — followed by why, and by what you *can* do instead if anything applies.`;
 }
 
 /**
@@ -187,10 +213,10 @@ export async function sendClaraMessage(userId: string, messages: ClaraChatMessag
           role: m.role === 'assistant' ? 'model' : 'user',
           parts: [{ text: m.content }],
         })),
-        config: { systemInstruction, ...geminiCallOptions() },
+        config: { systemInstruction, ...CLARA_GENERATION_CONFIG, ...geminiCallOptions() },
       }),
     'clara.chat',
   );
 
-  return response.text ?? '';
+  return outcomeToText(interpretGeminiResponse(response));
 }
