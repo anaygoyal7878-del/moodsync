@@ -235,6 +235,31 @@ export function ClaraChat() {
         <input
           value={input}
           onChange={(event) => setInput(event.target.value)}
+          // Enter sends, explicitly, rather than leaning on the browser's
+          // implicit form submission. Two reasons, both real: implicit
+          // submission is a browser behavior that can't be exercised in
+          // jsdom or driven by a synthetic keypress, so relying on it
+          // left the single most-used interaction in this component
+          // permanently unverifiable — and it quietly stops working the
+          // day this becomes a <textarea> for multi-line input, which a
+          // chat box tends to.
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            // `isComposing` guards IME input: mid-composition Enter
+            // commits a candidate character (Japanese, Chinese, Korean),
+            // and sending there would cut the word off mid-typing.
+            if (event.nativeEvent.isComposing) return;
+            // preventDefault runs for Shift+Enter too, not just plain
+            // Enter. A single-line input can't hold a newline, so the
+            // browser's own behavior here is to submit — meaning without
+            // this, the Shift branch below would `return` and the form
+            // would send anyway, which is exactly the accidental send
+            // someone reaching for a line break did not want. (Found by
+            // a test that asserted the guard worked; it didn't.)
+            event.preventDefault();
+            if (event.shiftKey) return;
+            void send(input);
+          }}
           placeholder="Ask Clara…"
           aria-label="Message Clara"
           className="min-w-0 flex-1 rounded-full px-4 py-2.5 text-[13.5px] outline-none"
