@@ -40,6 +40,12 @@ export interface MemoryFinding {
  * enough to catch a sync that lands a while after the action, narrow
  * enough that an unrelated evening doesn't get attributed to a morning
  * meditation. */
+/** How many days of history a correlation search covers. Exported so
+ * every caller uses the same window: Clara reasoning over 30 days while
+ * the Recovery page showed 60 would mean the assistant and the screen
+ * beside it citing different numbers for the same question. */
+export const MEMORY_WINDOW_DAYS = 60;
+
 const WINDOW_MINUTES = 90;
 /** Below this, a "finding" is one or two coincidences. This app doesn't
  * tell people what works for them off two data points. */

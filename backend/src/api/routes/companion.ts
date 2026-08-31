@@ -1,3 +1,4 @@
+import { hourInZone } from '@moodsync/shared';
 import type { FastifyInstance } from 'fastify';
 import {
   biometricReadingRepository,
@@ -29,6 +30,7 @@ import {
   rankRecoveryActions,
   detectHealthScenarios,
   computePersonalBaselines,
+  MEMORY_WINDOW_DAYS,
 } from '@moodsync/ai';
 import { userRepository } from '../../repositories/userRepository.js';
 import {
@@ -40,18 +42,9 @@ import {
   WELLNESS_HISTORY_DAYS,
 } from '../../services/companionContext.js';
 
-/** How far back Wellness Memory looks for before/after pairs. Long
- * enough to accumulate the 3+ occurrences a finding needs, short enough
- * that it reflects who the user is now. */
-const MEMORY_WINDOW_DAYS = 60;
+
 /** Planning day bounds, shared with the study-plan route's convention. */
 const PLANNING_DAY_END_HOUR = 21;
-
-function hourInZone(date: Date, timezone: string): number {
-  const formatted = new Intl.DateTimeFormat('en-US', { timeZone: timezone, hour: 'numeric', hour12: false }).format(date);
-  const hour = Number(formatted);
-  return Number.isFinite(hour) ? hour % 24 : date.getUTCHours();
-}
 
 /** First name only — "Good morning, Anay" reads like a person; the full
  * display name often doesn't. Falls back to null (no name in the

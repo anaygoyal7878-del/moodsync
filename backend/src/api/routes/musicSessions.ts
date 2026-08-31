@@ -1,3 +1,4 @@
+import { hourInZone } from '@moodsync/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { musicSessionRepository, biometricReadingRepository, focusSessionRepository } from '@moodsync/database';
@@ -69,12 +70,6 @@ const completeSchema = z.object({
    * in this app. */
   endedEarly: z.boolean().default(false),
 });
-
-function hourInZone(date: Date, timezone: string): number {
-  const formatted = new Intl.DateTimeFormat('en-US', { timeZone: timezone, hour: 'numeric', hour12: false }).format(date);
-  const hour = Number(formatted);
-  return Number.isFinite(hour) ? hour % 24 : date.getUTCHours();
-}
 
 export default async function musicSessionRoutes(app: FastifyInstance) {
   /**

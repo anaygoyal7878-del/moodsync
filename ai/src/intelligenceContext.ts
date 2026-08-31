@@ -3,11 +3,13 @@ import {
   meditationSessionRepository,
   focusSessionRepository,
   musicSessionRepository,
+  userTimezoneRepository,
 } from '@moodsync/database';
+import { hourInZone } from '@moodsync/shared';
 import { computeWellnessScores } from './wellness.js';
 import { computePersonalBaselines } from './personalBaselines.js';
 import { detectHealthScenarios } from './healthScenarios.js';
-import { correlateOccurrences } from './wellnessMemory.js';
+import { correlateOccurrences, MEMORY_WINDOW_DAYS } from './wellnessMemory.js';
 import { rankPlaylistsByEffect, type CompletedMusicSession } from './musicMemory.js';
 import { buildIntelligenceStack, type IntelligenceStackResult } from './intelligenceStack.js';
 
@@ -22,21 +24,23 @@ import { buildIntelligenceStack, type IntelligenceStackResult } from './intellig
  * second one. Two copies of "what does MoodSync know about this person"
  * is how they start disagreeing.
  *
- * `MEMORY_WINDOW_DAYS` matches the wellness-memory route's window, so
- * the correlations Clara reasons from are the same ones the Recovery
- * page shows the user. An assistant citing different numbers than the
- * screen next to it is worse than one that cites none.
+ * `MEMORY_WINDOW_DAYS` is imported from `wellnessMemory.ts` rather than
+ * redeclared, so the correlations Clara reasons from are the same ones
+ * the Recovery page shows. An assistant citing different numbers than
+ * the screen beside it is worse than one that cites none — and a local
+ * copy of that constant had already drifted to half the real window
+ * while a comment claimed the two matched.
  */
-const MEMORY_WINDOW_DAYS = 30;
 const BASELINE_HISTORY_DAYS = 30;
 const SESSION_LIMIT = 200;
 
 export async function loadIntelligenceStack(userId: string): Promise<IntelligenceStackResult> {
-  const [readings, meditations, focusSessions, musicSessions] = await Promise.all([
+  const [readings, meditations, focusSessions, musicSessions, timezone] = await Promise.all([
     biometricReadingRepository.listRecentNormalized(userId, BASELINE_HISTORY_DAYS),
     meditationSessionRepository.listForUser(userId, SESSION_LIMIT),
     focusSessionRepository.listForUser(userId, SESSION_LIMIT),
     musicSessionRepository.listCompletedSince(userId, MEMORY_WINDOW_DAYS),
+    userTimezoneRepository.getTimezone(userId),
   ]);
 
   const latest = readings[0];
@@ -60,9 +64,12 @@ export async function loadIntelligenceStack(userId: string): Promise<Intelligenc
   const findings = correlateOccurrences(occurrences, recoveryPoints);
 
   // Mapped the same way `loadCompletedSessions` in the music-sessions
-  // route does, minus the timezone conversion: `hourOfDay` only feeds
-  // `bestHoursForMode`, which this stack does not use, so requiring a
-  // timezone lookup here would be a query for a field nobody reads.
+  // route does, timezone conversion included. `hourOfDay` feeds
+  // `bestHoursForMode`, which this stack does not currently call — but
+  // filling it with a placeholder 0 would leave correct-looking data
+  // that silently reports every session as having happened at midnight
+  // the moment anyone did call it. One extra cheap query is worth not
+  // leaving that behind.
   const completed: CompletedMusicSession[] = musicSessions
     .filter((row) => row.endedAt !== null)
     .map((row) => ({
@@ -73,7 +80,7 @@ export async function loadIntelligenceStack(userId: string): Promise<Intelligenc
       endedAt: row.endedAt!,
       heartRateDelta: row.outcomeHeartRateDelta,
       endedEarly: row.endedEarly,
-      hourOfDay: 0,
+      hourOfDay: hourInZone(row.startedAt, timezone),
     }));
 
   return buildIntelligenceStack({

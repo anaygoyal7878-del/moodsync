@@ -141,6 +141,7 @@ export {
   correlateOccurrences,
   computeBestFocusHours,
   describeFinding,
+  MEMORY_WINDOW_DAYS,
   type HourlyPerformance,
   type MemoryFinding,
   type MetricPoint,

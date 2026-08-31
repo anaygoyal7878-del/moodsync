@@ -215,7 +215,7 @@ export function buildIntelligenceStack(input: IntelligenceStackInput): Intellige
   // because these are exactly the questions a wellness assistant gets
   // asked and exactly the ones it must not improvise an answer to.
   cannotAnswer.push(
-    'Anything diagnostic — whether you have a condition, what an symptom means, whether to take a medication — MoodSync has no clinical data and this needs a real clinician',
+    'Anything diagnostic — whether you have a condition, what a symptom means, whether to take a medication — MoodSync has no clinical data and this needs a real clinician',
     'Your sleep schedule regularity — MoodSync stores sleep scores but no bedtime or wake timestamps',
     'Nutrition specifics like calorie or macro targets — MoodSync does not track intake',
     'Blood pressure, glucose, weight or body composition — no connected source provides them',
@@ -233,7 +233,15 @@ export function describeStackForPrompt(stack: IntelligenceStackResult): string {
   lines.push(`Knowledge depth: ${stack.depth ?? 'nothing yet — no data has synced'}`);
   lines.push('');
   for (const layer of stack.layers) {
-    lines.push(`[${layer.unlocked ? 'UNLOCKED' : 'LOCKED'}] ${layer.name} (${layer.sampleSize}/${layer.requiredSamples} samples)`);
+    // Only layers with a real threshold get a fraction. The scenario
+    // layer has none — it gates on the baseline beneath it, not on a
+    // count of its own — and rendering it as "1/0 samples" put a piece
+    // of nonsense in front of the model.
+    const count =
+      layer.requiredSamples > 0
+        ? `${layer.sampleSize}/${layer.requiredSamples} samples`
+        : `${layer.sampleSize} currently applying`;
+    lines.push(`[${layer.unlocked ? 'UNLOCKED' : 'LOCKED'}] ${layer.name} (${count})`);
     for (const item of layer.knows) lines.push(`    - ${item}`);
     if (layer.needs) lines.push(`    Needs: ${layer.needs}`);
   }

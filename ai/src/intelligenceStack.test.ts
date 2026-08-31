@@ -55,7 +55,7 @@ describe('buildIntelligenceStack', () => {
     const stack = buildIntelligenceStack({
       ...empty,
       readingCount: 0,
-      musicEffects: [{ label: 'Calm', mode: 'relax', sessions: 9, meanHeartRateDelta: -5, helped: true, earlyStopRate: 0 } as never],
+      musicEffects: [{ label: 'Calm', mode: 'RELAX' as const, sessions: 9, meanHeartRateDelta: -5, helped: true, earlyStopRate: 0 }],
     });
     expect(stack.depth).toBeNull();
     expect(stack.layers.find((l) => l.id === 'preference')!.unlocked).toBe(true);
@@ -97,7 +97,7 @@ describe('buildIntelligenceStack', () => {
       baselines: baselines(200),
       scenarios: [],
       findings: [{ label: 'Meditation', meanDelta: 4, sampleSize: 20 }],
-      musicEffects: [{ label: 'Calm', mode: 'relax', sessions: 20, meanHeartRateDelta: -6, helped: true, earlyStopRate: 0 } as never],
+      musicEffects: [{ label: 'Calm', mode: 'RELAX' as const, sessions: 20, meanHeartRateDelta: -6, helped: true, earlyStopRate: 0 }],
     });
     expect(stack.depth).toBe('preference');
     expect(stack.cannotAnswer.join(' ')).toMatch(/diagnostic/i);
@@ -127,5 +127,31 @@ describe('describeStackForPrompt', () => {
     expect(text).toContain('You CAN answer');
     expect(text).toContain('You CANNOT answer');
     expect(text).toContain('Needs:');
+  });
+});
+
+describe('describeStackForPrompt formatting', () => {
+  it('does not render a sample fraction for a layer with no count threshold', () => {
+    // The scenario layer gates on the baseline beneath it, not on a
+    // count of its own, so "1/0 samples" was nonsense in text the model
+    // reads and reasons from.
+    const stack = buildIntelligenceStack({
+      readingCount: 30,
+      baselines: {
+        heartRate: null,
+        restingHeartRate: { value: 52, baseline: 52, z: 0, sampleSize: 30 },
+        heartRateVariability: null,
+        sleepScore: null,
+        activityLevel: null,
+        hasAnyBaseline: true,
+        maxSampleSize: 30,
+      },
+      scenarios: [],
+      findings: [],
+      musicEffects: [],
+    });
+    const text = describeStackForPrompt(stack);
+    expect(text).not.toContain('/0 samples');
+    expect(text).toContain('Researched patterns');
   });
 });
