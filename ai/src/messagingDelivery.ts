@@ -147,7 +147,26 @@ async function sendBlueBubblesText(baseUrl: string, password: string, handle: st
       chatGuid: `iMessage;-;${handle}`,
       tempGuid: `moodsync-proactive-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       message,
-      method: 'private-api',
+      // Deliberately omitted rather than pinned to 'private-api'.
+      //
+      // BlueBubbles picks the send method itself, and its own server
+      // code is explicit about the rule:
+      //
+      //   papiEnabled && !!Server().privateApi.helper
+      //     ? "private-api" : "apple-script"
+      //
+      // Pinning 'private-api' demands a path that only exists when the
+      // Private API helper bundle is installed, which requires System
+      // Integrity Protection to be disabled. On a normal Mac — SIP on,
+      // no helper — that request cannot be satisfied, and hardcoding it
+      // turned "iMessage works with a small feature gap" into "iMessage
+      // does not work at all".
+      //
+      // Letting the server choose means AppleScript delivery on a
+      // stock Mac and Private API automatically on a machine set up for
+      // it, with no config change either way. The AppleScript path
+      // sends plain text fine; what it gives up is tapbacks, effects
+      // and edits — none of which MoodSync sends.
     }),
   });
 
