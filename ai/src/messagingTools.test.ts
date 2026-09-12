@@ -14,6 +14,7 @@ const {
   createPendingCalendarWriteMock,
   getAppleCalendarSnapshotMock,
   getTimezoneMock,
+  getOccasionEventsMock,
 } = vi.hoisted(() => ({
   listLightsMock: vi.fn(),
   listScenesMock: vi.fn(),
@@ -36,6 +37,12 @@ const {
     async (): Promise<{ events: unknown[]; pushedAt: Date } | null> => null,
   ),
   getTimezoneMock: vi.fn(async () => 'UTC'),
+  // Typed rather than bare-null for the same reason as the snapshot mock
+  // above: a `null`-only return type stops a test resolving real events
+  // from compiling.
+  getOccasionEventsMock: vi.fn(
+    async (): Promise<Array<{ start: Date; end: Date; isAllDay: boolean; title?: string }> | null> => null,
+  ),
 }));
 
 vi.mock('@moodsync/database', () => ({
@@ -49,6 +56,10 @@ vi.mock('@moodsync/database', () => ({
   pendingCalendarWriteRepository: { create: createPendingCalendarWriteMock },
   appleCalendarSnapshotRepository: { getForUser: getAppleCalendarSnapshotMock },
   userTimezoneRepository: { getTimezone: getTimezoneMock },
+}));
+
+vi.mock('./calendarSignal.js', () => ({
+  getOccasionEvents: getOccasionEventsMock,
 }));
 
 vi.mock('./hueActionExecutor.js', () => ({
@@ -366,5 +377,81 @@ describe('executeConfirmedAction — create_calendar_event', () => {
       expect.objectContaining({ userId: 'u1', title: 'Dentist' }),
     );
     expect(result).toContain('next time your phone opens MoodSync');
+  });
+});
+
+describe('recommend_cologne', () => {
+  const tool = MESSAGING_TOOLS.recommend_cologne!;
+
+  beforeEach(() => {
+    findLatestNormalizedMock.mockResolvedValue(null);
+    getOccasionEventsMock.mockResolvedValue(null);
+    getTimezoneMock.mockResolvedValue('UTC');
+  });
+
+  it('recommends from the real catalog with no calendar and no wearable at all', () => {
+    // The cologne tool is deliberately not gated on a calendar: with
+    // nothing connected it still answers from time of day, which is a
+    // real answer. Gating it would leave the model to invent one.
+    return tool.handler('u1', {}).then((result) => {
+      expect(result.data.hasRecommendation).toBe(true);
+      expect(['Solaris', 'Everwood', 'Burnt Ash']).toContain(result.data.scent);
+      expect(Array.isArray(result.data.pulsePoints)).toBe(true);
+    });
+  });
+
+  it('flags when the brand publishes no note pyramid, rather than omitting the field', () => {
+    // Two of the three fragrances have no published pyramid. The model
+    // must be able to tell "not published" from "not returned", or it
+    // fills the gap with plausible-sounding notes for a real product.
+    return tool.handler('u1', {}).then((result) => {
+      expect(result.data).toHaveProperty('notesPublished');
+      expect(result.data.notesPublished).toBe(result.data.notes !== null);
+    });
+  });
+
+  it('reads the occasion from a calendar title when one is available', async () => {
+    const start = new Date(Date.now() + 2 * 60 * 60_000);
+    getOccasionEventsMock.mockResolvedValue([
+      { start, end: new Date(start.getTime() + 2 * 60 * 60_000), isAllDay: false, title: 'Dinner with Mara' },
+    ]);
+
+    const result = await tool.handler('u1', {});
+    expect(result.data.occasionSource).toBe('title');
+    expect(result.data.occasion).toBe('A date');
+    expect(result.data.applicationTiming).toBeTruthy();
+  });
+
+  it('marks a title-less event as inferred from structure, not stated', async () => {
+    // An Apple-sourced event has no title by design. The model needs to
+    // know this occasion was read from timing alone so it does not
+    // announce an occasion it was never told.
+    const start = new Date(Date.now() + 2 * 60 * 60_000);
+    getOccasionEventsMock.mockResolvedValue([
+      { start, end: new Date(start.getTime() + 2 * 60 * 60_000), isAllDay: false },
+    ]);
+
+    const result = await tool.handler('u1', {});
+    expect(['structure', 'none']).toContain(result.data.occasionSource);
+    expect(result.data.occasionSource).not.toBe('title');
+  });
+
+  it('never fails the turn when the calendar lookup throws', async () => {
+    // A calendar outage should cost the occasion, not the answer.
+    getOccasionEventsMock.mockRejectedValue(new Error('calendar down'));
+    const result = await tool.handler('u1', {});
+    expect(result.data.hasRecommendation).toBe(true);
+    expect(result.data.occasionSource).toBe('none');
+  });
+
+  it('is a read tool — a fragrance suggestion is advice, with nothing to confirm', async () => {
+    expect(tool.kind).toBe('read');
+    const result = await tool.handler('u1', {});
+    expect(result.confirmPrompt).toBeUndefined();
+  });
+
+  it('is offered even to an account with no Hue and no calendar', () => {
+    const selected = selectMessagingTools({ hueConnected: false, appleCalendarConnected: false });
+    expect(selected).toHaveProperty('recommend_cologne');
   });
 });

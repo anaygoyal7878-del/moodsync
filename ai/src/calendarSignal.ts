@@ -1,5 +1,6 @@
 import { calendarConnectionRepository, oauthTokenRepository, appleCalendarSnapshotRepository, type CalendarEventWindow } from '@moodsync/database';
 import { GoogleCalendarClient, refreshGoogleCalendarToken, type GoogleCalendarOAuthConfig } from '@moodsync/integration-google-calendar';
+import type { OccasionEvent } from './calendarOccasion.js';
 
 /**
  * Live calendar-load reads for the proactive worker's burnout/social-
@@ -172,4 +173,45 @@ export async function isInMeetingNow(userId: string, now: Date = new Date()): Pr
     events.map((e) => ({ start: e.start, end: e.end, isAllDay: e.isAllDay })),
     now,
   );
+}
+
+
+/**
+ * The day's events, shaped for occasion inference rather than load
+ * counting — which means titles when the source has them.
+ *
+ * Same two-source order as the functions above, but the return type
+ * carries the difference between them instead of flattening it. Apple's
+ * snapshot has no titles by design (see the `AppleCalendarSnapshot`
+ * schema comment), so those events come back with `title` absent, and
+ * `calendarOccasion.ts` falls back to classifying on shape. Google's
+ * come back with the real summary.
+ *
+ * Returns `null` rather than `[]` when no calendar is reachable, so
+ * "no calendar connected" stays distinguishable from "connected, and
+ * genuinely nothing on today" — the same distinction
+ * `getTodayCalendarLoad` maintains, and it matters here for the same
+ * reason: one of those should say "connect a calendar" and the other
+ * should say "nothing scheduled".
+ */
+export async function getOccasionEvents(
+  userId: string,
+  windowStart: Date,
+  windowEnd: Date,
+  now: Date = new Date(),
+): Promise<OccasionEvent[] | null> {
+  const appleEvents = await readAppleSnapshot(userId, now);
+  if (appleEvents) {
+    return appleEvents.map((e) => ({ start: e.start, end: e.end, isAllDay: e.isAllDay }));
+  }
+
+  const connection = await calendarConnectionRepository.findByUser(userId);
+  if (!connection || !connection.oauthTokenId) return null;
+
+  const config = requireGoogleCalendarConfig();
+  const accessToken = await getFreshAccessToken(connection.oauthTokenId, config);
+  const client = new GoogleCalendarClient(accessToken);
+  const events = await client.listEvents(windowStart, windowEnd);
+
+  return events.map((e) => ({ start: e.start, end: e.end, isAllDay: e.isAllDay, title: e.title }));
 }

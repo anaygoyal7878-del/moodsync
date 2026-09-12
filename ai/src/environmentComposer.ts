@@ -54,6 +54,26 @@ export interface ProposedChange {
    * show "72°F → 71°F" and the clamps stay auditable. */
   from?: number;
   to?: number;
+  /** Present only on a `scent` change. The fragrance detail a person
+   * actually needs to act on: where to put it, what is in it, and what
+   * the app read the occasion from.
+   *
+   * Carried as structured fields rather than folded into `reason`
+   * because they render differently — a note pyramid is a list, not a
+   * sentence — and because `notes` is legitimately null for two of the
+   * three fragrances (the brand does not publish those pyramids; see
+   * scentLibrary.ts). A null has to survive to the UI so it can show the
+   * description instead, which a flattened string could not express. */
+  scent?: {
+    pulsePoints: string[];
+    notes: { top: string[]; heart: string[]; base: string[] } | null;
+    occasion: string;
+    /** How the occasion was determined: 'title' from a calendar event
+     * name, 'structure' from its timing alone, 'none' from time of day.
+     * Surfaced so the UI never presents a shape-based guess with the
+     * same confidence as a real calendar title. */
+    occasionBasis: 'title' | 'structure' | 'none';
+  };
 }
 
 export interface EnvironmentProposal {
@@ -118,6 +138,9 @@ export interface EnvironmentCapabilities {
     reason: string;
     pulsePoints: string[];
     timing: string;
+    notes: { top: string[]; heart: string[]; base: string[] } | null;
+    occasion: string;
+    occasionBasis: 'title' | 'structure' | 'none';
   } | null;
   /** Current room temperature in Celsius from the HomeKit snapshot,
    * when a sensor reports one. Read-only — see the file header. */
@@ -402,6 +425,16 @@ export function composeEnvironment(
       summary: scent.summary,
       reason: `${scent.reason} ${scent.timing}`,
       actuation: 'manual_only',
+      // Previously stopped here, which quietly discarded the pulse
+      // points the engine had already chosen and the note pyramid the
+      // recommendation is built on — the two most actionable parts of a
+      // fragrance suggestion never reached the UI.
+      scent: {
+        pulsePoints: scent.pulsePoints,
+        notes: scent.notes,
+        occasion: scent.occasion,
+        occasionBasis: scent.occasionBasis,
+      },
     });
   }
 

@@ -44,6 +44,11 @@ import {
   type MoodState,
   type ProposedChange,
   type StateAssessment,
+  getOccasionEvents,
+  inferCalendarOccasion,
+  applicationTiming,
+  type OccasionEvent,
+  type CalendarOccasion,
 } from '@moodsync/ai';
 import type { AutomationAction } from '@moodsync/shared';
 
@@ -139,9 +144,14 @@ async function gatherContext(userId: string, now: Date) {
   // Both are best-effort: a calendar outage must not stop MoodSync
   // assessing state, and no observation history simply means the
   // held-duration guard blocks rather than permits (see stateHistory.ts).
-  const [observations, inMeeting] = await Promise.all([
+  // The day's events, for occasion inference. Windowed from now to end
+  // of local day: a fragrance suggestion is about what is still ahead,
+  // and pulling yesterday would only add events already over.
+  const dayEnd = new Date(now.getTime() + 18 * 60 * 60_000);
+  const [observations, inMeeting, occasionEvents] = await Promise.all([
     stateObservationRepository.listRecent(userId, now).catch(() => []),
     isInMeetingNow(userId, now).catch(() => false),
+    getOccasionEvents(userId, now, dayEnd, now).catch(() => null),
   ]);
 
   const history = latestRow
@@ -195,6 +205,10 @@ async function gatherContext(userId: string, now: Date) {
   return {
     userId,
     timezone,
+    // Carried on the context so everything downstream reasons from the
+    // same instant the context was gathered at, rather than each caller
+    // taking a fresh clock reading a few milliseconds later.
+    now,
     localHour: toLocalHour(now, timezone),
     latest: latestRow?.reading ?? null,
     history,
@@ -210,6 +224,7 @@ async function gatherContext(userId: string, now: Date) {
     userAway,
     inFocusSession,
     inMeeting,
+    occasionEvents,
     observations,
     bedroom,
   };
@@ -545,15 +560,34 @@ function buildGuardInput(
 }
 
 /**
- * The only occasion signal available without asking the user: a live
- * calendar event means "work" rather than a guess. Everything else is
- * left `unspecified` on purpose — `scentIntelligence.ts` then decides
- * on time of day alone, which is more honest than inventing an
- * occasion from a heart rate.
+ * What the user is actually dressing for, read from their calendar.
+ *
+ * This used to be two lines — in a meeting meant `work`, everything
+ * else meant `unspecified` — which left the scent engine's whole
+ * occasion axis unreachable and decided on time of day alone.
+ * `calendarOccasion.ts` now classifies the next event by title where
+ * the calendar source provides one, and by shape where it does not.
+ *
+ * The live-meeting check stays ahead of it as a floor: if a call is
+ * happening right now, that is the occasion regardless of what is
+ * scheduled later. Falling through to `unspecified` remains correct
+ * and common — no calendar, or nothing recognisable on it, and time of
+ * day decides, which is more honest than inventing an occasion from a
+ * heart rate.
  */
-function inferOccasion(ctx: { inMeeting: boolean; localHour: number }): Occasion {
-  if (ctx.inMeeting) return 'work';
-  return 'unspecified';
+function inferOccasion(ctx: {
+  inMeeting: boolean;
+  localHour: number;
+  occasionEvents: OccasionEvent[] | null;
+  now: Date;
+}): { occasion: Occasion; calendar: CalendarOccasion | null } {
+  const calendar = ctx.occasionEvents
+    ? inferCalendarOccasion(ctx.occasionEvents, ctx.now, ctx.localHour)
+    : null;
+
+  if (ctx.inMeeting) return { occasion: 'work', calendar };
+  if (calendar && calendar.occasion !== 'unspecified') return { occasion: calendar.occasion, calendar };
+  return { occasion: 'unspecified', calendar };
 }
 
 /** Which music category each state wants, mirroring the composer's own
@@ -588,13 +622,20 @@ async function composeProposal(
   }
 
   // Cologne suggestion — permanently manual_only, so no capability
-  // check is needed beyond the user's own toggle. `inMeeting` is the
-  // one real occasion signal available without asking; everything else
-  // falls back to time of day, which is enough on its own.
+  // check is needed beyond the user's own toggle. The occasion now
+  // comes from the calendar where one is reachable, with a live meeting
+  // taking precedence and time of day as the fallback.
+  const { occasion, calendar } = inferOccasion({
+    inMeeting: ctx.inMeeting,
+    localHour: ctx.localHour,
+    occasionEvents: ctx.occasionEvents,
+    now: ctx.now,
+  });
+
   const scentRec = ctx.settings.scentEnabled
     ? recommendScent({
         localHour: ctx.localHour,
-        occasion: inferOccasion(ctx),
+        occasion,
         state: assessment.currentState,
         // The catalog is a single brand's collection and MoodSync has
         // no record of what the user owns, so it recommends across the
@@ -603,13 +644,25 @@ async function composeProposal(
       })
     : null;
 
+  // Application timing against the real event, not the clock: applying
+  // as you leave means people meet top notes that are gone in half an
+  // hour. Only present when an event was actually found.
+  const eventTiming = calendar ? applicationTiming(calendar, ctx.now) : null;
+
   const scentSuggestion = scentRec
     ? {
         name: scentRec.scent.name,
         summary: `${scentRec.scent.name} — ${scentRec.scent.tagline}`,
-        reason: scentRec.reasons.join(' '),
+        // The calendar reason leads when there is one: "for the dinner
+        // you have at 7" is a better explanation than "it's evening".
+        reason: [calendar?.basis !== 'none' ? calendar?.reason : null, ...scentRec.reasons]
+          .filter((r): r is string => Boolean(r))
+          .join(' '),
         pulsePoints: scentRec.pulsePoints.map((p) => p.label),
-        timing: scentRec.timing,
+        timing: eventTiming ? `${eventTiming.headline}. ${eventTiming.detail}` : scentRec.timing,
+        notes: scentRec.scent.notes,
+        occasion,
+        occasionBasis: calendar?.basis ?? 'none',
       }
     : null;
 

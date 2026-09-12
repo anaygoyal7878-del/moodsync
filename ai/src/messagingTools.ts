@@ -12,6 +12,11 @@ import { computeLiveEnergyMeter } from './energyMeter.js';
 import { computeReadiness } from './dailyBrief.js';
 import { listHueLightsForUser, listHueScenesForUser } from './hueActionExecutor.js';
 import { CAFFEINE_DRINK_PRESETS, buildCaffeineLogReply } from './messagingAgent.js';
+import { recommendScent, OCCASION_LABELS } from './scentIntelligence.js';
+import { inferCalendarOccasion, applicationTiming } from './calendarOccasion.js';
+import { getOccasionEvents } from './calendarSignal.js';
+import { assessState } from './stateEngine.js';
+import { hourInZone } from '@moodsync/shared';
 
 /**
  * Task-completing tools for the messaging channel — see
@@ -401,6 +406,100 @@ const rememberFact: MessagingTool = {
   },
 };
 
+/**
+ * Cologne recommendation over text.
+ *
+ * The engine (`scentIntelligence.ts`) and the calendar-driven occasion
+ * inference (`calendarOccasion.ts`) both existed before this and were
+ * reachable only from the in-app Adaptive Environment card. Someone
+ * texting "what should I wear tonight" got a general answer from the
+ * model's own knowledge rather than the Nature's Note catalog and their
+ * own calendar — the two things that make the answer theirs.
+ *
+ * Read-only: a fragrance suggestion is advice a person carries out, so
+ * there is nothing to confirm and nothing to execute. That matches the
+ * `manual_only` actuation the environment composer already gives this
+ * channel.
+ *
+ * Returns the note pyramid as `null` rather than omitting it when the
+ * brand does not publish one, and says so in the payload, so the model
+ * describes the fragrance instead of inventing a pyramid for it — the
+ * same honesty boundary `scentLibrary.ts` holds.
+ */
+const recommendCologne: MessagingTool = {
+  kind: 'read',
+  declaration: {
+    name: 'recommend_cologne',
+    description:
+      "Recommends which cologne from the user's Nature's Note collection to wear, and when to apply it. Uses their calendar to work out the occasion, plus the time of day and their current wellness signals. Use this for any question about what fragrance or cologne to wear, what to put on for an event, or when to apply it.",
+    parameters: { type: 'object', properties: {} },
+  },
+  handler: async (userId) => {
+    const now = new Date();
+    const timezone = await userTimezoneRepository.getTimezone(userId);
+    const localHour = hourInZone(now, timezone);
+
+    const latest = await biometricReadingRepository.findLatestNormalized(userId);
+    const history = latest ? await biometricReadingRepository.listRecentNormalized(userId, 30) : [];
+
+    // Same state engine the in-app card uses, so a texted answer and the
+    // dashboard cannot disagree about what the user's signals say.
+    const assessment = assessState(
+      {
+        latest: latest?.reading ?? null,
+        history: history.filter((r) => r.timestamp !== latest?.reading.timestamp),
+        localHour,
+        bookedHoursToday: null,
+        inFocusSession: false,
+        minutesSinceWorkout: null,
+        userDeclaredState: null,
+      },
+      now,
+    );
+
+    // Looks ahead rather than at the whole day: what to wear is a
+    // question about what is still coming.
+    const events = await getOccasionEvents(userId, now, new Date(now.getTime() + 18 * 60 * 60_000), now).catch(() => null);
+    const calendar = events ? inferCalendarOccasion(events, now, localHour) : null;
+    const occasion = calendar && calendar.occasion !== 'unspecified' ? calendar.occasion : 'unspecified';
+
+    const rec = recommendScent({
+      localHour,
+      occasion,
+      state: assessment.currentState,
+      // MoodSync has no record of which bottles the user owns, so this
+      // recommends across the whole collection. Same limitation the
+      // environment card carries.
+      owned: [],
+    });
+    if (!rec) return { data: { hasRecommendation: false, message: 'No fragrance in the collection fit this moment.' } };
+
+    const timing = calendar ? applicationTiming(calendar, now) : null;
+
+    return {
+      data: {
+        hasRecommendation: true,
+        scent: rec.scent.name,
+        tagline: rec.scent.tagline,
+        description: rec.scent.description,
+        // Null for the two fragrances whose pyramids the brand does not
+        // publish. Flagged explicitly so the model says "the brand
+        // doesn't list its notes" rather than filling the gap.
+        notes: rec.scent.notes,
+        notesPublished: rec.scent.notes !== null,
+        reasons: rec.reasons,
+        occasion: OCCASION_LABELS[occasion],
+        occasionSource: calendar?.basis ?? 'none',
+        occasionReason: calendar?.reason ?? null,
+        pulsePoints: rec.pulsePoints.map((p) => ({ where: p.label, note: p.note })),
+        noteTiming: rec.timing,
+        applicationTiming: timing ? `${timing.headline}. ${timing.detail}` : null,
+        alternatives: rec.alternatives.map((a) => a.scent.name),
+      },
+    };
+  },
+};
+
 export const MESSAGING_TOOLS: Record<string, MessagingTool> = {
   get_wearable_snapshot: getWearableSnapshot,
   list_smart_home_devices: listSmartHomeDevices,
@@ -410,6 +509,7 @@ export const MESSAGING_TOOLS: Record<string, MessagingTool> = {
   get_nutrition_guidance: getNutritionGuidance,
   log_caffeine_intake: logCaffeineIntake,
   remember_fact: rememberFact,
+  recommend_cologne: recommendCologne,
 };
 
 export const MESSAGING_ACTION_TOOL_NAMES = new Set(

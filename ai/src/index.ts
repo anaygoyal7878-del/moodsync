@@ -211,6 +211,7 @@ export {
 export { buildCaffeineLogReply, buildProactiveNudge } from './messagingAgent.js';
 export { sendProactiveInsight } from './messagingDelivery.js';
 export {
+  getOccasionEvents,
   getTodayCalendarLoad,
   isInMeetingNow,
   computeLoadFromWindows,
@@ -345,6 +346,13 @@ export {
   type ScentRecommendation,
   type ScentRecommendationInput,
 } from './scentIntelligence.js';
+export {
+  inferCalendarOccasion,
+  applicationTiming,
+  type OccasionEvent,
+  type CalendarOccasion,
+  type OccasionBasis,
+} from './calendarOccasion.js';
 export {
   resolveMusicPlaylist,
   pickProvenPlaylist,

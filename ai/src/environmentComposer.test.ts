@@ -204,3 +204,57 @@ describe('composeEnvironment — music needs a real playlist, not just a categor
     expect(proposal.changes.find((c) => c.channel === 'music')).toBeUndefined();
   });
 });
+
+describe('composeEnvironment — scent detail survives to the change', () => {
+  const suggestion = {
+    name: 'Solaris',
+    summary: 'Solaris — The Signature',
+    reason: 'For daytime, something restrained tends to sit right.',
+    pulsePoints: ['Wrist', 'Inner elbow'],
+    timing: 'Top notes last about 30 minutes.',
+    notes: { top: ['Bergamot', 'Lemon'], heart: ['Cedarwood'], base: ['Sandalwood', 'Amber'] },
+    occasion: 'date',
+    occasionBasis: 'title' as const,
+  };
+
+  it('carries the note pyramid and pulse points through, instead of dropping them', () => {
+    // These were silently discarded: the composer built the change from
+    // summary and reason alone, so the two most actionable parts of a
+    // fragrance suggestion — where to put it and what is in it — never
+    // reached any UI.
+    const proposal = composeEnvironment('stressed', caps({ scentSuggestion: suggestion }), prefs(), 'Reason.');
+    const change = proposal.changes.find((c) => c.channel === 'scent');
+    expect(change?.scent?.pulsePoints).toEqual(['Wrist', 'Inner elbow']);
+    expect(change?.scent?.notes?.top).toContain('Bergamot');
+    expect(change?.scent?.notes?.base).toContain('Sandalwood');
+  });
+
+  it('preserves a null pyramid rather than substituting an empty one', () => {
+    // Two of the three fragrances have no published pyramid. Null has to
+    // survive so the UI can show the description instead — an empty
+    // array would render as a note list with nothing in it, implying the
+    // fragrance has no notes rather than that the brand doesn't say.
+    const proposal = composeEnvironment(
+      'stressed',
+      caps({ scentSuggestion: { ...suggestion, notes: null } }),
+      prefs(),
+      'Reason.',
+    );
+    expect(proposal.changes.find((c) => c.channel === 'scent')?.scent?.notes).toBeNull();
+  });
+
+  it('reports how the occasion was determined, so a guess is not shown as a fact', () => {
+    const fromShape = composeEnvironment(
+      'stressed',
+      caps({ scentSuggestion: { ...suggestion, occasionBasis: 'structure' as const } }),
+      prefs(),
+      'Reason.',
+    );
+    expect(fromShape.changes.find((c) => c.channel === 'scent')?.scent?.occasionBasis).toBe('structure');
+  });
+
+  it('still emits no scent change when the user has the channel off', () => {
+    const proposal = composeEnvironment('stressed', caps({ scentSuggestion: suggestion }), prefs({ scentEnabled: false }), 'Reason.');
+    expect(proposal.changes.find((c) => c.channel === 'scent')).toBeUndefined();
+  });
+});
