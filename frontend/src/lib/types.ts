@@ -547,3 +547,41 @@ export interface HabitStreakEntry {
 export interface HabitsResponse {
   habits: HabitStreakEntry[];
 }
+
+/** The Fragrance page's single read — see backend/src/services/scentService.ts.
+ *
+ * `notes: null` is meaningful and must not be normalised to `[]`: two of
+ * the three fragrances have no published note pyramid, and an empty list
+ * would render as "this fragrance has no notes" rather than "the brand
+ * doesn't say". `basis` likewise distinguishes an occasion read off a
+ * real event title from one inferred from a time block's shape, so the
+ * UI never shows a guess with the confidence of a fact. */
+export interface ScentBriefing {
+  enabled: boolean;
+  recommendation: {
+    name: string;
+    tagline: string;
+    description: string;
+    notes: { top: string[]; heart: string[]; base: string[] } | null;
+    notesPublished: boolean;
+    reasons: string[];
+    pulsePoints: Array<{ where: string; note: string }>;
+    noteTiming: string;
+    alternatives: Array<{ name: string; tagline: string }>;
+  } | null;
+  calendar: {
+    connected: boolean;
+    occasionLabel: string;
+    basis: "title" | "structure" | "none";
+    reason: string;
+    nextEvent: { startsAt: string; endsAt: string; durationMinutes: number } | null;
+    applicationTiming: { headline: string; detail: string } | null;
+  };
+  collection: Array<{
+    name: string;
+    tagline: string;
+    description: string;
+    notes: { top: string[]; heart: string[]; base: string[] } | null;
+  }>;
+  guidance: { rules: string[]; topMinutes: number; heartHours: number; baseLabel: string };
+}
