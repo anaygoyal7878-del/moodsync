@@ -316,7 +316,63 @@ body {
    * most of what separates "premium" from "flat rectangle". */
   --lux-edge-light: rgba(255, 255, 255, 0.055);
   --lux-sage: #8fb094;
-  --lux-gold: #cdad63;
+
+  /* ---- Gold scale ------------------------------------------------
+   *
+   * Four steps rather than one, because gold is doing four different
+   * jobs and a single value made them fight: a hairline border and a
+   * headline metric want very different weights of the same hue.
+   *
+   * Contrast measured against all three surfaces, same as the text
+   * tokens above. Worst pairing is --gold-muted on --lux-bg-card-2 at
+   * 5.11:1, which still clears AA for body text — so every step here is
+   * safe for type, not just for decoration. (bright 10.59-12.60,
+   * primary 8.36-9.94, soft 12.41-14.76.)
+   *
+   * Gold is an accent and must stay one. It marks what is *important*
+   * or *intelligent* — a key metric, an AI recommendation, the active
+   * nav item, a premium surface edge. It is not a brand wash: if a
+   * screen reads as gold-coloured rather than as having gold on it, the
+   * accent has stopped meaning anything. */
+  --gold-bright: #e8cb87;
+  --gold: #d6b36a;
+  --gold-muted: #a98a4d;
+  --gold-soft: #f0dda8;
+  /* The historical name, kept pointing at the scale's primary so the
+   * ~80 existing usages move with the system instead of drifting into a
+   * second, slightly-different gold. */
+  --lux-gold: var(--gold);
+
+  /* ---- Gradients --------------------------------------------------
+   *
+   * Deliberately warm-neutral: black through charcoal into a trace of
+   * gold. The cliché to avoid is the purple-to-blue "AI product"
+   * gradient, which reads as a template; warm bronze on near-black
+   * reads as material.
+   *
+   * Every one of these is low-contrast on purpose. A gradient here is
+   * lighting, not decoration — it should be felt as depth on a surface
+   * rather than noticed as a coloured shape. If you can name its
+   * colours at a glance it is too strong. */
+  --grad-hero: linear-gradient(160deg, #0b0e0d 0%, #131716 48%, rgba(214, 179, 106, 0.07) 100%);
+  --grad-surface: linear-gradient(155deg, rgba(255, 255, 255, 0.035) 0%, rgba(214, 179, 106, 0.022) 100%);
+  --grad-gold-glow: radial-gradient(120% 120% at 50% 0%, rgba(214, 179, 106, 0.13) 0%, rgba(214, 179, 106, 0) 62%);
+  --grad-gold-line: linear-gradient(90deg, rgba(214, 179, 106, 0) 0%, var(--gold) 45%, rgba(232, 203, 135, 0.85) 100%);
+
+  /* ---- Elevation ladder -------------------------------------------
+   *
+   * Four levels, so hierarchy is a choice a component makes rather than
+   * every card looking identical. Each pairs an outer shadow with the
+   * inset top-edge highlight below — the highlight is most of what
+   * separates a raised material from a lighter rectangle.
+   *
+   * L1 hero surfaces, L2 primary cards, L3 secondary data, L4 controls. */
+  --elev-1: 0 24px 64px -24px rgba(0, 0, 0, 0.75), inset 0 1px 0 0 var(--lux-edge-light);
+  --elev-2: 0 12px 32px -16px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 var(--lux-edge-light);
+  --elev-3: 0 6px 18px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.035);
+  --elev-4: 0 2px 8px -6px rgba(0, 0, 0, 0.4);
+  /* For a surface that should read as selected or AI-authored. */
+  --elev-gold: 0 12px 32px -18px rgba(214, 179, 106, 0.35), inset 0 1px 0 0 rgba(240, 221, 168, 0.14);
   /* Retuned from the old #d9a8c8 pink, which read as a different
    * palette next to sage/gold. Carries the same job: the critical /
    * "went the wrong way" accent. */

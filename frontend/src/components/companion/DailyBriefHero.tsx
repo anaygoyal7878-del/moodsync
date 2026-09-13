@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Sunrise, Moon, Sun, Sunset } from "lucide-react";
-import { Meter, Reasons, toneForScore, toneColor } from "./CompanionPrimitives";
+import { Metric, MetricRow, Reasons, toneForScore, toneColor } from "./CompanionPrimitives";
 import type { DailyBriefResponse } from "@/lib/types";
 
 const TIME_ICON = { morning: Sunrise, afternoon: Sun, evening: Sunset, night: Moon } as const;
@@ -42,15 +42,20 @@ export function DailyBriefHero({ brief }: { brief: DailyBriefResponse }) {
          centred card. */
       data-tour="wellness-score"
       className="lux-stagger-1 relative overflow-hidden rounded-[26px] p-6"
+      /* Warm charcoal into a trace of gold, replacing a purple gradient
+         (#241a2c → #171220) that read as the generic "AI product" look
+         rather than as this product's own palette — it also sat badly
+         next to the sage and gold around it. Tokens now, so an app-wide
+         retheme stays a token edit. */
       style={{
-        background: "linear-gradient(160deg, #241a2c 0%, #1d1622 55%, #171220 100%)",
+        background: "var(--grad-hero)",
         border: "1px solid var(--lux-hairline-gold)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+        boxShadow: "var(--elev-1)",
       }}
     >
       <div
-        className="pointer-events-none absolute -top-24 -right-16 h-56 w-56 rounded-full"
-        style={{ background: "radial-gradient(circle, rgba(212,175,120,0.10) 0%, rgba(212,175,120,0) 70%)" }}
+        className="pointer-events-none absolute inset-0"
+        style={{ background: "var(--grad-gold-glow)" }}
         aria-hidden="true"
       />
 
@@ -75,19 +80,28 @@ export function DailyBriefHero({ brief }: { brief: DailyBriefResponse }) {
         </p>
       ) : (
         <>
-          <div className="relative mt-5 grid grid-cols-2 gap-5">
-            <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.07em]" style={{ color: "var(--lux-muted)" }}>
-                Readiness
-              </p>
-              <Meter value={readiness} label={band ? READINESS_LABEL[band] : undefined} ariaLabel="Today's readiness" />
-            </div>
-            <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.07em]" style={{ color: "var(--lux-muted)" }}>
-                Energy now
-              </p>
-              <Meter value={brief.energy} ariaLabel="Live energy level" />
-            </div>
+          {/* The headline figures lead, at display scale, before any
+              bar. A number readable at a glance is what this screen
+              exists to deliver; the meters below give it shape without
+              competing for first look. Readiness carries the gold
+              because it is the metric that answers "how am I today" —
+              the accent stops meaning anything if all three wear it. */}
+          <div className="relative mt-5">
+            <MetricRow>
+              <Metric
+                value={readiness ?? "—"}
+                label="Readiness"
+                emphasis
+                progress={readiness}
+                {...(band ? { hint: READINESS_LABEL[band] } : {})}
+              />
+              <Metric value={brief.energy ?? "—"} label="Energy now" progress={brief.energy} />
+              <Metric
+                value={brief.scores?.recovery.value ?? "—"}
+                label="Recovery"
+                progress={brief.scores?.recovery.value ?? null}
+              />
+            </MetricRow>
           </div>
 
           <p className="relative mt-3 text-[11.5px]" style={{ color: "var(--lux-muted)" }}>

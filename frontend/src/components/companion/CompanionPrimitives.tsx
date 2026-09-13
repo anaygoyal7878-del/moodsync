@@ -1,3 +1,4 @@
+import { Children } from "react";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 
@@ -37,6 +38,44 @@ export function toneForScore(value: number): Tone {
   return "critical";
 }
 
+/**
+ * How prominent a surface is. Four levels rather than one, because a
+ * page where every card carries identical weight has no hierarchy — the
+ * eye has nothing to land on first, which is most of what makes a dark
+ * UI read as a dashboard instead of a product.
+ *
+ * - `hero`     one per page at most: the answer the page exists to give.
+ * - `primary`  the default. Real content.
+ * - `secondary` supporting data that should recede.
+ * - `ai`       an AI-authored surface. Gold-lit, because the whole point
+ *              of the accent is to mark what MoodSync *thought* rather
+ *              than what it merely recorded.
+ */
+export type SurfaceLevel = "hero" | "primary" | "secondary" | "ai";
+
+const SURFACE: Record<SurfaceLevel, { background: string; border: string; boxShadow: string }> = {
+  hero: {
+    background: "var(--grad-hero)",
+    border: "1px solid var(--lux-hairline)",
+    boxShadow: "var(--elev-1)",
+  },
+  primary: {
+    background: "var(--lux-bg-card)",
+    border: "1px solid var(--lux-hairline)",
+    boxShadow: "var(--elev-2)",
+  },
+  secondary: {
+    background: "var(--lux-bg-card)",
+    border: "1px solid var(--lux-hairline)",
+    boxShadow: "var(--elev-3)",
+  },
+  ai: {
+    background: "var(--lux-bg-card)",
+    border: "1px solid var(--lux-hairline-gold)",
+    boxShadow: "var(--elev-gold)",
+  },
+};
+
 export function Section({
   title,
   subtitle,
@@ -44,6 +83,7 @@ export function Section({
   action,
   children,
   className = "",
+  level = "primary",
 }: {
   title: string;
   subtitle?: string;
@@ -51,24 +91,31 @@ export function Section({
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  level?: SurfaceLevel;
 }) {
+  const surface = SURFACE[level];
   return (
-    <section
-      className={`rounded-[24px] p-5 ${className}`}
-      style={{
-        background: "var(--lux-bg-card)",
-        border: "1px solid var(--lux-hairline)",
-        // A one-pixel lit top edge plus a soft ambient drop. Together
-        // these are what make a card read as a raised material rather
-        // than a filled rectangle — the single cheapest premium cue on
-        // a dark UI, and it costs no extra element.
-        boxShadow: "inset 0 1px 0 var(--lux-edge-light), var(--shadow-md)",
-      }}
-    >
-      <div className="mb-4 flex items-start justify-between gap-3">
+    <section className={`relative overflow-hidden rounded-[24px] p-5 ${className}`} style={surface}>
+      {/* Ambient light from above, on the two levels meant to feel lit.
+          Pointer-events-none and behind content — it is lighting, not a
+          layer anyone interacts with. */}
+      {(level === "hero" || level === "ai") && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{ background: "var(--grad-gold-glow)" }}
+        />
+      )}
+      <div className="relative mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            {Icon && <Icon size={16} style={{ color: "var(--lux-sage)" }} aria-hidden="true" />}
+            {Icon && (
+              <Icon
+                size={16}
+                style={{ color: level === "ai" ? "var(--gold)" : "var(--lux-sage)" }}
+                aria-hidden="true"
+              />
+            )}
             <h2 className="font-luxury-display text-[15px] font-semibold" style={{ color: "var(--lux-ink)" }}>
               {title}
             </h2>
@@ -81,7 +128,7 @@ export function Section({
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </div>
-      {children}
+      <div className="relative">{children}</div>
     </section>
   );
 }
@@ -191,6 +238,112 @@ export function EmptyState({
 
 /** Small labelled figure, for the secondary numbers that sit under a
  * primary meter. */
+/**
+ * A headline metric — the number a screen is actually about.
+ *
+ * Distinct from `Stat`, which is a compact label/value pair for a row of
+ * supporting figures. This is the 82-Recovery treatment: the number
+ * leads at display scale, the label sits under it small and quiet, and
+ * the unit rides at the baseline rather than matching the digits. That
+ * ordering is the whole trick — a metric reads as premium when the
+ * figure is allowed to be the largest thing in its area and everything
+ * around it gets out of the way.
+ *
+ * `emphasis` marks the one metric that matters most right now. It is
+ * gold, and it should be used on at most one metric in a group: the
+ * accent means "this is the one to look at", which stops being true the
+ * moment three of them are gold.
+ *
+ * `tabular` keeps digits from reflowing as values change — a number
+ * that shifts horizontally while animating reads as broken.
+ */
+export function Metric({
+  value,
+  label,
+  unit,
+  emphasis = false,
+  hint,
+  progress,
+}: {
+  value: string | number;
+  label: string;
+  unit?: string;
+  emphasis?: boolean;
+  hint?: string;
+  /** 0-100. Draws a hairline bar under the figure so "32" carries its
+   * out-of-100 context without a second row repeating the number —
+   * which is what the first version of this did. Omit for a metric that
+   * has no ceiling (heart rate, minutes). */
+  progress?: number | null;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="flex items-baseline gap-1">
+        <span
+          className="font-luxury-display tabular text-[34px] font-semibold leading-none tracking-[-0.02em]"
+          style={{ color: emphasis ? "var(--gold)" : "var(--lux-ink)" }}
+        >
+          {value}
+        </span>
+        {unit && (
+          <span className="text-[13px] font-medium" style={{ color: "var(--lux-muted)" }}>
+            {unit}
+          </span>
+        )}
+      </div>
+      {typeof progress === "number" && (
+        <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full" style={{ background: "var(--lux-hairline)" }}>
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${Math.max(0, Math.min(100, progress))}%`,
+              background: emphasis ? "var(--grad-gold-line)" : "var(--lux-sage)",
+            }}
+          />
+        </div>
+      )}
+      <p className="mt-1.5 text-[11px] uppercase tracking-[0.08em]" style={{ color: "var(--lux-muted)" }}>
+        {label}
+      </p>
+      {hint && (
+        <p className="mt-1 text-[11.5px] leading-snug" style={{ color: "var(--lux-muted)" }}>
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A row of headline metrics divided by hairlines.
+ *
+ * Separators rather than individual cards: three boxed metrics sitting
+ * side by side read as three unrelated widgets, where one surface
+ * divided reads as a single reading of one person.
+ *
+ * Each child is wrapped here rather than asked to style itself, so the
+ * divider is a property of the row and `Metric` stays usable on its own
+ * elsewhere. (The tempting `gap-px` + parent-background trick needs
+ * every child to paint its own background, which `Metric` deliberately
+ * does not — it would have rendered as a grey grid.)
+ */
+export function MetricRow({ children }: { children: ReactNode }) {
+  const items = Children.toArray(children);
+  return (
+    <div className="grid" style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` }}>
+      {items.map((child, index) => (
+        <div
+          key={index}
+          className={index === 0 ? "" : "pl-4"}
+          style={index === 0 ? undefined : { borderLeft: "1px solid var(--lux-hairline)" }}
+        >
+          {child}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="min-w-0">
