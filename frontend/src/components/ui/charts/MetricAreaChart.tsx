@@ -3,7 +3,7 @@
 import { useId } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
-import { AXIS_TICK, GRID_STROKE, TOOLTIP_CONTENT_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_CURSOR } from "./chartChrome";
+import { AXIS_TICK, GRID_STROKE, TOOLTIP_CONTENT_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_CURSOR, ACTIVE_DOT } from "./chartChrome";
 
 export interface MetricPoint {
   x: string;
@@ -65,7 +65,7 @@ export function MetricAreaChart({
           strokeWidth={2}
           fill={`url(#${gradientId})`}
           dot={false}
-          activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--lux-bg-card)" }}
+          activeDot={ACTIVE_DOT}
           isAnimationActive={!reducedMotion}
         />
       </AreaChart>

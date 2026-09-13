@@ -96,6 +96,43 @@ function formatDelta(series: MetricPoint[], unit?: string): string | null {
  * below. The panel border is a hairline on the section's own surface so
  * the chart renders on the exact card color the palette was validated
  * against. */
+/**
+ * Shown when a section has a current reading but no series inside the
+ * chart window — connected and syncing, just not enough history to draw
+ * a line yet.
+ *
+ * Deliberately not an error and not a "connect a device" prompt: both
+ * would be wrong for someone whose wearable is working fine. The number
+ * they do have is still shown, because one real reading is worth more
+ * than an apology about the ones that are missing.
+ */
+function NoSeriesYet({ current, unit, label }: { current: string | null; unit?: string; label: string }) {
+  return (
+    <div
+      className="flex flex-col gap-2 rounded-[16px] p-4 sm:col-span-2"
+      style={{ background: "var(--lux-bg-card-2)", border: "1px solid var(--lux-hairline)" }}
+    >
+      {current !== null && (
+        <div className="flex items-baseline gap-1">
+          <span className="font-luxury-display tabular text-[26px] font-semibold leading-none" style={{ color: "var(--lux-ink)" }}>
+            {current}
+          </span>
+          {unit && (
+            <span className="text-[12px]" style={{ color: "var(--lux-muted)" }}>
+              {unit}
+            </span>
+          )}
+        </div>
+      )}
+      <p className="text-[12.5px] leading-relaxed" style={{ color: "var(--lux-muted)" }}>
+        {current !== null
+          ? `That's your most recent ${label}. There isn't enough history in this window to chart a trend yet — it fills in as your device keeps syncing.`
+          : `No ${label} has synced into this window yet. It fills in as your device keeps syncing.`}
+      </p>
+    </div>
+  );
+}
+
 function MetricPanel({
   label,
   color,
@@ -204,6 +241,19 @@ export function BiometricsSection({
   const hasSleepData = sleepScore.length > 0 || sleepStages.length > 0;
   const hasActivityData = steps.length > 0 || calories.length > 0 || latestOf("activityLevel") !== null;
 
+  // Whether any *series* exists to plot, which is a different question
+  // from whether the section has data at all.
+  //
+  // This gap was a real bug: `hasHeartData` is satisfied by a single
+  // latest reading, while every panel inside the section is gated on the
+  // history arrays. A user who synced recently but has nothing inside
+  // the chart window passed the section guard and then rendered a card
+  // containing a title and nothing else — no chart, no explanation, no
+  // indication anything was wrong. Sleep escaped it only because its
+  // guard happens to check arrays rather than the latest reading.
+  const heartSeriesEmpty = heartRate.length === 0 && restingHR.length === 0 && hrv.length === 0 && bloodOxygen.length === 0;
+  const activitySeriesEmpty = steps.length === 0 && calories.length === 0;
+
   return (
     <div className="flex flex-col gap-5">
       {!embedded && (
@@ -254,6 +304,13 @@ export function BiometricsSection({
       {hasHeartData && (
         <Section title="Heart" icon={HeartPulse} action={isSample ? <SampleBadge /> : undefined} className="lux-stagger-2">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {heartSeriesEmpty && (
+              <NoSeriesYet
+                current={latestOf("heartRate") !== null ? String(Math.round(latestOf("heartRate") as number)) : null}
+                unit="bpm"
+                label="heart rate"
+              />
+            )}
             {heartRate.length > 0 && (
               <MetricPanel
                 label="Heart rate"
@@ -342,6 +399,12 @@ export function BiometricsSection({
       {hasActivityData && (
         <Section title="Activity" icon={Flame} action={isSample ? <SampleBadge /> : undefined} className="lux-stagger-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {activitySeriesEmpty && (
+              <NoSeriesYet
+                current={latestOf("activityLevel") !== null ? String(Math.round(latestOf("activityLevel") as number)) : null}
+                label="activity"
+              />
+            )}
             {steps.length > 0 && (
               <MetricPanel
                 label="Steps"

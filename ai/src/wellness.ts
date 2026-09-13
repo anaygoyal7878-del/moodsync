@@ -239,13 +239,61 @@ function computeOverallScore(scores: {
  * oldest-or-newest order doesn't matter, and should NOT include `reading`
  * itself (baselines compare the latest point against history, not
  * against itself). */
+/** True when a reading carries anything the sleep score can use. */
+function reportsSleep(reading: NormalizedBiometricReading): boolean {
+  return (
+    reading.sleepScore !== undefined ||
+    reading.deepSleepMinutes !== undefined ||
+    reading.remSleepMinutes !== undefined ||
+    reading.lightSleepMinutes !== undefined
+  );
+}
+
+/**
+ * The newest reading that actually reports sleep, falling back to
+ * `latest` when none does.
+ *
+ * Bounded to `SLEEP_LOOKBACK_HOURS` on purpose: showing last Tuesday's
+ * sleep score as though it were today's would be worse than showing
+ * nothing. Past the window this returns `latest`, whose absent sleep
+ * fields produce an honest null.
+ */
+function mostRecentSleepBearing(
+  latest: NormalizedBiometricReading,
+  recentReadings: NormalizedBiometricReading[],
+): NormalizedBiometricReading {
+  if (reportsSleep(latest)) return latest;
+
+  const cutoff = new Date(latest.timestamp).getTime() - SLEEP_LOOKBACK_HOURS * 60 * 60_000;
+  let best: NormalizedBiometricReading | null = null;
+  for (const candidate of recentReadings) {
+    if (!reportsSleep(candidate)) continue;
+    const at = new Date(candidate.timestamp).getTime();
+    if (Number.isNaN(at) || at < cutoff || at > new Date(latest.timestamp).getTime()) continue;
+    if (best === null || at > new Date(best.timestamp).getTime()) best = candidate;
+  }
+  return best ?? latest;
+}
+
+/** How far back a sleep score may be carried forward. A night's sleep
+ * stays the answer for that day; it must not become the answer for the
+ * rest of the week. */
+const SLEEP_LOOKBACK_HOURS = 20;
+
 export function computeWellnessScores(
   reading: NormalizedBiometricReading,
   recentReadings: NormalizedBiometricReading[] = [],
 ): WellnessScores {
   const stress = computeStressScore(reading, recentReadings);
   const recovery = computeRecoveryScore(reading, recentReadings);
-  const sleep = computeSleepScore(reading);
+  // Sleep is looked up across recent readings rather than only on
+  // `reading`, because sleep is a property of the *night*, not of every
+  // sync. A watch that syncs in the evening sends heart rate and no
+  // sleep fields at all — so scoring the latest reading alone made
+  // someone's sleep score vanish partway through the day and reappear
+  // the next morning. Every other score here is genuinely "right now"
+  // and correctly reads the latest sample; this one is not.
+  const sleep = computeSleepScore(mostRecentSleepBearing(reading, recentReadings));
   const energy = computeEnergyScore(reading);
 
   return {

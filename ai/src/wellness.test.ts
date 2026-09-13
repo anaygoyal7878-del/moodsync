@@ -131,3 +131,40 @@ describe('computeWellnessScores', () => {
     expect(scores.focus.value).not.toBeNull();
   });
 });
+
+describe('sleep is a property of the night, not of every sync', () => {
+  // Uses the file's own `reading` helper rather than a cast, so these
+  // fixtures stay valid if NormalizedBiometricReading gains a field.
+  const night = (iso: string, sleepScore: number) => reading({ timestamp: iso, sleepScore });
+  const evening = (iso: string) => reading({ timestamp: iso, heartRate: 70 });
+
+  it('carries the morning sleep score through an evening sync that reports none', () => {
+    // The bug this guards: a watch syncing at 9pm sends heart rate and
+    // no sleep fields, so scoring the latest reading alone made the
+    // sleep score vanish partway through the day.
+    const scores = computeWellnessScores(evening('2026-09-13T21:00:00Z'), [night('2026-09-13T07:00:00Z', 82)]);
+    expect(scores.sleep.value).toBe(82);
+  });
+
+  it('still prefers the latest reading when it reports sleep itself', () => {
+    const scores = computeWellnessScores(night('2026-09-13T07:00:00Z', 91), [night('2026-09-12T07:00:00Z', 60)]);
+    expect(scores.sleep.value).toBe(91);
+  });
+
+  it('will not carry a stale score forward past the lookback window', () => {
+    // Last night's sleep is today's answer. Last week's is not, and
+    // showing it as though it were would be worse than showing nothing.
+    const scores = computeWellnessScores(evening('2026-09-13T21:00:00Z'), [night('2026-09-06T07:00:00Z', 82)]);
+    expect(scores.sleep.value).toBeNull();
+  });
+
+  it('never reaches forward to a reading newer than the one being scored', () => {
+    const scores = computeWellnessScores(evening('2026-09-13T07:00:00Z'), [night('2026-09-13T20:00:00Z', 82)]);
+    expect(scores.sleep.value).toBeNull();
+  });
+
+  it('reports an honest null when nothing in range reported sleep', () => {
+    const scores = computeWellnessScores(evening('2026-09-13T21:00:00Z'), [evening('2026-09-13T07:00:00Z')]);
+    expect(scores.sleep.value).toBeNull();
+  });
+});
