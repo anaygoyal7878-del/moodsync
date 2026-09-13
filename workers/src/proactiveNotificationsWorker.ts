@@ -41,6 +41,7 @@ import {
   userPreferencesRepository,
   userTimezoneRepository,
   messagingSettingsRepository,
+  plannedWorkoutRepository,
 } from '@moodsync/database';
 import {
   computeWellnessScores,
@@ -65,6 +66,11 @@ import {
   isRecurringNudgeDue,
   NUDGE_CONTENT,
   type NudgeKind,
+  checkHealthScenario,
+  detectHealthScenarios,
+  computePersonalBaselines,
+  selectDueWorkouts,
+  buildWorkoutReminder,
 } from '@moodsync/ai';
 
 function mean(values: number[]): number {
@@ -181,6 +187,65 @@ for (const userId of userIds) {
           totalSent++;
         }
       }
+    }
+
+    // Check: researched health scenarios.
+    //
+    // The detection lives in ai/src/healthScenarios.ts against published
+    // thresholds; this only decides whether a pattern is worth
+    // interrupting someone for. Only `caution` is sent — a resting heart
+    // rate a few beats up is worth seeing on the Recovery page but not
+    // worth a push, and sending the quiet ones alongside the loud one
+    // teaches people to dismiss the whole category unread.
+    let scenarios: ReturnType<typeof detectHealthScenarios> = [];
+    if (latest) {
+      const baselines = computePersonalBaselines(
+        latest.reading,
+        history.filter((r) => r.timestamp !== latest.reading.timestamp),
+      );
+      scenarios = detectHealthScenarios(baselines);
+      if (await deliverIfNotRecentlySent(userId, checkHealthScenario(scenarios))) totalSent++;
+    }
+
+    // Check: today's planned workouts.
+    //
+    // Deliberately bypasses `deliverIfNotRecentlySent`. That helper
+    // dedupes on title within a rolling window, which is right for
+    // recurring insights and wrong here: two different workouts can
+    // share a title across days, and the real "have we sent this"
+    // question is per-workout. `remindedAt` on the row answers it
+    // exactly, and survives a worker restart in a way an in-memory or
+    // title-based guard would not.
+    try {
+      const dayStartLocal = new Date(Date.now() - currentHour * 60 * 60_000);
+      const dayKey = new Date(Date.UTC(dayStartLocal.getUTCFullYear(), dayStartLocal.getUTCMonth(), dayStartLocal.getUTCDate()));
+      const pending = await plannedWorkoutRepository.listNeedingReminder(userId, dayKey);
+
+      if (pending.length > 0) {
+        const shaped = pending.map((w) => ({
+          id: w.id,
+          title: w.title,
+          kind: w.kind,
+          plannedMinutes: w.plannedMinutes,
+          plannedAtMinutes: w.plannedAtMinutes,
+        }));
+        const localMinutes = currentHour * 60 + new Date().getUTCMinutes();
+        const { timed, morning } = selectDueWorkouts(shaped, localMinutes);
+
+        // Timed sessions get their own reminder ahead of the session;
+        // untimed ones are batched into one morning note. Sent as two
+        // groups rather than one so an evening session's reminder still
+        // arrives when it can change something.
+        for (const group of [timed, morning]) {
+          const reminder = buildWorkoutReminder(group, scenarios, localMinutes);
+          if (!reminder) continue;
+          await deliverNotification({ userId, title: reminder.title, body: reminder.body });
+          await plannedWorkoutRepository.markReminded(reminder.workoutIds);
+          totalSent++;
+        }
+      }
+    } catch (error) {
+      console.error(`[proactive-notifications] workout reminder failed for user=${userId}:`, error instanceof Error ? error.message : error);
     }
 
     // Check 4: Burnout risk (poor sleep + low recovery + at least one of

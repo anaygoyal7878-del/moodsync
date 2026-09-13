@@ -45,6 +45,7 @@ export { computeWeeklyInsights, computeBiggestImprovement, type BiggestImproveme
 export { generateRecommendations, type RecommendationCandidate, type PlaylistSkipStat } from './recommendations.js';
 export { computeWalkingStreak, computeMeditationStreak, computeFocusStreak, type HabitStreakResult } from './habits.js';
 export {
+  checkHealthScenario,
   checkRecoveryUnusuallyHigh,
   checkRoomTemperatureOutsideSleepRange,
   checkSceneTimeOfDayPattern,
@@ -353,6 +354,14 @@ export {
   type CalendarOccasion,
   type OccasionBasis,
 } from './calendarOccasion.js';
+export {
+  selectDueWorkouts,
+  buildWorkoutReminder,
+  MORNING_REMINDER_HOUR,
+  LEAD_MINUTES,
+  type PlannedWorkoutLike,
+  type WorkoutReminder,
+} from './workoutReminder.js';
 export {
   resolveMusicPlaylist,
   pickProvenPlaylist,

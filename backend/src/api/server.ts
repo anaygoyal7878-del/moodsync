@@ -40,6 +40,7 @@ import musicSessionRoutes from './routes/musicSessions.js';
 import messagingRoutes from './routes/messaging.js';
 import environmentRoutes from './routes/environment.js';
 import scentRoutes from './routes/scent.js';
+import workoutRoutes from './routes/workouts.js';
 import affectRoutes from './routes/affect.js';
 import calendarRoutes from './routes/calendar.js';
 
@@ -108,6 +109,7 @@ export async function buildServer() {
   await app.register(messagingRoutes, { prefix: '/api' });
   await app.register(environmentRoutes, { prefix: '/api' });
   await app.register(scentRoutes, { prefix: '/api' });
+  await app.register(workoutRoutes, { prefix: '/api' });
   await app.register(affectRoutes, { prefix: '/api' });
   await app.register(calendarRoutes, { prefix: '/api' });
 

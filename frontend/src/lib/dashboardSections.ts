@@ -19,6 +19,7 @@ import {
   Repeat,
   Brain,
   Droplet,
+  Dumbbell,
   type LucideIcon,
 } from "lucide-react";
 
@@ -68,6 +69,7 @@ export const NAV_GROUPS = [
       { href: "/dashboard/habits", label: "Habits", icon: Repeat },
       { href: "/dashboard/meditation", label: "Meditate", icon: Sparkle },
       { href: "/dashboard/music", label: "Music", icon: Music },
+      { href: "/dashboard/workouts", label: "Workouts", icon: Dumbbell },
       { href: "/dashboard/fragrance", label: "Fragrance", icon: Droplet },
     ],
   },

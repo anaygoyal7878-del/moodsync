@@ -1,0 +1,350 @@
+"use client";
+
+import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Plus, Check, Trash2, Clock, Loader2 } from "lucide-react";
+import type { PlannedWorkout, WorkoutKind } from "@/lib/types";
+
+/**
+ * Plan a workout, and mark it done.
+ *
+ * The form is deliberately two required fields — what and when — with
+ * everything else optional. A planner that demands duration, time and
+ * intensity before it will accept "legs on Thursday" is a planner people
+ * stop opening, and an unentered workout produces no reminder at all,
+ * which is the whole point of the feature.
+ *
+ * Time of day is optional for the same reason, and it is not a cosmetic
+ * choice: leaving it blank means the reminder arrives with the morning's
+ * plan, while setting it moves the reminder to ninety minutes before the
+ * session. The helper text says so, because otherwise the field looks
+ * like decoration.
+ */
+
+const KINDS: Array<{ value: WorkoutKind; label: string }> = [
+  { value: "STRENGTH", label: "Strength" },
+  { value: "CARDIO", label: "Cardio" },
+  { value: "MOBILITY", label: "Mobility" },
+  { value: "SPORT", label: "Sport" },
+  { value: "REST", label: "Rest" },
+];
+
+/** "17:30" → 1050. Returns null for an empty or malformed value so the
+ * request omits the field rather than sending a nonsense number. */
+function timeToMinutes(value: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+export function WorkoutPlanner({ today, workouts }: { today: string; workouts: PlannedWorkout[] }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [date, setDate] = useState(today);
+  const [kind, setKind] = useState<WorkoutKind>("STRENGTH");
+  const [title, setTitle] = useState("");
+  const [minutes, setMinutes] = useState("");
+  const [atTime, setAtTime] = useState("");
+
+  const { upcoming, past } = useMemo(() => {
+    const up: PlannedWorkout[] = [];
+    const done: PlannedWorkout[] = [];
+    for (const w of workouts) (w.scheduledFor >= today ? up : done).push(w);
+    // Past ascends in the API; newest-first reads better looking backwards.
+    return { upcoming: up, past: done.reverse() };
+  }, [workouts, today]);
+
+  const create = useCallback(async () => {
+    if (!title.trim() || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/workouts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scheduledFor: date,
+          kind,
+          title: title.trim(),
+          plannedMinutes: minutes ? Number(minutes) : null,
+          plannedAtMinutes: timeToMinutes(atTime),
+        }),
+      });
+      if (!response.ok) {
+        setError("Couldn't save that one.");
+        return;
+      }
+      setTitle("");
+      setMinutes("");
+      setAtTime("");
+      setOpen(false);
+      router.refresh();
+    } catch {
+      setError("Couldn't reach the server.");
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, date, kind, title, minutes, atTime, router]);
+
+  const act = useCallback(
+    async (id: string, action: "complete" | "delete") => {
+      if (busy) return;
+      setBusy(true);
+      try {
+        await fetch(action === "complete" ? `/api/workouts/${id}/complete` : `/api/workouts/${id}`, {
+          method: action === "complete" ? "POST" : "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: action === "complete" ? "{}" : undefined,
+        });
+        router.refresh();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, router],
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[13px]" style={{ color: "var(--lux-muted)" }}>
+          {upcoming.length === 0 ? "Nothing planned yet." : `${upcoming.length} coming up.`}
+        </p>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-medium"
+          style={{ background: "var(--lux-sage)", color: "#16211a" }}
+        >
+          <Plus size={14} aria-hidden="true" />
+          Plan one
+        </button>
+      </div>
+
+      {open && (
+        <div
+          className="flex flex-col gap-3 rounded-[18px] p-4"
+          style={{ background: "var(--lux-bg-card-2)", border: "1px solid var(--lux-hairline)" }}
+        >
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[12px] uppercase tracking-[0.06em]" style={{ color: "var(--lux-muted)" }}>
+              What
+            </span>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Leg day, easy 5k, mobility…"
+              aria-label="Workout name"
+              className="rounded-[12px] px-3 py-2.5 text-[13.5px] outline-none"
+              style={{ background: "var(--lux-bg-card)", color: "var(--lux-ink)", border: "1px solid var(--lux-hairline)" }}
+            />
+          </label>
+
+          <div className="flex flex-wrap gap-1.5">
+            {KINDS.map((k) => (
+              <button
+                key={k.value}
+                type="button"
+                onClick={() => setKind(k.value)}
+                className="rounded-full px-3 py-1.5 text-[12.5px]"
+                style={
+                  kind === k.value
+                    ? { background: "var(--lux-sage)", color: "#16211a" }
+                    : { background: "var(--lux-bg-card)", color: "var(--lux-ink)", border: "1px solid var(--lux-hairline)" }
+                }
+              >
+                {k.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="Day">
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                aria-label="Day"
+                className="w-full rounded-[12px] px-3 py-2.5 text-[13.5px] outline-none"
+                style={{ background: "var(--lux-bg-card)", color: "var(--lux-ink)", border: "1px solid var(--lux-hairline)" }}
+              />
+            </Field>
+            <Field label="Minutes">
+              <input
+                type="number"
+                min={1}
+                max={600}
+                value={minutes}
+                onChange={(e) => setMinutes(e.target.value)}
+                placeholder="45"
+                aria-label="Planned minutes"
+                className="w-full rounded-[12px] px-3 py-2.5 text-[13.5px] outline-none"
+                style={{ background: "var(--lux-bg-card)", color: "var(--lux-ink)", border: "1px solid var(--lux-hairline)" }}
+              />
+            </Field>
+            <Field label="Time">
+              <input
+                type="time"
+                value={atTime}
+                onChange={(e) => setAtTime(e.target.value)}
+                aria-label="Time of day"
+                className="w-full rounded-[12px] px-3 py-2.5 text-[13.5px] outline-none"
+                style={{ background: "var(--lux-bg-card)", color: "var(--lux-ink)", border: "1px solid var(--lux-hairline)" }}
+              />
+            </Field>
+          </div>
+
+          {/* The time field changes when the reminder arrives, which is
+              not guessable from a blank input. */}
+          <p className="text-[11.5px] leading-relaxed" style={{ color: "var(--lux-muted)" }}>
+            Leave the time blank and the reminder arrives with your morning plan. Set one and it arrives 90 minutes
+            before — enough room to eat, change, or move it.
+          </p>
+
+          {error && (
+            <p role="alert" className="text-[12.5px]" style={{ color: "var(--lux-rose)" }}>
+              {error}
+            </p>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => void create()}
+              disabled={busy || title.trim().length === 0}
+              className="flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-medium disabled:opacity-50"
+              style={{ background: "var(--lux-sage)", color: "#16211a" }}
+            >
+              {busy && <Loader2 size={13} className="animate-spin" aria-hidden="true" />}
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="rounded-full px-4 py-2 text-[13px] font-medium"
+              style={{ background: "var(--lux-bg-card)", color: "var(--lux-ink)", border: "1px solid var(--lux-hairline)" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {upcoming.length > 0 && (
+        <ul className="flex flex-col gap-2">
+          {upcoming.map((w) => (
+            <WorkoutRow key={w.id} workout={w} today={today} busy={busy} onAct={act} />
+          ))}
+        </ul>
+      )}
+
+      {past.length > 0 && (
+        <details>
+          <summary className="cursor-pointer text-[12.5px]" style={{ color: "var(--lux-muted)" }}>
+            Earlier ({past.length})
+          </summary>
+          <ul className="mt-2 flex flex-col gap-2">
+            {past.map((w) => (
+              <WorkoutRow key={w.id} workout={w} today={today} busy={busy} onAct={act} />
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[12px] uppercase tracking-[0.06em]" style={{ color: "var(--lux-muted)" }}>
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function formatTime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const suffix = h < 12 ? "am" : "pm";
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return m === 0 ? `${hour12}${suffix}` : `${hour12}:${String(m).padStart(2, "0")}${suffix}`;
+}
+
+function WorkoutRow({
+  workout,
+  today,
+  busy,
+  onAct,
+}: {
+  workout: PlannedWorkout;
+  today: string;
+  busy: boolean;
+  onAct: (id: string, action: "complete" | "delete") => void;
+}) {
+  const done = workout.completedAt !== null;
+  const isToday = workout.scheduledFor === today;
+
+  const meta = [
+    isToday ? "Today" : workout.scheduledFor,
+    workout.plannedAtMinutes !== null ? formatTime(workout.plannedAtMinutes) : null,
+    workout.plannedMinutes ? `${workout.plannedMinutes} min` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <li
+      className="flex items-center gap-3 rounded-[16px] px-3.5 py-3"
+      style={{
+        background: "var(--lux-bg-card-2)",
+        border: `1px solid ${isToday && !done ? "var(--lux-hairline-gold)" : "var(--lux-hairline)"}`,
+        opacity: done ? 0.6 : 1,
+      }}
+    >
+      <div className="min-w-0 flex-1">
+        <p
+          className="truncate text-[13.5px] font-medium"
+          style={{ color: "var(--lux-ink)", textDecoration: done ? "line-through" : undefined }}
+        >
+          {workout.title}
+        </p>
+        <p className="mt-0.5 flex items-center gap-1 text-[12px]" style={{ color: "var(--lux-muted)" }}>
+          {workout.plannedAtMinutes !== null && <Clock size={11} aria-hidden="true" />}
+          {meta}
+        </p>
+      </div>
+
+      {!done && (
+        <button
+          type="button"
+          onClick={() => onAct(workout.id, "complete")}
+          disabled={busy}
+          aria-label={`Mark ${workout.title} done`}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full disabled:opacity-40"
+          style={{ background: "var(--lux-sage)", color: "#16211a" }}
+        >
+          <Check size={14} aria-hidden="true" />
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => onAct(workout.id, "delete")}
+        disabled={busy}
+        aria-label={`Delete ${workout.title}`}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full disabled:opacity-40"
+        style={{ background: "var(--lux-bg-card)", color: "var(--lux-muted)", border: "1px solid var(--lux-hairline)" }}
+      >
+        <Trash2 size={13} aria-hidden="true" />
+      </button>
+    </li>
+  );
+}

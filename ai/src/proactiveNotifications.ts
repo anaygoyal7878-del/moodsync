@@ -10,6 +10,8 @@
  * per-minute signal — so it's not included here, not faked).
  */
 
+import type { HealthScenario } from './healthScenarios.js';
+
 function mean(values: number[]): number {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
@@ -307,4 +309,48 @@ export function checkRecoveryEnvironmentConjunction(input: RecoveryEnvironmentIn
     title: 'Your recovery is low, and today is stacked against it',
     body: `Recovery is low and ${reasons.join(' and ')}. Worth protecting a break where you can, even a short one.`,
   };
+}
+
+
+/**
+ * Turns a researched health scenario into a proactive notification.
+ *
+ * `healthScenarios.ts` already decides *whether* a pattern applies and
+ * on what published basis; this decides only whether it is worth
+ * interrupting someone for, and how to word it in a notification's
+ * space. Keeping those separate matters — the detection thresholds are
+ * grounded in literature and should not be adjusted to make a
+ * notification fire more often.
+ *
+ * Only `caution` scenarios are sent. A `notice` — a resting heart rate
+ * a few beats up, one low-HRV morning — is real and worth seeing on the
+ * Recovery page, but it is not worth a push. The strain/illness
+ * scenario is the one that changes what someone should do today, and
+ * sending the quieter ones alongside it would train people to dismiss
+ * the category without reading it.
+ *
+ * The body deliberately carries the finding rather than the guidance:
+ * a notification is a reason to open the app, and the finding is the
+ * part that is specific to this person's own numbers. Full guidance and
+ * the research basis live on the page, which has room for them.
+ */
+export function checkHealthScenario(scenarios: HealthScenario[]): ProactiveNotificationCandidate | null {
+  const caution = scenarios.find((s) => s.severity === 'caution');
+  if (!caution) return null;
+
+  return {
+    title: caution.title,
+    // Trimmed to the first sentence of the finding: notification bodies
+    // get truncated by the OS, and a truncated number is worse than no
+    // number — "your HRV is 41ms against your usua…" reads as broken.
+    body: `${firstSentence(caution.finding)} Open MoodSync for what this usually means.`,
+  };
+}
+
+/** First sentence, or the whole string when there is no sentence break.
+ * Splits on a period followed by a space so "41ms." mid-number is not
+ * mistaken for a boundary. */
+function firstSentence(text: string): string {
+  const match = text.match(/^(.*?[.!?])\s/);
+  return match?.[1] ?? text;
 }

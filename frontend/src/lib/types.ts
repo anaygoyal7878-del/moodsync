@@ -585,3 +585,32 @@ export interface ScentBriefing {
   }>;
   guidance: { rules: string[]; topMinutes: number; heartHours: number; baseLabel: string };
 }
+
+export type WorkoutKind = "STRENGTH" | "CARDIO" | "MOBILITY" | "SPORT" | "REST";
+
+/** A planned workout. `scheduledFor` is a local calendar date
+ * (YYYY-MM-DD), not a timestamp — people plan "legs on Thursday", and a
+ * real instant would slide the session across a day boundary for anyone
+ * not on the server's timezone. `plannedAtMinutes` is local minutes past
+ * midnight, and null is meaningful: it moves the reminder from
+ * 90-minutes-before to the morning batch. */
+export interface PlannedWorkout {
+  id: string;
+  scheduledFor: string;
+  kind: WorkoutKind;
+  title: string;
+  plannedMinutes: number | null;
+  plannedAtMinutes: number | null;
+  notes: string | null;
+  completedAt: string | null;
+  actualMinutes: number | null;
+  perceivedEffort: number | null;
+}
+
+export interface WorkoutListResponse {
+  /** The user's own local date, resolved server-side so the client never
+   * has to guess which day "today" is. */
+  today: string;
+  timezone: string;
+  workouts: PlannedWorkout[];
+}

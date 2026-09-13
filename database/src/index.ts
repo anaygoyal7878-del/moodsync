@@ -41,6 +41,7 @@ export {
 export { calendarConnectionRepository } from './repositories/calendarConnectionRepository.js';
 export { caffeineLogRepository, type CreateCaffeineLogInput } from './repositories/caffeineLogRepository.js';
 export { focusSessionRepository, type CreateFocusSessionInput } from './repositories/focusSessionRepository.js';
+export { plannedWorkoutRepository, type PlannedWorkoutInput } from './repositories/plannedWorkoutRepository.js';
 export {
   musicSessionRepository,
   type StartMusicSessionInput,

@@ -43,6 +43,7 @@ model User {
   meditationSessions   MeditationSession[]
   caffeineLogs         CaffeineLog[]
   focusSessions        FocusSession[]
+  plannedWorkouts    PlannedWorkout[]
   musicSessions        MusicSession[]
   messagingConnections MessagingConnection[]
   messagingMessages    MessagingMessage[]
@@ -1217,6 +1218,67 @@ model FocusSession {
 
   @@index([userId, completedAt])
   @@map("focus_sessions")
+}
+
+/// A workout the user has planned for a given day, and (once done) what
+/// they actually did.
+///
+/// Deliberately a *plan* first and a log second, which is what separates
+/// it from MeditationSession and FocusSession above — those only ever
+/// record something that already happened. A workout is worth knowing
+/// about before it happens: that is what lets MoodSync remind someone in
+/// the morning, and what lets the recovery signals argue with the plan
+/// ("your HRV is down, consider making today the easy one") while there
+/// is still time to change it.
+///
+/// `scheduledFor` is a date, not a timestamp, because people plan "legs
+/// on Thursday" rather than "legs at 17:30". A specific time is optional
+/// and only used to decide when a reminder is useful.
+model PlannedWorkout {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Local calendar date the workout is planned for, stored at UTC
+  /// midnight. Compared against the user's own timezone, never the
+  /// server's — see workoutService.
+  scheduledFor DateTime
+  kind         WorkoutKind
+  /// The user's own words: "upper body", "5k easy", "leg day".
+  title String
+  /// Planned duration. Null when they haven't decided.
+  plannedMinutes Int?
+  /// Optional local time of day (minutes past midnight, 0-1439) for the
+  /// reminder. Null means remind in the morning with the day's plan.
+  plannedAtMinutes Int?
+  notes            String?
+
+  /// Set when the user marks it done. Null means still planned — a
+  /// workout that never gets completed is data too, and deleting it
+  /// would erase the fact that a plan was missed.
+  completedAt     DateTime?
+  actualMinutes   Int?
+  /// 1-5, how hard it felt. The one outcome signal worth collecting by
+  /// hand, since no wearable reports perceived exertion.
+  perceivedEffort Int?
+
+  /// When the reminder for this workout was delivered, so the worker
+  /// never sends twice. Null means not yet reminded.
+  remindedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, scheduledFor])
+  @@map("planned_workouts")
+}
+
+enum WorkoutKind {
+  STRENGTH
+  CARDIO
+  MOBILITY
+  SPORT
+  REST
 }
 
 // ---------------------------------------------------------------------
