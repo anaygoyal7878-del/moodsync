@@ -51,6 +51,7 @@ export function WorkoutPlanner({ today, workouts }: { today: string; workouts: P
   const [title, setTitle] = useState("");
   const [minutes, setMinutes] = useState("");
   const [atTime, setAtTime] = useState("");
+  const [notes, setNotes] = useState("");
 
   const { upcoming, past } = useMemo(() => {
     const up: PlannedWorkout[] = [];
@@ -74,6 +75,7 @@ export function WorkoutPlanner({ today, workouts }: { today: string; workouts: P
           title: title.trim(),
           plannedMinutes: minutes ? Number(minutes) : null,
           plannedAtMinutes: timeToMinutes(atTime),
+          notes: notes.trim() || null,
         }),
       });
       if (!response.ok) {
@@ -83,6 +85,7 @@ export function WorkoutPlanner({ today, workouts }: { today: string; workouts: P
       setTitle("");
       setMinutes("");
       setAtTime("");
+      setNotes("");
       setOpen(false);
       router.refresh();
     } catch {
@@ -90,18 +93,37 @@ export function WorkoutPlanner({ today, workouts }: { today: string; workouts: P
     } finally {
       setBusy(false);
     }
-  }, [busy, date, kind, title, minutes, atTime, router]);
+  }, [busy, date, kind, title, minutes, atTime, notes, router]);
 
-  const act = useCallback(
-    async (id: string, action: "complete" | "delete") => {
+  const complete = useCallback(
+    async (id: string, detail: { actualMinutes: number | null; perceivedEffort: number | null }) => {
       if (busy) return;
       setBusy(true);
       try {
-        await fetch(action === "complete" ? `/api/workouts/${id}/complete` : `/api/workouts/${id}`, {
-          method: action === "complete" ? "POST" : "DELETE",
+        // Both fields are sent, including nulls. The API accepts them and
+        // an earlier version of this posted a bare `{}`, which silently
+        // threw away the only outcome signal no wearable reports —
+        // perceived effort. Nulls are a real answer ("done, didn't say"),
+        // and the column stays nullable to hold exactly that.
+        await fetch(`/api/workouts/${id}/complete`, {
+          method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: action === "complete" ? "{}" : undefined,
+          body: JSON.stringify(detail),
         });
+        router.refresh();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, router],
+  );
+
+  const remove = useCallback(
+    async (id: string) => {
+      if (busy) return;
+      setBusy(true);
+      try {
+        await fetch(`/api/workouts/${id}`, { method: "DELETE" });
         router.refresh();
       } finally {
         setBusy(false);
@@ -200,6 +222,21 @@ export function WorkoutPlanner({ today, workouts }: { today: string; workouts: P
             </Field>
           </div>
 
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[12px] uppercase tracking-[0.06em]" style={{ color: "var(--lux-muted)" }}>
+              Notes <span className="normal-case tracking-normal">(optional)</span>
+            </span>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Working sets, route, what to focus on…"
+              aria-label="Notes"
+              rows={2}
+              className="resize-y rounded-[12px] px-3 py-2.5 text-[13.5px] outline-none"
+              style={{ background: "var(--lux-bg-card)", color: "var(--lux-ink)", border: "1px solid var(--lux-hairline)" }}
+            />
+          </label>
+
           {/* The time field changes when the reminder arrives, which is
               not guessable from a blank input. */}
           <p className="text-[11.5px] leading-relaxed" style={{ color: "var(--lux-muted)" }}>
@@ -239,7 +276,7 @@ export function WorkoutPlanner({ today, workouts }: { today: string; workouts: P
       {upcoming.length > 0 && (
         <ul className="flex flex-col gap-2">
           {upcoming.map((w) => (
-            <WorkoutRow key={w.id} workout={w} today={today} busy={busy} onAct={act} />
+            <WorkoutRow key={w.id} workout={w} today={today} busy={busy} onComplete={complete} onRemove={remove} />
           ))}
         </ul>
       )}
@@ -251,7 +288,7 @@ export function WorkoutPlanner({ today, workouts }: { today: string; workouts: P
           </summary>
           <ul className="mt-2 flex flex-col gap-2">
             {past.map((w) => (
-              <WorkoutRow key={w.id} workout={w} today={today} busy={busy} onAct={act} />
+              <WorkoutRow key={w.id} workout={w} today={today} busy={busy} onComplete={complete} onRemove={remove} />
             ))}
           </ul>
         </details>
@@ -279,17 +316,34 @@ function formatTime(minutes: number): string {
   return m === 0 ? `${hour12}${suffix}` : `${hour12}:${String(m).padStart(2, "0")}${suffix}`;
 }
 
+/**
+ * One workout row, with an inline "how did it go" step on completion.
+ *
+ * Completing opens a two-field panel rather than finishing immediately,
+ * because perceived effort is the one outcome signal no wearable
+ * reports — if it is not collected here it does not exist. But the panel
+ * never blocks: "Just done" completes with both fields null, which is a
+ * real answer and what the nullable columns are for. Demanding the
+ * detail would cost the completion itself, and a workout marked done
+ * with no detail is far more useful than one never marked at all.
+ */
 function WorkoutRow({
   workout,
   today,
   busy,
-  onAct,
+  onComplete,
+  onRemove,
 }: {
   workout: PlannedWorkout;
   today: string;
   busy: boolean;
-  onAct: (id: string, action: "complete" | "delete") => void;
+  onComplete: (id: string, detail: { actualMinutes: number | null; perceivedEffort: number | null }) => void;
+  onRemove: (id: string) => void;
 }) {
+  const [logging, setLogging] = useState(false);
+  const [actual, setActual] = useState("");
+  const [effort, setEffort] = useState<number | null>(null);
+
   const done = workout.completedAt !== null;
   const isToday = workout.scheduledFor === today;
 
@@ -301,50 +355,143 @@ function WorkoutRow({
     .filter(Boolean)
     .join(" · ");
 
+  // What actually happened, shown instead of the plan once it has. A
+  // completed row that still reads "45 min" when the user logged 30 is
+  // reporting the intention as though it were the outcome.
+  const outcome = done
+    ? [
+        workout.actualMinutes ? `${workout.actualMinutes} min` : null,
+        workout.perceivedEffort ? `effort ${workout.perceivedEffort}/5` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
+
+  const submit = (detail: { actualMinutes: number | null; perceivedEffort: number | null }) => {
+    setLogging(false);
+    onComplete(workout.id, detail);
+  };
+
   return (
     <li
-      className="flex items-center gap-3 rounded-[16px] px-3.5 py-3"
+      className="flex flex-col gap-2.5 rounded-[16px] px-3.5 py-3"
       style={{
         background: "var(--lux-bg-card-2)",
         border: `1px solid ${isToday && !done ? "var(--lux-hairline-gold)" : "var(--lux-hairline)"}`,
-        opacity: done ? 0.6 : 1,
+        opacity: done ? 0.7 : 1,
       }}
     >
-      <div className="min-w-0 flex-1">
-        <p
-          className="truncate text-[13.5px] font-medium"
-          style={{ color: "var(--lux-ink)", textDecoration: done ? "line-through" : undefined }}
-        >
-          {workout.title}
-        </p>
-        <p className="mt-0.5 flex items-center gap-1 text-[12px]" style={{ color: "var(--lux-muted)" }}>
-          {workout.plannedAtMinutes !== null && <Clock size={11} aria-hidden="true" />}
-          {meta}
-        </p>
-      </div>
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p
+            className="truncate text-[13.5px] font-medium"
+            style={{ color: "var(--lux-ink)", textDecoration: done ? "line-through" : undefined }}
+          >
+            {workout.title}
+          </p>
+          <p className="mt-0.5 flex items-center gap-1 text-[12px]" style={{ color: "var(--lux-muted)" }}>
+            {workout.plannedAtMinutes !== null && !done && <Clock size={11} aria-hidden="true" />}
+            {done && outcome ? outcome : meta}
+          </p>
+          {workout.notes && (
+            <p className="mt-1 text-[12px] leading-snug" style={{ color: "var(--lux-muted)" }}>
+              {workout.notes}
+            </p>
+          )}
+        </div>
 
-      {!done && (
+        {!done && (
+          <button
+            type="button"
+            onClick={() => setLogging((v) => !v)}
+            disabled={busy}
+            aria-label={`Mark ${workout.title} done`}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full disabled:opacity-40"
+            style={{ background: "var(--lux-sage)", color: "#16211a" }}
+          >
+            <Check size={14} aria-hidden="true" />
+          </button>
+        )}
         <button
           type="button"
-          onClick={() => onAct(workout.id, "complete")}
+          onClick={() => onRemove(workout.id)}
           disabled={busy}
-          aria-label={`Mark ${workout.title} done`}
+          aria-label={`Delete ${workout.title}`}
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full disabled:opacity-40"
-          style={{ background: "var(--lux-sage)", color: "#16211a" }}
+          style={{ background: "var(--lux-bg-card)", color: "var(--lux-muted)", border: "1px solid var(--lux-hairline)" }}
         >
-          <Check size={14} aria-hidden="true" />
+          <Trash2 size={13} aria-hidden="true" />
         </button>
+      </div>
+
+      {logging && !done && (
+        <div className="flex flex-col gap-2.5 rounded-[12px] p-3" style={{ background: "var(--lux-bg-card)" }}>
+          <p className="text-[12px] uppercase tracking-[0.06em]" style={{ color: "var(--lux-muted)" }}>
+            How did it go?
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={600}
+              value={actual}
+              onChange={(e) => setActual(e.target.value)}
+              placeholder={workout.plannedMinutes ? String(workout.plannedMinutes) : "min"}
+              aria-label="Actual minutes"
+              className="w-20 rounded-[10px] px-2.5 py-2 text-[13px] outline-none"
+              style={{ background: "var(--lux-bg-card-2)", color: "var(--lux-ink)", border: "1px solid var(--lux-hairline)" }}
+            />
+            <span className="text-[12px]" style={{ color: "var(--lux-muted)" }}>
+              min
+            </span>
+
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => setEffort(level)}
+                  aria-label={`Effort ${level} of 5`}
+                  aria-pressed={effort === level}
+                  className="h-8 w-8 rounded-full text-[12.5px]"
+                  style={
+                    effort === level
+                      ? { background: "var(--lux-sage)", color: "#16211a" }
+                      : { background: "var(--lux-bg-card-2)", color: "var(--lux-ink)", border: "1px solid var(--lux-hairline)" }
+                  }
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="text-[11px]" style={{ color: "var(--lux-muted)" }}>
+            Effort is 1 (easy) to 5 (all out) — nothing you wear measures this, so it only exists if you say.
+          </p>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => submit({ actualMinutes: actual ? Number(actual) : null, perceivedEffort: effort })}
+              disabled={busy}
+              className="rounded-full px-3.5 py-1.5 text-[12.5px] font-medium disabled:opacity-50"
+              style={{ background: "var(--lux-sage)", color: "#16211a" }}
+            >
+              Log it
+            </button>
+            <button
+              type="button"
+              onClick={() => submit({ actualMinutes: null, perceivedEffort: null })}
+              disabled={busy}
+              className="rounded-full px-3.5 py-1.5 text-[12.5px] disabled:opacity-50"
+              style={{ background: "var(--lux-bg-card-2)", color: "var(--lux-ink)", border: "1px solid var(--lux-hairline)" }}
+            >
+              Just done
+            </button>
+          </div>
+        </div>
       )}
-      <button
-        type="button"
-        onClick={() => onAct(workout.id, "delete")}
-        disabled={busy}
-        aria-label={`Delete ${workout.title}`}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full disabled:opacity-40"
-        style={{ background: "var(--lux-bg-card)", color: "var(--lux-muted)", border: "1px solid var(--lux-hairline)" }}
-      >
-        <Trash2 size={13} aria-hidden="true" />
-      </button>
     </li>
   );
 }
