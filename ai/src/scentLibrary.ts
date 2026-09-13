@@ -4,22 +4,26 @@
  *
  * ## What is real here and what is not
  *
- * **Real, taken verbatim from the site:** the four collection entries
- * (Solaris, Everwood, Burnt Ash, plus an unreleased fourth), their
- * marketing descriptions, the "From $15" pricing, and — for Solaris
- * only — the full top/heart/base note breakdown the site publishes in
- * its "Scent Architecture" section, along with the timing bands it
- * states (top 0-30 min, heart 30 min-4 hrs, base 4+ hrs).
+ * **Real, taken verbatim from the site:** the Solaris and Everwood
+ * entries, their marketing descriptions, the "From $15" pricing, and —
+ * for Solaris only — the full top/heart/base note breakdown the site
+ * publishes in its "Scent Architecture" section, along with the timing
+ * bands it states (top 0-30 min, heart 30 min-4 hrs, base 4+ hrs).
  *
- * **Deliberately absent:** Everwood's and Burnt Ash's note pyramids.
- * The site's Scent Architecture panel is tabbed and only Solaris's
- * tab content was retrievable; Burnt Ash has no tab there at all. Their
- * `notes` fields are therefore `null` rather than invented. A cologne's
- * note pyramid is its actual formula — guessing "probably oud and
- * leather" for a real product a real business sells would be
- * fabricating a spec sheet. `null` propagates honestly: the UI shows
- * the description instead, and `scentIntelligence.ts` matches on the
- * `character` axes below rather than on notes it doesn't have.
+ * **A deliberate subset, not the whole site.** The brand lists more
+ * fragrances than this file carries; MoodSync recommends from Solaris
+ * and Everwood only. That is a product decision, not a transcription
+ * gap, and it is recorded here so nobody "fixes" this file by adding
+ * back an entry they find on the site.
+ *
+ * **Deliberately absent:** Everwood's note pyramid. The site's Scent
+ * Architecture panel is tabbed and only Solaris's tab content was
+ * retrievable, so Everwood's `notes` field is `null` rather than
+ * invented. A cologne's note pyramid is its actual formula — guessing
+ * "probably oud and leather" for a real product a real business sells
+ * would be fabricating a spec sheet. `null` propagates honestly: the UI
+ * shows the description instead, and `scentIntelligence.ts` matches on
+ * the `character` axes below rather than on notes it doesn't have.
  *
  * **Derived, not claimed as the brand's own:** the `character` numbers.
  * These are MoodSync's reading of each fragrance's published
@@ -27,7 +31,7 @@
  * measurements and the site does not publish them.
  */
 
-export type ScentId = 'solaris' | 'everwood' | 'burnt-ash';
+export type ScentId = 'solaris' | 'everwood';
 
 export interface ScentNotes {
   /** 0-30 min per the site — the first impression. */
@@ -93,14 +97,6 @@ export const SCENTS: Record<ScentId, Scent> = {
     // that could be read. Left null rather than invented.
     notes: null,
     character: { brightness: 0.4, intensity: 0.8, warmth: 0.65 },
-  },
-  'burnt-ash': {
-    id: 'burnt-ash',
-    name: 'Burnt Ash',
-    tagline: 'Raw Intensity',
-    description: 'Smoky and magnetic. An unapologetic scent that lingers long after you leave.',
-    notes: null,
-    character: { brightness: 0.15, intensity: 0.9, warmth: 0.9 },
   },
 };
 

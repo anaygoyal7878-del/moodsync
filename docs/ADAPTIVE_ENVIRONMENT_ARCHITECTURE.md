@@ -231,7 +231,7 @@ was designed as advice from the start rather than retrofitted into it.
 entries, their descriptions, the pulse-point guidance and the
 application rules are transcribed from naturesnotefragrances.com.
 Solaris's full top/heart/base pyramid is published on the site and is
-stored verbatim. **Everwood's and Burnt Ash's pyramids are `null`** —
+stored verbatim. **Everwood's pyramid is `null`** —
 the site's Scent Architecture panel is tabbed and only Solaris's tab
 content was retrievable. A cologne's note pyramid is its actual
 formula; guessing "probably oud and leather" for a real product a real
@@ -306,7 +306,7 @@ noise. So:
   recommendations span the whole collection rather than what the user
   actually has on their shelf. Wiring a real owned-fragrances list is
   the obvious next step and the engine already supports it.
-- **Everwood and Burnt Ash note pyramids** are absent (above). If the
+- **Everwood's note pyramid** is absent (above). If the
   brand publishes them, they drop straight into `scentLibrary.ts`.
 - **`userAsleep` is always false** in the service. It would need a live
   sleep-session signal that no connected provider currently pushes —

@@ -395,7 +395,7 @@ describe('recommend_cologne', () => {
     // real answer. Gating it would leave the model to invent one.
     return tool.handler('u1', {}).then((result) => {
       expect(result.data.hasRecommendation).toBe(true);
-      expect(['Solaris', 'Everwood', 'Burnt Ash']).toContain(result.data.scent);
+      expect(['Solaris', 'Everwood']).toContain(result.data.scent);
       expect(Array.isArray(result.data.pulsePoints)).toBe(true);
     });
   });

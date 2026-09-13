@@ -76,6 +76,34 @@ export interface ScentBriefing {
   guidance: { rules: string[]; topMinutes: number; heartHours: number; baseLabel: string };
 }
 
+/**
+ * Drops reasons that restate something the briefing already returns as
+ * its own field.
+ *
+ * `recommendScent` composes `reasons` for a caller that renders one
+ * paragraph — the Adaptive Environment card joins them into a single
+ * sentence, where repeating the fragrance's description is useful
+ * context. This payload returns `description` and `notes` as separate
+ * fields, so the same reasons arrive as visible duplication: the
+ * Fragrance page was rendering "Smoky and magnetic. An unapologetic
+ * scent…" as the description and again, verbatim, as a bullet directly
+ * beneath it.
+ *
+ * Filtered here rather than in the page so the rule lives next to the
+ * fields it is deduplicating against — a page that later stops showing
+ * the pyramid would otherwise silently lose that reason with no
+ * indication why.
+ */
+export function withoutEchoes(reasons: string[], description: string, hasNotes: boolean): string[] {
+  return reasons.filter((reason) => {
+    if (reason.includes(description)) return false;
+    // "Opens with bergamot, lemon… settles into cedarwood…" is the note
+    // pyramid in sentence form, which is redundant beside the real one.
+    if (hasNotes && /^Opens with /i.test(reason)) return false;
+    return true;
+  });
+}
+
 export const scentService = {
   async getBriefing(userId: string, now: Date = new Date()): Promise<ScentBriefing> {
     const [timezone, settings, latest] = await Promise.all([
@@ -126,7 +154,7 @@ export const scentService = {
             description: rec.scent.description,
             notes: rec.scent.notes,
             notesPublished: rec.scent.notes !== null,
-            reasons: rec.reasons,
+            reasons: withoutEchoes(rec.reasons, rec.scent.description, rec.scent.notes !== null),
             pulsePoints: rec.pulsePoints.map((p) => ({ where: p.label, note: p.note })),
             noteTiming: rec.timing,
             alternatives: rec.alternatives.map((a) => ({ name: a.scent.name, tagline: a.scent.tagline })),

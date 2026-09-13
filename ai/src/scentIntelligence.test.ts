@@ -20,11 +20,10 @@ describe('scent library — honesty about what the brand publishes', () => {
     expect(SCENTS.solaris.notes!.base).toEqual(['Sandalwood', 'Amber', 'Musk']);
   });
 
-  it('leaves unpublished note pyramids null rather than inventing a formula', () => {
-    // Everwood and Burnt Ash have no readable pyramid on the site.
-    // Guessing one would fabricate a real product's actual recipe.
+  it('leaves an unpublished note pyramid null rather than inventing a formula', () => {
+    // Everwood has no readable pyramid on the site. Guessing one would
+    // fabricate a real product's actual recipe.
     expect(SCENTS.everwood.notes).toBeNull();
-    expect(SCENTS['burnt-ash'].notes).toBeNull();
   });
 
   it('gives every fragrance the brand’s own description, not a paraphrase', () => {
@@ -36,21 +35,22 @@ describe('scent library — honesty about what the brand publishes', () => {
 });
 
 describe('recommendScent — occasion drives the answer', () => {
-  it('picks the elegant-bold fragrance for a formal event, not the rawest one', () => {
+  it('picks the bolder fragrance for a formal event', () => {
     // Everwood is the brand's "Timeless Sophistication … elegance for
-    // unforgettable moments"; Burnt Ash is "Raw Intensity …
-    // unapologetic". Black tie wants the former. An earlier version of
-    // this test asserted Burnt Ash on the assumption that "formal" just
-    // means "most intense" — the character-axis match is more faithful
-    // to how the brand positions its own products.
+    // unforgettable moments" — black tie wants that over the bright
+    // daytime signature, and the character-axis match is what gets it
+    // there rather than a hardcoded occasion mapping.
     const result = recommendScent(input({ occasion: 'formal_event', localHour: 19 }))!;
     expect(result.scent.id).toBe('everwood');
     expect(result.scent.character.intensity).toBeGreaterThan(0.7);
   });
 
-  it('still ranks the rawest fragrance as a close alternative for formal wear', () => {
+  it('offers the other fragrance as the alternative', () => {
+    // With a two-fragrance catalog the runner-up is always the other
+    // one; this guards that alternatives are populated at all, which a
+    // caller renders as "also in the collection".
     const result = recommendScent(input({ occasion: 'formal_event', localHour: 19 }))!;
-    expect(result.alternatives.map((a) => a.scent.id)).toContain('burnt-ash');
+    expect(result.alternatives.map((a) => a.scent.id)).toContain('solaris');
   });
 
   it('picks the bright signature for daytime work', () => {

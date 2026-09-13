@@ -258,7 +258,13 @@ export function CinematicHero({
       // with no motion and no scroll hijacking.
       gsap.set(".text-track, .text-days", { autoAlpha: 1, y: 0, scale: 1, filter: "none", rotationX: 0, clipPath: "none" });
       gsap.set(".main-card", { autoAlpha: 1, y: 0 });
-      gsap.set([".card-left-text", ".card-right-text", ".mockup-scroll-wrapper", ".floating-badge", ".phone-widget"], {
+      // The right-hand text column is absent on purpose: this hero was
+      // written for a symmetric left/right layout and only the left
+      // column was ever built, so the matching selector had matched
+      // nothing since this file was added. GSAP warns once per miss on
+      // every page load, which is where those console warnings came
+      // from.
+      gsap.set([".card-left-text", ".mockup-scroll-wrapper", ".floating-badge", ".phone-widget"], {
         autoAlpha: 1,
       });
       gsap.set(".counter-val", { innerHTML: metricValue });
@@ -271,7 +277,13 @@ export function CinematicHero({
       gsap.set(".text-track", { autoAlpha: 0, y: 60, scale: 0.85, filter: "blur(20px)", rotationX: -20 });
       gsap.set(".text-days", { autoAlpha: 1, clipPath: "inset(0 100% 0 0)" });
       gsap.set(".main-card", { y: window.innerHeight + 200, autoAlpha: 1 });
-      gsap.set([".card-left-text", ".card-right-text", ".mockup-scroll-wrapper", ".floating-badge", ".phone-widget"], {
+      // The right-hand text column is absent on purpose: this hero was
+      // written for a symmetric left/right layout and only the left
+      // column was ever built, so the matching selector had matched
+      // nothing since this file was added. GSAP warns once per miss on
+      // every page load, which is where those console warnings came
+      // from.
+      gsap.set([".card-left-text", ".mockup-scroll-wrapper", ".floating-badge", ".phone-widget"], {
         autoAlpha: 0,
       });
       gsap.set(".cta-wrapper", { autoAlpha: 0, scale: 0.8, filter: "blur(30px)" });
@@ -317,12 +329,11 @@ export function CinematicHero({
           "-=2.0",
         )
         .fromTo(".card-left-text", { x: -50, autoAlpha: 0 }, { x: 0, autoAlpha: 1, ease: "power4.out", duration: 1.5 }, "-=1.5")
-        .fromTo(".card-right-text", { x: 50, autoAlpha: 0, scale: 0.8 }, { x: 0, autoAlpha: 1, scale: 1, ease: "expo.out", duration: 1.5 }, "<")
         .to({}, { duration: 2.5 })
         .set(".hero-text-wrapper", { autoAlpha: 0 })
         .set(".cta-wrapper", { autoAlpha: 1 })
         .to({}, { duration: 1.5 })
-        .to([".mockup-scroll-wrapper", ".floating-badge", ".card-left-text", ".card-right-text"], {
+        .to([".mockup-scroll-wrapper", ".floating-badge", ".card-left-text"], {
           scale: 0.9,
           y: -40,
           z: -200,
