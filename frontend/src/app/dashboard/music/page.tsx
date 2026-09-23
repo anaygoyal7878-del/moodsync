@@ -10,6 +10,7 @@ import { artworkUrl } from "@/lib/appleMusicArtwork";
 import { RecommendedForNow } from "@/components/dashboard/RecommendedForNow";
 import { AdaptiveMusic } from "@/components/companion/AdaptiveMusic";
 import { MusicEffectChart } from "@/components/dashboard/music/MusicEffectChart";
+import { LastSessionEvolution } from "@/components/dashboard/music/LastSessionEvolution";
 
 /** Real, honest roadmap — deferred work only (see
  * docs/APPLE_MUSIC_ARCHITECTURE.md §5). "Listening Analytics" used to
@@ -239,6 +240,8 @@ export default function MusicHomePage() {
       <AdaptiveMusic />
 
       <RecommendedForNow />
+
+      <LastSessionEvolution />
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">How music moves you</h2>

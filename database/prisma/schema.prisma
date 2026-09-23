@@ -1025,11 +1025,48 @@ model MusicSession {
   /// (`endedAt` null).
   endedEarly Boolean @default(false)
 
+  samples MusicSessionSample[]
+
   createdAt DateTime @default(now())
 
   @@index([userId, startedAt])
   @@index([userId, mode])
   @@map("music_sessions")
+}
+
+/// A biometric sample taken *during* a music session.
+///
+/// MusicSession already stores a baseline and an outcome delta, which
+/// answers "did anything change" but not "how did it change" — and the
+/// second question is the one a person actually wants a chart for. A
+/// session that dropped ten beats in the first two minutes and drifted
+/// back is a completely different session from one that came down
+/// steadily, and the delta alone reports them identically.
+///
+/// Samples are written by the client while a session plays, so this is
+/// as dense as the device is willing to report. Deliberately no
+/// computed scores here beyond stress: everything else is derivable
+/// from the reading, and a table that stores derivations goes stale the
+/// moment the formula changes.
+model MusicSessionSample {
+  id        String       @id @default(uuid())
+  sessionId String
+  session   MusicSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  /// When the sample was taken. Absolute rather than an offset so a
+  /// paused or resumed session still plots correctly.
+  at DateTime
+
+  heartRate   Int?
+  /// MoodSync's computed stress score at this moment, 0-100. Nullable
+  /// because stress needs HRV plus history, which not every device or
+  /// moment provides.
+  stressScore Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([sessionId, at])
+  @@map("music_session_samples")
 }
 
 model MusicPlayLog {

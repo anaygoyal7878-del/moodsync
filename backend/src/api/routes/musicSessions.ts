@@ -17,6 +17,7 @@ import {
   journeyLabel,
   type MusicMode,
   type CompletedMusicSession,
+  buildAdaptationPlan,
 } from '@moodsync/ai';
 import { loadCompanionContext, WELLNESS_HISTORY_DAYS } from '../../services/companionContext.js';
 
@@ -62,6 +63,11 @@ const startSchema = z.object({
   itemName: z.string().min(1).max(300),
   itemKind: z.enum(ITEM_KINDS),
   itemExternalId: z.string().max(300).optional(),
+});
+
+const sampleSchema = z.object({
+  heartRate: z.number().int().min(20).max(250).nullable().optional(),
+  stressScore: z.number().int().min(0).max(100).nullable().optional(),
 });
 
 const completeSchema = z.object({
@@ -118,6 +124,88 @@ export default async function musicSessionRoutes(app: FastifyInstance) {
 
   /** The session currently playing, so a client that reloaded mid-song
    * reattaches rather than starting a duplicate. */
+  /**
+   * The tempo plan for a session about to start.
+   *
+   * Read-only and cheap on purpose — the client asks for this before
+   * committing to a session, so someone can see what MoodSync intends
+   * and why before pressing play rather than after.
+   */
+  app.get<{ Querystring: { goal?: string; minutes?: string } }>(
+    '/music-sessions/plan',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const goal = request.query.goal;
+      if (goal !== 'calm' && goal !== 'focus' && goal !== 'energize') {
+        return reply.code(400).send({ error: "goal must be 'calm', 'focus' or 'energize'" });
+      }
+      const minutes = Math.max(5, Math.min(120, Number(request.query.minutes) || 20));
+
+      const userId = request.userId!;
+      const latest = await biometricReadingRepository.findLatestNormalized(userId);
+      const history = latest ? await biometricReadingRepository.listRecentNormalized(userId, 30) : [];
+      const scores = latest
+        ? computeWellnessScores(
+            latest.reading,
+            history.filter((r) => r.timestamp !== latest.reading.timestamp),
+          )
+        : null;
+
+      return reply.send(
+        buildAdaptationPlan({
+          heartRate: latest?.reading.heartRate ?? null,
+          stress: scores?.stress.value ?? null,
+          goal,
+          minutes,
+        }),
+      );
+    },
+  );
+
+  /**
+   * Records one biometric sample during a playing session.
+   *
+   * The client samples; the server does not poll. A server-side poller
+   * would have to guess when a session is actually audible, and would
+   * keep sampling through a pause — the device already knows both.
+   */
+  app.post<{ Params: { id: string } }>(
+    '/music-sessions/:id/samples',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const parsed = sampleSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+      const ok = await musicSessionRepository.addSample(request.params.id, request.userId!, {
+        at: new Date(),
+        heartRate: parsed.data.heartRate ?? null,
+        stressScore: parsed.data.stressScore ?? null,
+      });
+      // 409 rather than 404: the session may well exist and simply be
+      // closed, and "already ended" is a different problem for the
+      // client than "no such session".
+      if (!ok) return reply.code(409).send({ error: 'No open session with that id' });
+      return reply.code(201).send({ recorded: true });
+    },
+  );
+
+  /** The session's biometric evolution, for the chart. */
+  app.get<{ Params: { id: string } }>(
+    '/music-sessions/:id/samples',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const samples = await musicSessionRepository.listSamples(request.params.id, request.userId!);
+      if (samples === null) return reply.code(404).send({ error: 'No such session' });
+      return reply.send({
+        samples: samples.map((s) => ({
+          at: s.at.toISOString(),
+          heartRate: s.heartRate,
+          stressScore: s.stressScore,
+        })),
+      });
+    },
+  );
+
   app.get('/music-sessions/open', { preHandler: app.authenticate }, async (request, reply) => {
     return reply.send({ session: await musicSessionRepository.findOpenSession(request.userId!) });
   });

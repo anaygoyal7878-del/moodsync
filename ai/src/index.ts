@@ -68,6 +68,13 @@ export {
   type MusicRecommendationResult,
 } from './musicIntelligence.js';
 export {
+  buildAdaptationPlan,
+  type AdaptationGoal,
+  type AdaptationInput,
+  type AdaptationPlan,
+  type TempoStep,
+} from './musicAdaptation.js';
+export {
   computeHomeWellnessScore,
   computeOverallHomeWellnessScore,
   type RoomWellnessInput,

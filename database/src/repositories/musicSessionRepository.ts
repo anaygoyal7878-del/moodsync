@@ -34,6 +34,39 @@ export const musicSessionRepository = {
     return prisma.musicSession.create({ data: input });
   },
 
+  /**
+   * Records one biometric sample against an open session.
+   *
+   * Ownership is checked against the session's `userId` rather than
+   * trusted from the caller, and a closed session is refused: samples
+   * arriving after `endedAt` would silently extend a session's chart
+   * past the point the outcome was computed from, making the graph and
+   * the summary disagree.
+   */
+  async addSample(
+    sessionId: string,
+    userId: string,
+    sample: { at: Date; heartRate: number | null; stressScore: number | null },
+  ): Promise<boolean> {
+    const session = await prisma.musicSession.findFirst({
+      where: { id: sessionId, userId, endedAt: null },
+      select: { id: true },
+    });
+    if (!session) return false;
+
+    await prisma.musicSessionSample.create({
+      data: { sessionId, at: sample.at, heartRate: sample.heartRate, stressScore: sample.stressScore },
+    });
+    return true;
+  },
+
+  /** A session's samples in time order, for the evolution chart. */
+  async listSamples(sessionId: string, userId: string) {
+    const session = await prisma.musicSession.findFirst({ where: { id: sessionId, userId }, select: { id: true } });
+    if (!session) return null;
+    return prisma.musicSessionSample.findMany({ where: { sessionId }, orderBy: { at: 'asc' } });
+  },
+
   /** Ends a session, writing the computed outcome. Scoped by userId as
    * well as id so a caller can only ever complete their own session —
    * same auth-safety pattern as smartHomeConnectionRepository.disconnect. */
