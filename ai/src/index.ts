@@ -169,6 +169,21 @@ export {
   type ScenarioSeverity,
 } from './healthScenarios.js';
 export {
+  buildRecoveryContext,
+  type RecoveryContext,
+  type RecoveryContextInput,
+  type RecoveryState,
+  type RecoverySignal,
+  type Confidence,
+} from './recoveryContext.js';
+export {
+  EVIDENCE_SOURCES,
+  sourcesFor,
+  sourceById,
+  type EvidenceSource,
+  type EvidenceTopic,
+} from './evidenceSources.js';
+export {
   buildIntelligenceStack,
   describeStackForPrompt,
   type IntelligenceStackResult,

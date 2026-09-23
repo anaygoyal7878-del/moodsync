@@ -31,6 +31,8 @@ import {
   detectHealthScenarios,
   computePersonalBaselines,
   MEMORY_WINDOW_DAYS,
+  buildRecoveryContext,
+  sourceById,
 } from '@moodsync/ai';
 import { userRepository } from '../../repositories/userRepository.js';
 import {
@@ -301,8 +303,35 @@ export default async function companionRoutes(app: FastifyInstance) {
     // the user can argue with. Computed against readings that exclude
     // the latest one, so today's value is never compared to a mean it
     // just contributed to (see computePersonalBaselines' own note).
-    const healthScenarios = timezoneContext.latest
-      ? detectHealthScenarios(computePersonalBaselines(timezoneContext.latest, readings.slice(1)))
+    const baselines = timezoneContext.latest
+      ? computePersonalBaselines(timezoneContext.latest, readings.slice(1))
+      : null;
+    const healthScenarios = baselines ? detectHealthScenarios(baselines) : [];
+
+    // Recovery Intelligence — the multi-signal, baseline-relative read.
+    // Sits beside the 0-100 recovery score rather than replacing it: the
+    // score stays as a documented heuristic, this answers the question
+    // the score was being asked to answer ("what should I do today")
+    // with a state, explicit confidence, and the signals behind it.
+    //
+    // `age` is null because MoodSync stores no birth date. That is not a
+    // gap to paper over — it means the adult sleep band applies and the
+    // engine says which band it used, rather than guessing an age from
+    // anything.
+    const latestReading = timezoneContext.latest;
+    const sleepMinutes =
+      latestReading &&
+      latestReading.deepSleepMinutes !== undefined &&
+      latestReading.remSleepMinutes !== undefined &&
+      latestReading.lightSleepMinutes !== undefined
+        ? latestReading.deepSleepMinutes + latestReading.remSleepMinutes + latestReading.lightSleepMinutes
+        : null;
+
+    const recoveryContext = baselines
+      ? buildRecoveryContext({ baselines, sleepMinutes, age: null })
+      : null;
+    const evidence = recoveryContext
+      ? recoveryContext.sourceIds.map((id) => sourceById(id)).filter((s): s is NonNullable<typeof s> => s !== undefined)
       : [];
 
     return reply.send({
@@ -310,6 +339,8 @@ export default async function companionRoutes(app: FastifyInstance) {
       bestFocusHours: bestHours,
       recoveryActions,
       healthScenarios,
+      recoveryContext,
+      evidence,
       windowDays: MEMORY_WINDOW_DAYS,
       historyDays: WELLNESS_HISTORY_DAYS,
     });

@@ -4,6 +4,7 @@ import { HeartPulse, AlertTriangle, Footprints, Droplets, Wind, Clock, Brain, Sp
 import type { LucideIcon } from "lucide-react";
 import { PageHeader, Section, Meter, EmptyState, toneColor } from "@/components/companion/CompanionPrimitives";
 import type { DailyBriefResponse, WellnessMemoryResponse, RecoveryAction, RecoveryActionKind, HealthScenario } from "@/lib/types";
+import { RecoveryIntelligence } from "@/components/dashboard/recovery/RecoveryIntelligence";
 
 const ACTION_ICON: Record<RecoveryActionKind, LucideIcon> = {
   walk: Footprints,
@@ -88,6 +89,8 @@ export default async function RecoveryPage() {
   const stress = brief?.scores?.stress.value ?? null;
   const actions = memory?.recoveryActions ?? [];
   const scenarios = memory?.healthScenarios ?? [];
+  const recoveryContext = memory?.recoveryContext ?? null;
+  const evidence = memory?.evidence ?? [];
 
   return (
     <div className="flex flex-col gap-5">
@@ -108,6 +111,15 @@ export default async function RecoveryPage() {
             </p>
           </div>
         </section>
+      )}
+
+      {/* Leads the page: this is the multi-signal read that explains
+          itself, and everything below it is either an action derived
+          from the same signals or supporting detail. */}
+      {recoveryContext && (
+        <div className="lux-stagger-1">
+          <RecoveryIntelligence context={recoveryContext} evidence={evidence} />
+        </div>
       )}
 
       {/* Above "Do this next" on purpose: these say what the body is

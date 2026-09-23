@@ -235,6 +235,9 @@ export interface HealthScenario {
 }
 
 export interface WellnessMemoryResponse {
+  /** Null until enough history exists to compare against. */
+  recoveryContext?: RecoveryContextResponse | null;
+  evidence?: EvidenceSourceEntry[];
   findings: MemoryFinding[];
   bestFocusHours: Array<{ hourOfDay: number; meanScore: number; sampleSize: number }>;
   /** Ranked server-side for this moment — order and reasons both vary. */
@@ -613,4 +616,42 @@ export interface WorkoutListResponse {
   today: string;
   timezone: string;
   workouts: PlannedWorkout[];
+}
+
+/** One signal behind a recovery reading — see ai/src/recoveryContext.ts.
+ * `suggestsRecovery` is nullable on purpose: null means the signal is
+ * unavailable or genuinely neutral, which is different from it pointing
+ * away from needing recovery. */
+export interface RecoverySignalEntry {
+  id: "hrv" | "resting-heart-rate" | "sleep" | "activity";
+  label: string;
+  value: string | null;
+  direction: "above" | "below" | "typical" | "unknown";
+  comparison: string;
+  suggestsRecovery: boolean | null;
+  sampleSize: number;
+}
+
+export interface RecoveryContextResponse {
+  state: "recovering-well" | "normal" | "higher-need" | "priority" | "insufficient-data";
+  headline: string;
+  guidance: string;
+  confidence: "high" | "moderate" | "low";
+  confidenceReason: string;
+  signals: RecoverySignalEntry[];
+  sourceIds: string[];
+  isDiagnostic: false;
+}
+
+/** A citation from the evidence register, including what it does *not*
+ * establish — the field that keeps the citation honest. */
+export interface EvidenceSourceEntry {
+  id: string;
+  title: string;
+  organization: string;
+  url: string;
+  topic: string;
+  accessed: string;
+  supports: string;
+  limits: string | null;
 }
