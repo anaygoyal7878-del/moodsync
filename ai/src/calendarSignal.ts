@@ -1,6 +1,7 @@
 import { calendarConnectionRepository, oauthTokenRepository, appleCalendarSnapshotRepository, type CalendarEventWindow } from '@moodsync/database';
 import { GoogleCalendarClient, refreshGoogleCalendarToken, type GoogleCalendarOAuthConfig } from '@moodsync/integration-google-calendar';
 import type { OccasionEvent } from './calendarOccasion.js';
+import { mergeCalendarSources, type SourceEvent, type UnifiedEvent } from './unifiedCalendar.js';
 
 /**
  * Live calendar-load reads for the proactive worker's burnout/social-
@@ -117,6 +118,64 @@ async function readAppleSnapshot(userId: string, now: Date): Promise<EventWindow
 }
 
 /**
+ * Reads Google Calendar for a window, or null when it is not connected.
+ *
+ * Failures degrade to null rather than throwing. An expired Google token
+ * must cost the Google half of the calendar, not the Apple half too —
+ * which is exactly what happened when the two were either/or and one
+ * throw aborted the whole read.
+ */
+async function readGoogleWindow(userId: string, windowStart: Date, windowEnd: Date): Promise<SourceEvent[] | null> {
+  const connection = await calendarConnectionRepository.findByUser(userId);
+  if (!connection || !connection.oauthTokenId) return null;
+
+  // Outside the try on purpose. A missing client id or secret is a
+  // deployment bug, not a runtime failure, and swallowing it would turn
+  // a misconfigured server into "this user silently never sees their
+  // Google events" — with nothing but a log line to find it by. Runtime
+  // failures below (expired token, API outage) degrade to null; a broken
+  // configuration stays loud.
+  const config = requireGoogleCalendarConfig();
+
+  try {
+    const accessToken = await getFreshAccessToken(connection.oauthTokenId, config);
+    const client = new GoogleCalendarClient(accessToken);
+    const events = await client.listEvents(windowStart, windowEnd);
+    await calendarConnectionRepository.markSynced(connection.id);
+    return events.map((e) => ({ start: e.start, end: e.end, isAllDay: e.isAllDay, title: e.title }));
+  } catch (error) {
+    // Logged without event content: calendar titles are sensitive and a
+    // server log is not the place for them.
+    console.error('calendarSignal: Google Calendar read failed', {
+      userId,
+      reason: error instanceof Error ? error.message : 'unknown',
+    });
+    return null;
+  }
+}
+
+/**
+ * Both calendars, merged and deduplicated — see `unifiedCalendar.ts`.
+ *
+ * This replaces three either/or readers that returned the moment a
+ * fresh Apple snapshot existed and never consulted Google. Anyone with
+ * events in both lost every Google event silently.
+ */
+async function readUnifiedWindow(
+  userId: string,
+  windowStart: Date,
+  windowEnd: Date,
+  now: Date,
+): Promise<UnifiedEvent[] | null> {
+  const [apple, google] = await Promise.all([
+    readAppleSnapshot(userId, now).catch(() => null),
+    readGoogleWindow(userId, windowStart, windowEnd),
+  ]);
+  const appleInWindow = apple ? apple.filter((e) => e.start < windowEnd && e.end > windowStart) : null;
+  return mergeCalendarSources(appleInWindow, google);
+}
+
+/**
  * Today's calendar load for `checkBurnoutRisk`/`checkSocialBatteryLow`.
  * Returns `null` (never `{eventCount: 0, bookedHours: 0}`) when neither
  * source has anything, so "no calendar connected" stays distinguishable
@@ -125,23 +184,8 @@ async function readAppleSnapshot(userId: string, now: Date): Promise<EventWindow
  * for this field.
  */
 export async function getTodayCalendarLoad(userId: string, windowStart: Date, windowEnd: Date, now: Date = new Date()): Promise<TodayCalendarLoad | null> {
-  const appleEvents = await readAppleSnapshot(userId, now);
-  if (appleEvents) return computeLoadFromWindows(appleEvents, windowStart, windowEnd);
-
-  const connection = await calendarConnectionRepository.findByUser(userId);
-  if (!connection || !connection.oauthTokenId) return null;
-
-  const config = requireGoogleCalendarConfig();
-  const accessToken = await getFreshAccessToken(connection.oauthTokenId, config);
-  const client = new GoogleCalendarClient(accessToken);
-  const events = await client.listEvents(windowStart, windowEnd);
-  await calendarConnectionRepository.markSynced(connection.id);
-
-  return computeLoadFromWindows(
-    events.map((e) => ({ start: e.start, end: e.end, isAllDay: e.isAllDay })),
-    windowStart,
-    windowEnd,
-  );
+  const events = await readUnifiedWindow(userId, windowStart, windowEnd, now);
+  return events === null ? null : computeLoadFromWindows(events, windowStart, windowEnd);
 }
 
 /**
@@ -151,48 +195,34 @@ export async function getTodayCalendarLoad(userId: string, windowStart: Date, wi
  * not dim someone's lights mid-call. All-day events are excluded
  * deliberately: "Company Holiday" spans the whole day but is not a
  * meeting, and treating it as one would silence MoodSync for 24 hours.
- * Returns `false` (not null) when neither source has a usable
- * calendar — no calendar means no known meeting, and the other guards
- * still apply.
+ * Returns `false` (not null) when neither source has a usable calendar
+ * — no calendar means no known meeting, and the other guards still
+ * apply.
+ *
+ * Now reads both sources. Under the either/or version, a meeting that
+ * existed only in Google Calendar was invisible whenever an Apple
+ * snapshot was fresh — so MoodSync could dim the lights in the middle of
+ * exactly the call this guard exists to protect.
  */
 export async function isInMeetingNow(userId: string, now: Date = new Date()): Promise<boolean> {
-  const appleEvents = await readAppleSnapshot(userId, now);
-  if (appleEvents) return isMeetingAt(appleEvents, now);
-
-  const connection = await calendarConnectionRepository.findByUser(userId);
-  if (!connection || !connection.oauthTokenId) return false;
-
-  const config = requireGoogleCalendarConfig();
-  const accessToken = await getFreshAccessToken(connection.oauthTokenId, config);
-  const client = new GoogleCalendarClient(accessToken);
   // A narrow window around now — enough to catch an event in progress
   // without pulling the whole day again.
-  const events = await client.listEvents(new Date(now.getTime() - 4 * 60 * 60_000), new Date(now.getTime() + 60_000));
-
-  return isMeetingAt(
-    events.map((e) => ({ start: e.start, end: e.end, isAllDay: e.isAllDay })),
-    now,
-  );
+  const events = await readUnifiedWindow(userId, new Date(now.getTime() - 4 * 60 * 60_000), new Date(now.getTime() + 60_000), now);
+  return events === null ? false : isMeetingAt(events, now);
 }
 
-
 /**
- * The day's events, shaped for occasion inference rather than load
- * counting — which means titles when the source has them.
+ * The day's events, shaped for occasion inference — which means titles
+ * where a source has them.
  *
- * Same two-source order as the functions above, but the return type
- * carries the difference between them instead of flattening it. Apple's
- * snapshot has no titles by design (see the `AppleCalendarSnapshot`
- * schema comment), so those events come back with `title` absent, and
- * `calendarOccasion.ts` falls back to classifying on shape. Google's
- * come back with the real summary.
+ * Apple's snapshot has no titles by design (see the
+ * `AppleCalendarSnapshot` schema comment), so Apple-only events come
+ * back with `title` absent and `calendarOccasion.ts` classifies them on
+ * shape. An event present in both keeps the Google title.
  *
- * Returns `null` rather than `[]` when no calendar is reachable, so
- * "no calendar connected" stays distinguishable from "connected, and
- * genuinely nothing on today" — the same distinction
- * `getTodayCalendarLoad` maintains, and it matters here for the same
- * reason: one of those should say "connect a calendar" and the other
- * should say "nothing scheduled".
+ * Returns `null` rather than `[]` when no calendar is reachable, so "no
+ * calendar connected" stays distinguishable from "connected, and
+ * genuinely nothing on today".
  */
 export async function getOccasionEvents(
   userId: string,
@@ -200,18 +230,7 @@ export async function getOccasionEvents(
   windowEnd: Date,
   now: Date = new Date(),
 ): Promise<OccasionEvent[] | null> {
-  const appleEvents = await readAppleSnapshot(userId, now);
-  if (appleEvents) {
-    return appleEvents.map((e) => ({ start: e.start, end: e.end, isAllDay: e.isAllDay }));
-  }
-
-  const connection = await calendarConnectionRepository.findByUser(userId);
-  if (!connection || !connection.oauthTokenId) return null;
-
-  const config = requireGoogleCalendarConfig();
-  const accessToken = await getFreshAccessToken(connection.oauthTokenId, config);
-  const client = new GoogleCalendarClient(accessToken);
-  const events = await client.listEvents(windowStart, windowEnd);
-
+  const events = await readUnifiedWindow(userId, windowStart, windowEnd, now);
+  if (events === null) return null;
   return events.map((e) => ({ start: e.start, end: e.end, isAllDay: e.isAllDay, title: e.title }));
 }

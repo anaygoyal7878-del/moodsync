@@ -40,6 +40,13 @@ const { getTodayCalendarLoad, isInMeetingNow, computeLoadFromWindows, isMeetingA
 // test to know about a source it isn't testing.
 beforeEach(() => {
   vi.clearAllMocks();
+  // clearAllMocks resets call history but keeps mockResolvedValue
+  // implementations, so a Google connection set by one test leaked into
+  // the next. That was harmless while Apple and Google were either/or —
+  // a fresh Apple snapshot never consulted Google — and became visible
+  // once the two are merged. "Not connected" is the correct default;
+  // tests that need Google say so.
+  findByUserMock.mockResolvedValue(null);
   getAppleSnapshotMock.mockResolvedValue(null);
 });
 
@@ -182,7 +189,13 @@ describe('Apple Calendar source', () => {
   const freshPush = new Date(NOW.getTime() - 60 * 60_000); // 1h old
   const stalePush = new Date(NOW.getTime() - 25 * 60 * 60_000); // 25h old
 
-  it('prefers a fresh Apple snapshot over Google, and never touches Google at all', async () => {
+  // Replaces "prefers a fresh Apple snapshot over Google, and never
+  // touches Google at all". That was a deliberate either/or design, and
+  // it silently dropped every Google-only event for anyone with both
+  // calendars connected. The sources are now merged — see
+  // unifiedCalendar.ts — so Google is always consulted when connected.
+  it('uses a fresh Apple snapshot on its own when Google is not connected', async () => {
+    findByUserMock.mockResolvedValue(null);
     getAppleSnapshotMock.mockResolvedValue({
       pushedAt: freshPush,
       events: [{ startsAt: '2026-08-15T09:00:00Z', endsAt: '2026-08-15T09:30:00Z', isAllDay: false }],
@@ -196,8 +209,53 @@ describe('Apple Calendar source', () => {
     );
 
     expect(result).toEqual({ eventCount: 1, bookedHours: 0.5 });
-    expect(findByUserMock).not.toHaveBeenCalled();
     expect(listEventsMock).not.toHaveBeenCalled();
+  });
+
+  it('adds Google-only events on top of a fresh Apple snapshot — the bug the merge fixes', async () => {
+    Object.assign(process.env, REQUIRED_ENV);
+    findByUserMock.mockResolvedValue({ id: 'c1', oauthTokenId: 't1' });
+    getDecryptedMock.mockResolvedValue({ accessToken: 'a', refreshToken: 'r', expiresAt: new Date(Date.now() + 3600_000) });
+    getAppleSnapshotMock.mockResolvedValue({
+      pushedAt: freshPush,
+      events: [{ startsAt: '2026-08-15T09:00:00Z', endsAt: '2026-08-15T09:30:00Z', isAllDay: false }],
+    });
+    listEventsMock.mockResolvedValue([
+      { start: new Date('2026-08-15T18:00:00Z'), end: new Date('2026-08-15T19:00:00Z'), isAllDay: false, title: 'Dinner' },
+    ]);
+
+    const result = await getTodayCalendarLoad('u1', new Date('2026-08-15T00:00:00Z'), new Date('2026-08-15T23:59:59Z'), NOW);
+    expect(result).toEqual({ eventCount: 2, bookedHours: 1.5 });
+  });
+
+  it('counts an event present in both calendars once, not twice', async () => {
+    Object.assign(process.env, REQUIRED_ENV);
+    findByUserMock.mockResolvedValue({ id: 'c1', oauthTokenId: 't1' });
+    getDecryptedMock.mockResolvedValue({ accessToken: 'a', refreshToken: 'r', expiresAt: new Date(Date.now() + 3600_000) });
+    getAppleSnapshotMock.mockResolvedValue({
+      pushedAt: freshPush,
+      events: [{ startsAt: '2026-08-15T09:00:00Z', endsAt: '2026-08-15T10:00:00Z', isAllDay: false }],
+    });
+    listEventsMock.mockResolvedValue([
+      { start: new Date('2026-08-15T09:00:00Z'), end: new Date('2026-08-15T10:00:00Z'), isAllDay: false, title: 'Standup' },
+    ]);
+
+    const result = await getTodayCalendarLoad('u1', new Date('2026-08-15T00:00:00Z'), new Date('2026-08-15T23:59:59Z'), NOW);
+    expect(result).toEqual({ eventCount: 1, bookedHours: 1 });
+  });
+
+  it('keeps the Apple half when Google fails at runtime, instead of losing both', async () => {
+    Object.assign(process.env, REQUIRED_ENV);
+    findByUserMock.mockResolvedValue({ id: 'c1', oauthTokenId: 't1' });
+    getDecryptedMock.mockResolvedValue({ accessToken: 'a', refreshToken: 'r', expiresAt: new Date(Date.now() + 3600_000) });
+    getAppleSnapshotMock.mockResolvedValue({
+      pushedAt: freshPush,
+      events: [{ startsAt: '2026-08-15T09:00:00Z', endsAt: '2026-08-15T09:30:00Z', isAllDay: false }],
+    });
+    listEventsMock.mockRejectedValue(new Error('Google API unavailable'));
+
+    const result = await getTodayCalendarLoad('u1', new Date('2026-08-15T00:00:00Z'), new Date('2026-08-15T23:59:59Z'), NOW);
+    expect(result).toEqual({ eventCount: 1, bookedHours: 0.5 });
   });
 
   it('falls back to Google when the Apple snapshot is stale, rather than trusting old data', async () => {
@@ -228,13 +286,27 @@ describe('Apple Calendar source', () => {
   });
 
   it('drives isInMeetingNow from a fresh Apple snapshot too', async () => {
+    findByUserMock.mockResolvedValue(null);
     getAppleSnapshotMock.mockResolvedValue({
       pushedAt: freshPush,
       events: [{ startsAt: '2026-08-15T14:30:00Z', endsAt: '2026-08-15T15:30:00Z', isAllDay: false }],
     });
 
     expect(await isInMeetingNow('u1', NOW)).toBe(true);
-    expect(findByUserMock).not.toHaveBeenCalled();
+  });
+
+  it('detects a meeting that exists only in Google even when Apple is fresh', async () => {
+    // Under either/or this meeting was invisible, so MoodSync could dim
+    // the lights in the middle of exactly the call inMeeting protects.
+    Object.assign(process.env, REQUIRED_ENV);
+    findByUserMock.mockResolvedValue({ id: 'c1', oauthTokenId: 't1' });
+    getDecryptedMock.mockResolvedValue({ accessToken: 'a', refreshToken: 'r', expiresAt: new Date(Date.now() + 3600_000) });
+    getAppleSnapshotMock.mockResolvedValue({ pushedAt: freshPush, events: [] });
+    listEventsMock.mockResolvedValue([
+      { start: new Date('2026-08-15T14:30:00Z'), end: new Date('2026-08-15T15:30:00Z'), isAllDay: false, title: 'Client call' },
+    ]);
+
+    expect(await isInMeetingNow('u1', NOW)).toBe(true);
   });
 
   it('ignores an unparseable event window rather than crashing on it', async () => {
