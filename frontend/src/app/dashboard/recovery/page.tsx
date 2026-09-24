@@ -3,7 +3,8 @@ import { backendFetch } from "@/lib/api";
 import { HeartPulse, AlertTriangle, Footprints, Droplets, Wind, Clock, Brain, Sparkles, Activity } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PageHeader, Section, Meter, EmptyState, toneColor } from "@/components/companion/CompanionPrimitives";
-import type { DailyBriefResponse, WellnessMemoryResponse, RecoveryAction, RecoveryActionKind, HealthScenario } from "@/lib/types";
+import type { DailyBriefResponse, WellnessMemoryResponse, RecoveryAction, RecoveryActionKind, HealthScenario, RecommendationEntry } from "@/lib/types";
+import { RecommendationsSection } from "@/components/dashboard/RecommendationsSection";
 import { RecoveryIntelligence } from "@/components/dashboard/recovery/RecoveryIntelligence";
 
 const ACTION_ICON: Record<RecoveryActionKind, LucideIcon> = {
@@ -78,10 +79,12 @@ function ScenarioCard({ scenario }: { scenario: HealthScenario }) {
 }
 
 export default async function RecoveryPage() {
-  const [briefResult, memoryResult] = await Promise.all([
+  const [briefResult, memoryResult, recommendationsResult] = await Promise.all([
     backendFetch<DailyBriefResponse>("/api/daily-brief"),
     backendFetch<WellnessMemoryResponse>("/api/wellness-memory"),
+    backendFetch<{ recommendations: RecommendationEntry[] }>("/api/recommendations"),
   ]);
+  const recommendations = recommendationsResult.ok ? recommendationsResult.data.recommendations : [];
 
   const brief = briefResult.ok ? briefResult.data : null;
   const memory = memoryResult.ok ? memoryResult.data : null;
@@ -94,7 +97,7 @@ export default async function RecoveryPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="Recovery" subtitle="Where you stand, and what actually helps you." />
+      <PageHeader title="Recovery" subtitle="Where you stand, what helps, and what to try." />
 
       {brief?.burnout && (
         <section
@@ -239,6 +242,17 @@ export default async function RecoveryPage() {
             </div>
           )}
         </Section>
+      </div>
+
+      {/* Recommendations live here rather than in their own bottom-nav
+          tab. The bar already carries six tabs and a seventh gets cramped
+          at phone width, and these suggestions answer the same question
+          as "Do this next" above — what would help — just on a longer
+          horizon: routines to set up rather than things to do now. The
+          standalone /dashboard/recommendations page still exists, so no
+          saved link breaks. */}
+      <div className="lux-stagger-4">
+        <RecommendationsSection recommendations={recommendations} />
       </div>
     </div>
   );
