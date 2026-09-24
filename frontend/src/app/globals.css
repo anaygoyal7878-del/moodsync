@@ -485,7 +485,7 @@ body {
 @keyframes lux-fade-up {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -493,20 +493,33 @@ body {
   }
 }
 
+/* One easing for every entrance in the app, so motion reads as a single
+ * system rather than a dozen components each choosing their own curve.
+ *
+ * Decelerating (expo-out shaped): most of the travel happens in the
+ * first third, then it settles. The previous `ease` accelerated *into*
+ * the motion, so content started slowly — which on an entrance reads as
+ * hesitation. Arriving fast and settling reads as intent.
+ *
+ * Steps tightened from 70ms to 55ms and duration from 500ms to 440ms:
+ * the cascade should be perceptible as order, not watched as a sequence. */
+.ms-luxury {
+  --ease-out-premium: cubic-bezier(0.22, 1, 0.36, 1);
+}
 .ms-luxury .lux-stagger-1 {
-  animation: lux-fade-up 0.5s ease 0.05s both;
+  animation: lux-fade-up 0.44s var(--ease-out-premium) 0.04s both;
 }
 .ms-luxury .lux-stagger-2 {
-  animation: lux-fade-up 0.5s ease 0.12s both;
+  animation: lux-fade-up 0.44s var(--ease-out-premium) 0.095s both;
 }
 .ms-luxury .lux-stagger-3 {
-  animation: lux-fade-up 0.5s ease 0.19s both;
+  animation: lux-fade-up 0.44s var(--ease-out-premium) 0.15s both;
 }
 .ms-luxury .lux-stagger-4 {
-  animation: lux-fade-up 0.5s ease 0.26s both;
+  animation: lux-fade-up 0.44s var(--ease-out-premium) 0.205s both;
 }
 .ms-luxury .lux-stagger-5 {
-  animation: lux-fade-up 0.5s ease 0.33s both;
+  animation: lux-fade-up 0.44s var(--ease-out-premium) 0.26s both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -704,4 +717,28 @@ body {
   .bg-adaptive {
     transition: none;
   }
+}
+
+
+/* ---- Segmented control (MetricTabs) --------------------------------
+ * The indicator slides and the panel crossfades with a short rise.
+ * Durations are deliberately brief: this is feedback for a tap, and
+ * anything past ~250ms starts to feel like the app is making you wait.
+ * Easing is a decelerating curve so motion settles rather than stops. */
+.metric-tab-indicator {
+  transition: left 280ms var(--ease-out-premium, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.metric-tab-panel {
+  animation: metric-tab-in 220ms var(--ease-out-premium, cubic-bezier(0.22, 1, 0.36, 1)) both;
+}
+@keyframes metric-tab-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* In CSS rather than JS so it applies from first paint — a JS check
+ * would let one animation play before hydration switched it off. */
+@media (prefers-reduced-motion: reduce) {
+  .metric-tab-indicator { transition: none; }
+  .metric-tab-panel { animation: none; }
 }

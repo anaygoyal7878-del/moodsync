@@ -1,6 +1,7 @@
 "use client";
 
 import { LineChart, Line, XAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { CHART_ANIMATION } from "@/components/ui/charts/useChartMotion";
 import { Card } from "@/components/ui/Card";
 import { usePrefersReducedMotion } from "@/components/ui/charts/usePrefersReducedMotion";
 import { AXIS_TICK, GRID_STROKE, TOOLTIP_CONTENT_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_CURSOR } from "@/components/ui/charts/chartChrome";
@@ -65,7 +66,7 @@ export function WellnessTimeline({ history }: { history: NormalizedBiometricRead
               strokeWidth={2}
               dot={false}
               connectNulls
-              isAnimationActive={!reducedMotion}
+              isAnimationActive={!reducedMotion} {...CHART_ANIMATION}
             />
           ))}
         </LineChart>

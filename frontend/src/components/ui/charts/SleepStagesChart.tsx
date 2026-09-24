@@ -1,7 +1,7 @@
 "use client";
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
+import { useChartMotion, CHART_ANIMATION } from "./useChartMotion";
 import { AXIS_TICK, GRID_STROKE, TOOLTIP_CONTENT_STYLE, TOOLTIP_LABEL_STYLE, formatMinutesAsDuration } from "./chartChrome";
 
 export interface SleepStagesPoint {
@@ -29,11 +29,13 @@ const STAGES = [
 ] as const;
 
 export function SleepStagesChart({ data, height = 180 }: { data: SleepStagesPoint[]; height?: number }) {
-  const reducedMotion = usePrefersReducedMotion();
+  const { ref, visible, animate } = useChartMotion();
 
   if (data.length === 0) return null;
 
   return (
+    <div ref={ref} style={{ height }}>
+      {visible && (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} margin={{ top: 6, right: 4, left: 4, bottom: 0 }} barCategoryGap="30%">
         <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
@@ -61,10 +63,12 @@ export function SleepStagesChart({ data, height = 180 }: { data: SleepStagesPoin
             strokeWidth={2}
             maxBarSize={36}
             radius={i === STAGES.length - 1 ? [4, 4, 0, 0] : undefined}
-            isAnimationActive={!reducedMotion}
+            isAnimationActive={animate} {...CHART_ANIMATION}
           />
         ))}
       </BarChart>
     </ResponsiveContainer>
+      )}
+    </div>
   );
 }

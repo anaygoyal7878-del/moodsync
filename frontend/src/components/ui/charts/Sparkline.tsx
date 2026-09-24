@@ -1,6 +1,7 @@
 "use client";
 
 import { LineChart, Line, ResponsiveContainer } from "recharts";
+import { CHART_ANIMATION } from "./useChartMotion";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
 export interface SparklinePoint {
@@ -19,7 +20,7 @@ export function Sparkline({ data, color = "var(--brand)", height = 32 }: { data:
   return (
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data}>
-        <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={false} isAnimationActive={!reducedMotion} />
+        <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={false} isAnimationActive={!reducedMotion} {...CHART_ANIMATION} />
       </LineChart>
     </ResponsiveContainer>
   );

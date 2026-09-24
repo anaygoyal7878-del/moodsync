@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CHART_ANIMATION } from "@/components/ui/charts/useChartMotion";
 import Link from "next/link";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from "recharts";
 import { HeartPulse, Brain } from "lucide-react";
@@ -53,7 +54,7 @@ function DeltaBars({
             return [signed, point.itemName];
           }}
         />
-        <Bar dataKey="delta" fill={color} radius={2} maxBarSize={26} isAnimationActive={!reducedMotion} />
+        <Bar dataKey="delta" fill={color} radius={2} maxBarSize={26} isAnimationActive={!reducedMotion} {...CHART_ANIMATION} />
       </BarChart>
     </ResponsiveContainer>
   );

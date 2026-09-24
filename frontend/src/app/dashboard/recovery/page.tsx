@@ -91,7 +91,13 @@ export default async function RecoveryPage() {
   const recovery = brief?.scores?.recovery.value ?? null;
   const stress = brief?.scores?.stress.value ?? null;
   const actions = memory?.recoveryActions ?? [];
-  const scenarios = memory?.healthScenarios ?? [];
+  // Only `caution` scenarios render here. A `notice` — HRV one SD below
+  // baseline, sleep quality one SD below — uses the same threshold on
+  // the same data as the Recovery Intelligence signal rows above, so
+  // showing both put the same finding on screen twice (609px of it at
+  // phone width). A caution is different in kind: it is the combination
+  // of signals, which the per-signal table does not express.
+  const scenarios = (memory?.healthScenarios ?? []).filter((scenario) => scenario.severity === "caution");
   const recoveryContext = memory?.recoveryContext ?? null;
   const evidence = memory?.evidence ?? [];
 

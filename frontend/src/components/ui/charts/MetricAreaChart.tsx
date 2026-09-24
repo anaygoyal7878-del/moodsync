@@ -2,7 +2,7 @@
 
 import { useId } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
+import { useChartMotion, CHART_ANIMATION } from "./useChartMotion";
 import { AXIS_TICK, GRID_STROKE, TOOLTIP_CONTENT_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_CURSOR, ACTIVE_DOT } from "./chartChrome";
 
 export interface MetricPoint {
@@ -35,12 +35,16 @@ export function MetricAreaChart({
   /** Y domain override, e.g. [0, 100] for score metrics. */
   domain?: [number, number];
 }) {
-  const reducedMotion = usePrefersReducedMotion();
+  const { ref, visible, animate } = useChartMotion();
   const gradientId = useId();
 
   if (data.length < 2) return null;
 
   return (
+    // The wrapper holds the chart's final height before it mounts, so a
+    // deferred reveal never shifts the layout beneath it.
+    <div ref={ref} style={{ height }}>
+      {visible && (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data} margin={{ top: 6, right: 4, left: 4, bottom: 0 }}>
         <defs>
@@ -66,9 +70,12 @@ export function MetricAreaChart({
           fill={`url(#${gradientId})`}
           dot={false}
           activeDot={ACTIVE_DOT}
-          isAnimationActive={!reducedMotion}
+          isAnimationActive={animate}
+          {...CHART_ANIMATION}
         />
       </AreaChart>
     </ResponsiveContainer>
+      )}
+    </div>
   );
 }

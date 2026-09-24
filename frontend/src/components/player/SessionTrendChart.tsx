@@ -1,6 +1,7 @@
 "use client";
 
 import { useId } from "react";
+import { CHART_ANIMATION } from "@/components/ui/charts/useChartMotion";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer } from "recharts";
 import { usePrefersReducedMotion } from "@/components/ui/charts/usePrefersReducedMotion";
 import { TOOLTIP_CONTENT_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_CURSOR } from "@/components/ui/charts/chartChrome";
@@ -117,7 +118,7 @@ export function SessionTrendChart({
               fill={`url(#${gradientId})`}
               dot={false}
               activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--base)" }}
-              isAnimationActive={!reducedMotion}
+              isAnimationActive={!reducedMotion} {...CHART_ANIMATION}
             />
           </AreaChart>
         </ResponsiveContainer>

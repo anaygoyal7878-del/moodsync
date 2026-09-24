@@ -1,6 +1,7 @@
 "use client";
 
 import { LineChart, Line, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { CHART_ANIMATION } from "./useChartMotion";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
 export interface TrendChartPoint {
@@ -53,7 +54,7 @@ export function TrendChart({
           labelStyle={{ color: "var(--ink-muted)" }}
           formatter={(value) => [unit ? `${value} ${unit}` : String(value), label]}
         />
-        <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={false} isAnimationActive={!reducedMotion} />
+        <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={false} isAnimationActive={!reducedMotion} {...CHART_ANIMATION} />
       </LineChart>
     </ResponsiveContainer>
   );

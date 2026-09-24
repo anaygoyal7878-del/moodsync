@@ -1,7 +1,7 @@
 "use client";
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
+import { useChartMotion, CHART_ANIMATION } from "./useChartMotion";
 import { AXIS_TICK, GRID_STROKE, TOOLTIP_CONTENT_STYLE, TOOLTIP_LABEL_STYLE } from "./chartChrome";
 
 export interface DailyBarPoint {
@@ -31,13 +31,15 @@ export function DailyBarChart({
   height?: number;
   formatValue?: (value: number) => string;
 }) {
-  const reducedMotion = usePrefersReducedMotion();
+  const { ref, visible, animate } = useChartMotion();
 
   if (data.length < 2) return null;
 
   const format = formatValue ?? ((v: number) => (unit ? `${v.toLocaleString()} ${unit}` : v.toLocaleString()));
 
   return (
+    <div ref={ref} style={{ height }}>
+      {visible && (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} margin={{ top: 6, right: 4, left: 4, bottom: 0 }} barCategoryGap="28%">
         <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
@@ -49,8 +51,10 @@ export function DailyBarChart({
           cursor={{ fill: "var(--surface-highlight)" }}
           formatter={(value) => [format(Number(value)), label]}
         />
-        <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} maxBarSize={36} isAnimationActive={!reducedMotion} />
+        <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} maxBarSize={36} isAnimationActive={animate} {...CHART_ANIMATION} />
       </BarChart>
     </ResponsiveContainer>
+      )}
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { HeartPulse, Moon, Flame } from "lucide-react";
+import { MetricTabs } from "@/components/ui/MetricTabs";
 import { PageHeader, Section } from "@/components/companion/CompanionPrimitives";
 import { ScoreRing } from "@/components/ui/charts/ScoreRing";
 import { MetricAreaChart, type MetricPoint } from "@/components/ui/charts/MetricAreaChart";
@@ -301,138 +302,169 @@ export function BiometricsSection({
         </Section>
       )}
 
-      {hasHeartData && (
-        <Section title="Heart" icon={HeartPulse} action={isSample ? <SampleBadge /> : undefined} className="lux-stagger-2">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {heartSeriesEmpty && (
-              <NoSeriesYet
-                current={latestOf("heartRate") !== null ? String(Math.round(latestOf("heartRate") as number)) : null}
-                unit="bpm"
-                label="heart rate"
-              />
-            )}
-            {heartRate.length > 0 && (
-              <MetricPanel
-                label="Heart rate"
-                color="var(--viz-heart)"
-                value={latestOf("heartRate") !== null ? String(Math.round(latestOf("heartRate") as number)) : null}
-                unit="bpm"
-                className="sm:col-span-2"
-              >
-                <MetricAreaChart data={heartRate} color="var(--viz-heart)" label="Heart rate" unit="bpm" />
-              </MetricPanel>
-            )}
-            {restingHR.length > 0 && (
-              <MetricPanel
-                label="Resting heart rate"
-                color="var(--viz-rhr)"
-                value={String(restingHR[restingHR.length - 1].value)}
-                unit="bpm"
-                delta={formatDelta(restingHR, "bpm")}
-              >
-                <MetricAreaChart data={restingHR} color="var(--viz-rhr)" label="Resting HR" unit="bpm" height={120} />
-              </MetricPanel>
-            )}
-            {hrv.length > 0 && (
-              <MetricPanel
-                label="Heart rate variability"
-                color="var(--viz-hrv)"
-                value={String(Math.round(hrv[hrv.length - 1].value))}
-                unit="ms"
-                delta={formatDelta(hrv, "ms")}
-              >
-                <MetricAreaChart data={hrv} color="var(--viz-hrv)" label="HRV" unit="ms" height={120} />
-              </MetricPanel>
-            )}
-            {bloodOxygen.length > 0 && (
-              <MetricPanel
-                label="Blood oxygen"
-                color="var(--viz-oxygen)"
-                value={String(bloodOxygen[bloodOxygen.length - 1].value)}
-                unit="% SpO₂"
-                delta={formatDelta(bloodOxygen, "%")}
-              >
-                <MetricAreaChart data={bloodOxygen} color="var(--viz-oxygen)" label="SpO₂" unit="%" height={120} domain={[85, 100]} />
-              </MetricPanel>
-            )}
-            {latestOf("respiratoryRate") !== null && (
-              <MetricPanel
-                label="Respiratory rate"
-                color="var(--lux-muted)"
-                value={String(latestOf("respiratoryRate"))}
-                unit="breaths/min"
-              />
-            )}
-          </div>
-        </Section>
-      )}
-
-      {hasSleepData && (
-        <Section title="Sleep" icon={Moon} action={isSample ? <SampleBadge /> : undefined} className="lux-stagger-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {sleepScore.length > 0 && (
-              <MetricPanel
-                label="Sleep score"
-                color="var(--viz-sleep)"
-                value={String(sleepScore[sleepScore.length - 1].value)}
-                unit="/100"
-                delta={formatDelta(sleepScore)}
-                className={sleepStages.length === 0 ? "sm:col-span-2" : undefined}
-              >
-                <MetricAreaChart data={sleepScore} color="var(--viz-sleep)" label="Sleep score" height={140} domain={[0, 100]} />
-              </MetricPanel>
-            )}
-            {sleepStages.length > 0 && (
-              <MetricPanel
-                label="Sleep stages"
-                color="var(--viz-sleep-deep)"
-                value={null}
-                className={sleepScore.length === 0 ? "sm:col-span-2" : undefined}
-              >
-                <SleepStagesChart data={sleepStages} height={160} />
-              </MetricPanel>
-            )}
-          </div>
-        </Section>
-      )}
-
-      {hasActivityData && (
-        <Section title="Activity" icon={Flame} action={isSample ? <SampleBadge /> : undefined} className="lux-stagger-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {activitySeriesEmpty && (
-              <NoSeriesYet
-                current={latestOf("activityLevel") !== null ? String(Math.round(latestOf("activityLevel") as number)) : null}
-                label="activity"
-              />
-            )}
-            {steps.length > 0 && (
-              <MetricPanel
-                label="Steps"
-                color="var(--viz-activity)"
-                value={steps[steps.length - 1].value.toLocaleString()}
-                delta={formatDelta(steps)}
-                className="sm:col-span-2"
-              >
-                <DailyBarChart data={steps} color="var(--viz-activity)" label="Steps" />
-              </MetricPanel>
-            )}
-            {calories.length > 0 && (
-              <MetricPanel
-                label="Active calories"
-                color="var(--viz-activity)"
-                value={Math.round(calories[calories.length - 1].value).toLocaleString()}
-                unit="kcal"
-                delta={formatDelta(calories, "kcal")}
-              >
-                <MetricAreaChart data={calories} color="var(--viz-activity)" label="Calories" unit="kcal" height={120} />
-              </MetricPanel>
-            )}
-            {latestOf("activityLevel") !== null && (
-              <MetricPanel label="Activity level" color="var(--viz-activity)" value={String(latestOf("activityLevel"))} unit="/100" />
-            )}
-          </div>
-        </Section>
-      )}
+      {/* One section at a time. Stacked, these three were 2,298px at
+          phone width — 60% of the entire Home page — so a person had to
+          scroll past Heart and Sleep to reach Activity. Nothing is
+          removed; a segmented control chooses which one is showing. */}
+      <MetricTabs
+        ariaLabel="Biometrics"
+        tabs={[
+          ...(hasHeartData
+            ? [
+                {
+                  id: "heart",
+                  label: "Heart",
+                  content: (
+                    <Section title="Heart" icon={HeartPulse} action={isSample ? <SampleBadge /> : undefined}>
+                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                {heartSeriesEmpty && (
+                                  <NoSeriesYet
+                                    current={latestOf("heartRate") !== null ? String(Math.round(latestOf("heartRate") as number)) : null}
+                                    unit="bpm"
+                                    label="heart rate"
+                                  />
+                                )}
+                                {heartRate.length > 0 && (
+                                  <MetricPanel
+                                    label="Heart rate"
+                                    color="var(--viz-heart)"
+                                    value={latestOf("heartRate") !== null ? String(Math.round(latestOf("heartRate") as number)) : null}
+                                    unit="bpm"
+                                    className="sm:col-span-2"
+                                  >
+                                    <MetricAreaChart data={heartRate} color="var(--viz-heart)" label="Heart rate" unit="bpm" />
+                                  </MetricPanel>
+                                )}
+                                {restingHR.length > 0 && (
+                                  <MetricPanel
+                                    label="Resting heart rate"
+                                    color="var(--viz-rhr)"
+                                    value={String(restingHR[restingHR.length - 1].value)}
+                                    unit="bpm"
+                                    delta={formatDelta(restingHR, "bpm")}
+                                  >
+                                    <MetricAreaChart data={restingHR} color="var(--viz-rhr)" label="Resting HR" unit="bpm" height={120} />
+                                  </MetricPanel>
+                                )}
+                                {hrv.length > 0 && (
+                                  <MetricPanel
+                                    label="Heart rate variability"
+                                    color="var(--viz-hrv)"
+                                    value={String(Math.round(hrv[hrv.length - 1].value))}
+                                    unit="ms"
+                                    delta={formatDelta(hrv, "ms")}
+                                  >
+                                    <MetricAreaChart data={hrv} color="var(--viz-hrv)" label="HRV" unit="ms" height={120} />
+                                  </MetricPanel>
+                                )}
+                                {bloodOxygen.length > 0 && (
+                                  <MetricPanel
+                                    label="Blood oxygen"
+                                    color="var(--viz-oxygen)"
+                                    value={String(bloodOxygen[bloodOxygen.length - 1].value)}
+                                    unit="% SpO₂"
+                                    delta={formatDelta(bloodOxygen, "%")}
+                                  >
+                                    <MetricAreaChart data={bloodOxygen} color="var(--viz-oxygen)" label="SpO₂" unit="%" height={120} domain={[85, 100]} />
+                                  </MetricPanel>
+                                )}
+                                {latestOf("respiratoryRate") !== null && (
+                                  <MetricPanel
+                                    label="Respiratory rate"
+                                    color="var(--lux-muted)"
+                                    value={String(latestOf("respiratoryRate"))}
+                                    unit="breaths/min"
+                                  />
+                                )}
+                              </div>
+                            </Section>
+                  ),
+                },
+              ]
+            : []),
+          ...(hasSleepData
+            ? [
+                {
+                  id: "sleep",
+                  label: "Sleep",
+                  content: (
+                    <Section title="Sleep" icon={Moon} action={isSample ? <SampleBadge /> : undefined}>
+                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                {sleepScore.length > 0 && (
+                                  <MetricPanel
+                                    label="Sleep score"
+                                    color="var(--viz-sleep)"
+                                    value={String(sleepScore[sleepScore.length - 1].value)}
+                                    unit="/100"
+                                    delta={formatDelta(sleepScore)}
+                                    className={sleepStages.length === 0 ? "sm:col-span-2" : undefined}
+                                  >
+                                    <MetricAreaChart data={sleepScore} color="var(--viz-sleep)" label="Sleep score" height={140} domain={[0, 100]} />
+                                  </MetricPanel>
+                                )}
+                                {sleepStages.length > 0 && (
+                                  <MetricPanel
+                                    label="Sleep stages"
+                                    color="var(--viz-sleep-deep)"
+                                    value={null}
+                                    className={sleepScore.length === 0 ? "sm:col-span-2" : undefined}
+                                  >
+                                    <SleepStagesChart data={sleepStages} height={160} />
+                                  </MetricPanel>
+                                )}
+                              </div>
+                            </Section>
+                  ),
+                },
+              ]
+            : []),
+          ...(hasActivityData
+            ? [
+                {
+                  id: "activity",
+                  label: "Activity",
+                  content: (
+                    <Section title="Activity" icon={Flame} action={isSample ? <SampleBadge /> : undefined}>
+                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                {activitySeriesEmpty && (
+                                  <NoSeriesYet
+                                    current={latestOf("activityLevel") !== null ? String(Math.round(latestOf("activityLevel") as number)) : null}
+                                    label="activity"
+                                  />
+                                )}
+                                {steps.length > 0 && (
+                                  <MetricPanel
+                                    label="Steps"
+                                    color="var(--viz-activity)"
+                                    value={steps[steps.length - 1].value.toLocaleString()}
+                                    delta={formatDelta(steps)}
+                                    className="sm:col-span-2"
+                                  >
+                                    <DailyBarChart data={steps} color="var(--viz-activity)" label="Steps" />
+                                  </MetricPanel>
+                                )}
+                                {calories.length > 0 && (
+                                  <MetricPanel
+                                    label="Active calories"
+                                    color="var(--viz-activity)"
+                                    value={Math.round(calories[calories.length - 1].value).toLocaleString()}
+                                    unit="kcal"
+                                    delta={formatDelta(calories, "kcal")}
+                                  >
+                                    <MetricAreaChart data={calories} color="var(--viz-activity)" label="Calories" unit="kcal" height={120} />
+                                  </MetricPanel>
+                                )}
+                                {latestOf("activityLevel") !== null && (
+                                  <MetricPanel label="Activity level" color="var(--viz-activity)" value={String(latestOf("activityLevel"))} unit="/100" />
+                                )}
+                              </div>
+                            </Section>
+                  ),
+                },
+              ]
+            : []),
+        ]}
+      />
 
       <WellnessTimeline history={history} />
     </div>

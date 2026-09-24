@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { AXIS_TICK, GRID_STROKE, TOOLTIP_CONTENT_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_CURSOR, ACTIVE_DOT } from "@/components/ui/charts/chartChrome";
+import { useChartMotion, CHART_ANIMATION } from "@/components/ui/charts/useChartMotion";
 
 /**
  * How heart rate and stress moved *during* one listening session.
@@ -52,6 +53,9 @@ function formatElapsed(seconds: number): string {
 
 export function SessionEvolutionChart({ sessionId }: { sessionId: string }) {
   const [rows, setRows] = useState<ChartRow[] | null>(null);
+  // Was hardcoded to never animate, which ignored the motion preference
+  // in both directions — no motion for people who wanted it.
+  const { animate } = useChartMotion();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -156,7 +160,7 @@ export function SessionEvolutionChart({ sessionId }: { sessionId: string }) {
             dot={false}
             activeDot={ACTIVE_DOT}
             connectNulls
-            isAnimationActive={false}
+            isAnimationActive={animate} {...CHART_ANIMATION}
           />
           <Line
             yAxisId="stress"
@@ -168,7 +172,7 @@ export function SessionEvolutionChart({ sessionId }: { sessionId: string }) {
             dot={false}
             activeDot={ACTIVE_DOT}
             connectNulls
-            isAnimationActive={false}
+            isAnimationActive={animate} {...CHART_ANIMATION}
           />
         </LineChart>
       </ResponsiveContainer>
