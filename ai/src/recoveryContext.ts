@@ -1,4 +1,5 @@
 import type { PersonalBaselines, BaselineComparison } from './personalBaselines.js';
+import type { TrainingLoadSummary } from './trainingLoad.js';
 
 /**
  * Recovery Intelligence — a multi-signal, baseline-relative reading of
@@ -59,7 +60,7 @@ export type Confidence = 'high' | 'moderate' | 'low';
 export type SignalDirection = 'above' | 'below' | 'typical' | 'unknown';
 
 export interface RecoverySignal {
-  id: 'hrv' | 'resting-heart-rate' | 'sleep' | 'activity';
+  id: 'hrv' | 'resting-heart-rate' | 'sleep' | 'activity' | 'training-load';
   label: string;
   /** The reading itself, formatted for display. Null when unavailable. */
   value: string | null;
@@ -110,6 +111,12 @@ const NOTABLE_Z = 1.0;
  * spread is narrow enough that a z-score would trip on noise. */
 const RHR_ELEVATED_BPM = 5;
 
+/** How much heavier than a typical week the last seven days must be
+ * before it counts as a recovery signal. 30% is a deliberately wide
+ * margin: weekly training volume naturally varies, and a signal that
+ * fired on an ordinary busier week would be noise. */
+const HIGH_LOAD_RATIO = 1.3;
+
 /** Below this many readings, a baseline is not yet a baseline. Mirrors
  * `MIN_SAMPLES_FOR_BASELINE`. */
 const MIN_SAMPLES = 5;
@@ -122,6 +129,9 @@ export interface RecoveryContextInput {
   /** The user's age, when known — only used to pick the right published
    * sleep band. Null is fine and common. */
   age: number | null;
+  /** Load from logged workouts. Null when there are none — optional so
+   * every existing caller keeps working unchanged. */
+  trainingLoad?: TrainingLoadSummary | null;
 }
 
 function formatDuration(minutes: number): string {
@@ -277,6 +287,42 @@ function activitySignal(activity: BaselineComparison | null): RecoverySignal {
   };
 }
 
+
+function trainingLoadSignal(load: TrainingLoadSummary | null): RecoverySignal {
+  if (load === null || load.ratio === null) {
+    const unrated = load?.unratedSessionsThisWeek ?? 0;
+    return {
+      id: 'training-load',
+      label: 'Training load',
+      value: null,
+      direction: 'unknown',
+      // Says *why* it's unknown when the reason is actionable: sessions
+      // were logged but not rated, so they carry no intensity.
+      comparison:
+        unrated > 0
+          ? `${unrated} workout${unrated === 1 ? '' : 's'} this week had no effort rating, so load can't be measured yet.`
+          : 'Log and rate a few weeks of workouts to compare against your usual.',
+      suggestsRecovery: null,
+      sampleSize: load?.ratedSessionsThisWeek ?? 0,
+    };
+  }
+  const high = load.ratio >= HIGH_LOAD_RATIO;
+  const pct = Math.round((load.ratio - 1) * 100);
+  return {
+    id: 'training-load',
+    label: 'Training load',
+    value: `${load.ratedSessionsThisWeek} session${load.ratedSessionsThisWeek === 1 ? '' : 's'}`,
+    direction: high ? 'above' : load.ratio <= 0.7 ? 'below' : 'typical',
+    comparison: high
+      ? `About ${pct}% more than your usual week`
+      : load.ratio <= 0.7
+        ? 'Lighter than your usual week'
+        : 'Close to your usual week',
+    suggestsRecovery: high ? true : null,
+    sampleSize: load.ratedSessionsThisWeek,
+  };
+}
+
 /**
  * Reads the signals and returns a state, a confidence, and the evidence.
  *
@@ -287,18 +333,31 @@ function activitySignal(activity: BaselineComparison | null): RecoverySignal {
  * an app.
  */
 export function buildRecoveryContext(input: RecoveryContextInput): RecoveryContext {
-  const { baselines, sleepMinutes, age } = input;
+  const { baselines, sleepMinutes, age, trainingLoad = null } = input;
 
   const signals: RecoverySignal[] = [
     hrvSignal(baselines.heartRateVariability),
     rhrSignal(baselines.restingHeartRate),
     sleepSignal(sleepMinutes, baselines.sleepScore, age),
     activitySignal(baselines.activityLevel),
+    trainingLoadSignal(trainingLoad),
   ];
 
   const known = signals.filter((s) => s.direction !== 'unknown');
-  const flagging = signals.filter((s) => s.suggestsRecovery === true);
   const reassuring = signals.filter((s) => s.suggestsRecovery === false);
+
+  // Wearable activity and logged training load frequently describe the
+  // *same* hard week from two angles. Counting both would let one cause
+  // escalate the state on its own — the single-cause verdict this ladder
+  // exists to prevent. So for escalation they are one "load" dimension;
+  // both rows still render, since each is independently informative.
+  const LOAD_IDS = new Set<RecoverySignal['id']>(['activity', 'training-load']);
+  const flaggingSignals = signals.filter((s) => s.suggestsRecovery === true);
+  const loadFlagged = flaggingSignals.some((s) => LOAD_IDS.has(s.id));
+  const flagging = [
+    ...flaggingSignals.filter((s) => !LOAD_IDS.has(s.id)),
+    ...(loadFlagged ? [flaggingSignals.find((s) => LOAD_IDS.has(s.id))!] : []),
+  ];
 
   const band = sleepBandFor(age);
   const sourceIds = ['hrv-wearable-review', 'ppg-vs-ecg-meta', band.sourceId];
@@ -312,7 +371,7 @@ export function buildRecoveryContext(input: RecoveryContextInput): RecoveryConte
       guidance:
         'Keep your wearable syncing for a few more days. Recovery readings compare you against your own history, so they need that history before they mean anything.',
       confidence: 'low',
-      confidenceReason: `Only ${known.length} of 4 signals have enough history to compare against.`,
+      confidenceReason: `Only ${known.length} of ${signals.length} signals have enough history to compare against.`,
       signals,
       sourceIds,
       isDiagnostic: false,
@@ -331,7 +390,16 @@ export function buildRecoveryContext(input: RecoveryContextInput): RecoveryConte
   // Confidence is about the evidence, not the conclusion: plenty of
   // agreeing signals off long history is high; a split verdict or thin
   // history is not.
-  const thinnest = Math.min(...known.map((s) => s.sampleSize).filter((n) => n > 0), Infinity);
+  // Training load is excluded from the thinnest-history check. For every
+  // other signal sampleSize counts readings behind a baseline; for load
+  // it counts sessions *this week*, where three is a full week rather
+  // than thin history. Including it marked a well-evidenced read as low
+  // confidence. Its sufficiency is enforced upstream instead: it produces
+  // no comparison at all until two prior weeks exist.
+  const thinnest = Math.min(
+    ...known.filter((s) => s.id !== 'training-load').map((s) => s.sampleSize).filter((n) => n > 0),
+    Infinity,
+  );
   const conflicted = flagging.length > 0 && reassuring.length > 0;
   const confidence: Confidence =
     conflicted || known.length < 3 || thinnest < 10

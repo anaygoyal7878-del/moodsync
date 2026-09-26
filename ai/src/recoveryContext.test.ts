@@ -234,13 +234,14 @@ describe('guardrails that must hold in every case', () => {
     }
   });
 
-  it('always reports all four signals, present or not', () => {
+  it('always reports every signal, present or not', () => {
     for (const c of cases) {
       expect(buildRecoveryContext(c).signals.map((s) => s.id).sort()).toEqual([
         'activity',
         'hrv',
         'resting-heart-rate',
         'sleep',
+        'training-load',
       ]);
     }
   });
@@ -287,5 +288,83 @@ describe('evidence register', () => {
     const ppg = EVIDENCE_SOURCES.filter((s) => s.topic === 'wearable-accuracy');
     expect(ppg.length).toBeGreaterThanOrEqual(2);
     expect(ppg.some((s) => /ECG/i.test(s.limits ?? ''))).toBe(true);
+  });
+});
+
+describe('training load', () => {
+  const load = (ratio: number | null, rated = 4, unrated = 0) => ({
+    acuteLoad: ratio === null ? 0 : ratio * 600,
+    typicalWeeklyLoad: ratio === null ? null : 600,
+    ratio,
+    ratedSessionsThisWeek: rated,
+    unratedSessionsThisWeek: unrated,
+  });
+  const steady = baselines({ heartRateVariability: cmp(61, 61, 0), restingHeartRate: cmp(52, 52, 0), activityLevel: cmp(55, 55, 0) });
+
+  it('flags a week well above the usual as recovery context', () => {
+    const result = buildRecoveryContext(input({ baselines: steady, sleepMinutes: 8 * 60, trainingLoad: load(1.5) }));
+    const signal = result.signals.find((s) => s.id === 'training-load')!;
+    expect(signal.suggestsRecovery).toBe(true);
+    expect(signal.comparison).toMatch(/50% more than your usual week/);
+  });
+
+  it('does not escalate on heavy training alone', () => {
+    // A hard week on its own is ordinary training, not a recovery verdict.
+    const result = buildRecoveryContext(input({ baselines: steady, sleepMinutes: 8 * 60, trainingLoad: load(1.6) }));
+    expect(result.state).toBe('normal');
+  });
+
+  it('escalates when heavy training coincides with an independent signal', () => {
+    const result = buildRecoveryContext(
+      input({
+        baselines: baselines({ heartRateVariability: cmp(41, 61, -1.8), restingHeartRate: cmp(52, 52, 0), activityLevel: cmp(55, 55, 0) }),
+        sleepMinutes: 8 * 60,
+        trainingLoad: load(1.6),
+      }),
+    );
+    expect(result.state).toBe('higher-need');
+  });
+
+  it('counts wearable activity and logged load as one cause, not two', () => {
+    // Both describe the same hard week. Counting them separately would
+    // let one cause escalate the state by itself.
+    const result = buildRecoveryContext(
+      input({
+        baselines: baselines({ heartRateVariability: cmp(61, 61, 0), restingHeartRate: cmp(52, 52, 0), activityLevel: cmp(88, 55, 1.9) }),
+        sleepMinutes: 8 * 60,
+        trainingLoad: load(1.6),
+      }),
+    );
+    expect(result.signals.filter((s) => s.suggestsRecovery === true)).toHaveLength(2);
+    expect(result.state).toBe('normal');
+  });
+
+  it('says why load is unknown when workouts were logged without effort ratings', () => {
+    const result = buildRecoveryContext(input({ baselines: steady, trainingLoad: load(null, 0, 3) }));
+    const signal = result.signals.find((s) => s.id === 'training-load')!;
+    expect(signal.direction).toBe('unknown');
+    expect(signal.comparison).toMatch(/3 workouts this week had no effort rating/);
+  });
+
+  it('treats a lighter week as neutral, not as proof of recovery', () => {
+    const result = buildRecoveryContext(input({ baselines: steady, trainingLoad: load(0.5) }));
+    const signal = result.signals.find((s) => s.id === 'training-load')!;
+    expect(signal.direction).toBe('below');
+    expect(signal.suggestsRecovery).toBeNull();
+  });
+});
+
+describe('training load and confidence', () => {
+  it('does not read a normal week of three sessions as thin history', () => {
+    // sessionCount for load means sessions this week, not readings behind
+    // a baseline — three is a full week, and must not drag confidence down.
+    const result = buildRecoveryContext(
+      input({
+        baselines: baselines({ heartRateVariability: cmp(41, 61, -1.8, 30), restingHeartRate: cmp(52, 52, 0, 30), activityLevel: cmp(55, 55, 0, 30) }),
+        sleepMinutes: 8 * 60,
+        trainingLoad: { acuteLoad: 720, typicalWeeklyLoad: 360, ratio: 2, ratedSessionsThisWeek: 3, unratedSessionsThisWeek: 0 },
+      }),
+    );
+    expect(result.confidence).not.toBe('low');
   });
 });

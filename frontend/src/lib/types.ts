@@ -237,7 +237,6 @@ export interface HealthScenario {
 export interface WellnessMemoryResponse {
   /** Null until enough history exists to compare against. */
   recoveryContext?: RecoveryContextResponse | null;
-  evidence?: EvidenceSourceEntry[];
   findings: MemoryFinding[];
   bestFocusHours: Array<{ hourOfDay: number; meanScore: number; sampleSize: number }>;
   /** Ranked server-side for this moment — order and reasons both vary. */
@@ -623,7 +622,7 @@ export interface WorkoutListResponse {
  * unavailable or genuinely neutral, which is different from it pointing
  * away from needing recovery. */
 export interface RecoverySignalEntry {
-  id: "hrv" | "resting-heart-rate" | "sleep" | "activity";
+  id: "hrv" | "resting-heart-rate" | "sleep" | "activity" | "training-load";
   label: string;
   value: string | null;
   direction: "above" | "below" | "typical" | "unknown";
@@ -643,18 +642,6 @@ export interface RecoveryContextResponse {
   isDiagnostic: false;
 }
 
-/** A citation from the evidence register, including what it does *not*
- * establish — the field that keeps the citation honest. */
-export interface EvidenceSourceEntry {
-  id: string;
-  title: string;
-  organization: string;
-  url: string;
-  topic: string;
-  accessed: string;
-  supports: string;
-  limits: string | null;
-}
 
 /** The health profile read — what the person entered plus what MoodSync
  * derived from it. Measurements are metric on the wire; `units` says how
@@ -676,5 +663,4 @@ export interface HealthProfileResponse {
     bmi: { value: number; category: "underweight" | "healthy" | "overweight" | "obesity" | null; note: string } | null;
     weightTrend: { latestKg: number; changeKg: number | null; spanDays: number } | null;
   };
-  evidence: EvidenceSourceEntry[];
 }

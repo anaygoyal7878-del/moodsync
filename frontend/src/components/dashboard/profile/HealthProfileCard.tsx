@@ -350,24 +350,6 @@ export function HealthProfileCard() {
             </p>
           )}
 
-          {data.evidence.length > 0 && (
-            <details>
-              <summary className="cursor-pointer text-[11.5px]" style={{ color: "var(--lux-muted)" }}>
-                Where these numbers come from
-              </summary>
-              <ul className="mt-2 flex flex-col gap-2">
-                {data.evidence.map((source) => (
-                  <li key={source.id} className="text-[11.5px] leading-relaxed" style={{ color: "var(--lux-muted)" }}>
-                    <a href={source.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2" style={{ color: "var(--lux-sage)" }}>
-                      {source.title}
-                    </a>{" "}
-                    — {source.organization}. {source.supports}
-                    {source.limits && <span style={{ opacity: 0.85 }}> Does not establish: {source.limits}</span>}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
         </div>
       )}
 

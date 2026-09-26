@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { healthProfileRepository, biometricReadingRepository, userPreferencesRepository } from '@moodsync/database';
-import { ageFrom, estimateMaxHeartRate, heartRateZones, bmiFor, weightTrend, sourceById } from '@moodsync/ai';
+import { ageFrom, estimateMaxHeartRate, heartRateZones, bmiFor, weightTrend } from '@moodsync/ai';
 
 /**
  * The health profile: what the person told MoodSync, plus what MoodSync
@@ -54,11 +54,6 @@ export default async function healthProfileRoutes(app: FastifyInstance) {
     const latestWeight = weights[0]?.weightKg ?? null;
     const bmi = profile?.heightCm && latestWeight !== null ? bmiFor(profile.heightCm, latestWeight, age) : null;
 
-    const evidence = [maxHr ? 'tanaka-max-hr' : null, bmi ? 'cdc-bmi' : null]
-      .filter((id): id is string => id !== null)
-      .map((id) => sourceById(id))
-      .filter((s): s is NonNullable<typeof s> => s !== undefined);
-
     return reply.send({
       profile: {
         birthDate: profile?.birthDate ? profile.birthDate.toISOString().slice(0, 10) : null,
@@ -73,7 +68,6 @@ export default async function healthProfileRoutes(app: FastifyInstance) {
         bmi,
         weightTrend: weightTrend(weights.map((w) => ({ weightKg: w.weightKg, recordedAt: w.recordedAt }))),
       },
-      evidence,
     });
   });
 

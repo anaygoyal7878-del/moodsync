@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, Minus, HelpCircle, ShieldCheck } from "lucide-react";
-import type { RecoveryContextResponse, EvidenceSourceEntry } from "@/lib/types";
+import type { RecoveryContextResponse } from "@/lib/types";
 
 /**
  * Recovery Intelligence — the state, the signals behind it, and the
@@ -9,7 +9,13 @@ import type { RecoveryContextResponse, EvidenceSourceEntry } from "@/lib/types";
  * a person cannot interrogate is one they can only obey or ignore, and
  * most people pick ignore. So every layer is visible in order: what
  * MoodSync concluded, how sure it is and why, which readings produced
- * it, and what published guidance the thresholds came from.
+ * it.
+ *
+ * The thresholds come from the evidence register in
+ * ai/src/evidenceSources.ts, which is what the logic is built on. The
+ * sources are deliberately not rendered here: the screen explains the
+ * reasoning in the person's own numbers, and a bibliography under a
+ * recovery card is reading material nobody asked for.
  *
  * The signal rows are deliberately unflashy. Each shows the reading, an
  * arrow, and a comparison against that person's own range — never
@@ -50,13 +56,7 @@ function DirectionIcon({ direction }: { direction: string }) {
   return <HelpCircle size={13} aria-hidden="true" />;
 }
 
-export function RecoveryIntelligence({
-  context,
-  evidence,
-}: {
-  context: RecoveryContextResponse;
-  evidence: EvidenceSourceEntry[];
-}) {
+export function RecoveryIntelligence({ context }: { context: RecoveryContextResponse }) {
   const accent = STATE_ACCENT[context.state] ?? "var(--lux-sage)";
   const border = STATE_BORDER[context.state] ?? "var(--lux-hairline)";
 
@@ -114,41 +114,6 @@ export function RecoveryIntelligence({
           ))}
         </ul>
       </div>
-
-      {evidence.length > 0 && (
-        <details className="mt-4">
-          <summary className="cursor-pointer text-[12px]" style={{ color: "var(--lux-muted)" }}>
-            Where these comparisons come from
-          </summary>
-          <ul className="mt-2.5 flex flex-col gap-2.5">
-            {evidence.map((source) => (
-              <li key={source.id} className="text-[12px] leading-relaxed" style={{ color: "var(--lux-muted)" }}>
-                <a
-                  href={source.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline underline-offset-2"
-                  style={{ color: "var(--lux-sage)" }}
-                >
-                  {source.title}
-                </a>{" "}
-                — {source.organization}
-                <br />
-                {source.supports}
-                {/* The limits line is what keeps a citation honest: it
-                    says what the source does NOT establish, which is
-                    exactly where a reader would otherwise assume. */}
-                {source.limits && (
-                  <>
-                    <br />
-                    <span style={{ opacity: 0.85 }}>Does not establish: {source.limits}</span>
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
 
       <p className="mt-4 text-[11px] leading-relaxed" style={{ color: "var(--lux-muted)" }}>
         Based on your own recent readings, not population averages. Wearable sensors estimate heart rate and HRV

@@ -71,7 +71,7 @@ function ScenarioCard({ scenario }: { scenario: HealthScenario }) {
           {scenario.guidance}
         </p>
         <p className="mt-0.5 text-[11.5px] leading-relaxed" style={{ color: "var(--lux-muted)" }}>
-          {scenario.basis} Based on {scenario.sampleSize} of your readings — a signal to consider, not a diagnosis.
+          Based on {scenario.sampleSize} of your readings — a signal to consider, not a diagnosis.
         </p>
       </div>
     </section>
@@ -99,7 +99,6 @@ export default async function RecoveryPage() {
   // of signals, which the per-signal table does not express.
   const scenarios = (memory?.healthScenarios ?? []).filter((scenario) => scenario.severity === "caution");
   const recoveryContext = memory?.recoveryContext ?? null;
-  const evidence = memory?.evidence ?? [];
 
   return (
     <div className="flex flex-col gap-5">
@@ -127,7 +126,7 @@ export default async function RecoveryPage() {
           from the same signals or supporting detail. */}
       {recoveryContext && (
         <div className="lux-stagger-1">
-          <RecoveryIntelligence context={recoveryContext} evidence={evidence} />
+          <RecoveryIntelligence context={recoveryContext} />
         </div>
       )}
 

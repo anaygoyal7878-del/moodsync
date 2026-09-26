@@ -458,3 +458,4 @@ export {
   type BmiCategory,
   type WeightTrend,
 } from './bodyProfile.js';
+export { summarizeTrainingLoad, sessionLoad, type LoggedSession, type TrainingLoadSummary } from './trainingLoad.js';

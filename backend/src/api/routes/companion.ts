@@ -8,6 +8,7 @@ import {
   userPreferencesRepository,
   pendingDeviceCommandRepository,
   healthProfileRepository,
+  plannedWorkoutRepository,
 } from '@moodsync/database';
 import {
   composeDailyBrief,
@@ -33,8 +34,8 @@ import {
   computePersonalBaselines,
   MEMORY_WINDOW_DAYS,
   buildRecoveryContext,
-  sourceById,
   ageFrom,
+  summarizeTrainingLoad,
 } from '@moodsync/ai';
 import { userRepository } from '../../repositories/userRepository.js';
 import {
@@ -332,12 +333,27 @@ export default async function companionRoutes(app: FastifyInstance) {
     const healthProfile = await healthProfileRepository.get(userId).catch(() => null);
     const age = healthProfile?.birthDate ? ageFrom(healthProfile.birthDate) : null;
 
-    const recoveryContext = baselines
-      ? buildRecoveryContext({ baselines, sleepMinutes, age })
+    // Training load from logged workouts. Four weeks: this week plus the
+    // three that define "typical". Actual minutes when logged, planned as
+    // a fallback — a session marked done without a duration still took
+    // roughly the time that was planned for it.
+    const completed = await plannedWorkoutRepository
+      .listCompletedSince(userId, new Date(Date.now() - 28 * 86_400_000))
+      .catch(() => []);
+    const trainingLoad = completed.length
+      ? summarizeTrainingLoad(
+          completed.map((w) => ({
+            completedAt: w.completedAt!,
+            minutes: w.actualMinutes ?? w.plannedMinutes,
+            effort: w.perceivedEffort,
+          })),
+        )
       : null;
-    const evidence = recoveryContext
-      ? recoveryContext.sourceIds.map((id) => sourceById(id)).filter((s): s is NonNullable<typeof s> => s !== undefined)
-      : [];
+
+    const recoveryContext = baselines
+      ? buildRecoveryContext({ baselines, sleepMinutes, age, trainingLoad })
+      : null;
+
 
     return reply.send({
       findings: findings.map((f) => ({ ...f, sentence: describeFinding(f, 'recovery', true) })),
@@ -345,7 +361,6 @@ export default async function companionRoutes(app: FastifyInstance) {
       recoveryActions,
       healthScenarios,
       recoveryContext,
-      evidence,
       windowDays: MEMORY_WINDOW_DAYS,
       historyDays: WELLNESS_HISTORY_DAYS,
     });

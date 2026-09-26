@@ -92,6 +92,16 @@ export const plannedWorkoutRepository = {
     });
   },
 
+  /** Completed sessions since a date, for training-load. Selects only
+   * the three fields load needs rather than whole rows. */
+  async listCompletedSince(userId: string, since: Date) {
+    return prisma.plannedWorkout.findMany({
+      where: { userId, completedAt: { gte: since } },
+      select: { completedAt: true, actualMinutes: true, plannedMinutes: true, perceivedEffort: true },
+      orderBy: { completedAt: 'desc' },
+    });
+  },
+
   async markReminded(ids: string[]) {
     if (ids.length === 0) return;
     await prisma.plannedWorkout.updateMany({ where: { id: { in: ids } }, data: { remindedAt: new Date() } });
