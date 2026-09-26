@@ -655,3 +655,26 @@ export interface EvidenceSourceEntry {
   supports: string;
   limits: string | null;
 }
+
+/** The health profile read — what the person entered plus what MoodSync
+ * derived from it. Measurements are metric on the wire; `units` says how
+ * to display them. See backend/src/api/routes/healthProfile.ts. */
+export interface HealthProfileResponse {
+  profile: { birthDate: string | null; heightCm: number | null };
+  units: "imperial" | "metric";
+  weights: Array<{ id: string; weightKg: number; recordedAt: string }>;
+  derived: {
+    age: number | null;
+    maxHeartRate: { bpm: number; basis: "measured" | "tanaka-2001"; range: { low: number; high: number } | null } | null;
+    zones: Array<{
+      zone: 1 | 2 | 3 | 4 | 5;
+      label: string;
+      minBpm: number;
+      maxBpm: number;
+      feel: string;
+    }> | null;
+    bmi: { value: number; category: "underweight" | "healthy" | "overweight" | "obesity" | null; note: string } | null;
+    weightTrend: { latestKg: number; changeKg: number | null; spanDays: number } | null;
+  };
+  evidence: EvidenceSourceEntry[];
+}

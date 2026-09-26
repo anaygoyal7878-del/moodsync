@@ -442,3 +442,19 @@ export {
   type MessagingToolKind,
 } from './messagingTools.js';
 export { executeConfirmedAction } from './messagingTools.js';
+export {
+  ageFrom,
+  estimateMaxHeartRate,
+  heartRateZones,
+  zoneFor,
+  bmiFor,
+  weightTrend,
+  KG_PER_LB,
+  CM_PER_IN,
+  MIN_ADULT_BMI_AGE,
+  type MaxHeartRateEstimate,
+  type HeartRateZone,
+  type BmiResult,
+  type BmiCategory,
+  type WeightTrend,
+} from './bodyProfile.js';

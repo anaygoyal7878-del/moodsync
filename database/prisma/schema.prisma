@@ -59,6 +59,8 @@ model User {
   appleCalendarSnapshot AppleCalendarSnapshot?
   pendingCalendarWrites  PendingCalendarWrite[]
   preferences          UserPreferences?
+  healthProfile        HealthProfile?
+  weightEntries        WeightEntry[]
   homeSnapshot         HomeSnapshot?
 
   @@map("users")
@@ -1081,6 +1083,57 @@ model MusicPlayLog {
   @@index([userId, playlistUri])
   @@index([likedSignal, playedAt])
   @@map("music_play_logs")
+}
+
+/// Body measurements a person chooses to tell MoodSync.
+///
+/// Separate from UserPreferences on purpose: that model is notification
+/// and automation configuration, and this is health data. Keeping them
+/// apart means this can be exported, audited or deleted on its own
+/// without touching how someone's quiet hours work.
+///
+/// **What is collected, and why each field earns its place.** Every
+/// field here is used by something — least privilege applies to what we
+/// ask for, not just to what we share:
+///
+/// - `birthDate` gives age, which selects the right published sleep band
+///   (AASM's 8–10h for 13–18 vs the adult 7–9h) and enables age-predicted
+///   heart-rate zones. A *date* rather than an age, because age changes
+///   and a stored age silently goes wrong every birthday.
+/// - `heightCm` pairs with weight for BMI.
+///
+/// Deliberately **not** collected: sex. The one calculation that would
+/// use it — BMI for under-20s, which CDC interprets against age-and-sex
+/// growth percentiles — is not built, so asking for it would be
+/// collecting sensitive data with no use for it.
+///
+/// Metric is canonical. Display units come from
+/// `UserPreferences.preferredUnits`, and converting at the edge means one
+/// stored value rather than two that can disagree.
+model HealthProfile {
+  userId    String    @id
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  birthDate DateTime?
+  heightCm  Float?
+  updatedAt DateTime  @updatedAt
+  createdAt DateTime  @default(now())
+
+  @@map("health_profiles")
+}
+
+/// Weight over time. A log rather than a field on HealthProfile, because
+/// a single value can only ever say what someone weighs, never how it is
+/// moving — and the direction is the part worth knowing.
+model WeightEntry {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weightKg   Float
+  recordedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([userId, recordedAt])
+  @@map("weight_entries")
 }
 
 model UserPreferences {

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { HealthProfileCard } from "@/components/dashboard/profile/HealthProfileCard";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { LogOut, ChevronRight, CheckCircle2, PlayCircle } from "lucide-react";
@@ -68,7 +69,7 @@ export function LuxuryProfile({
       <section className="lux-stagger-1 flex flex-col items-center pt-2 pb-4">
         <div
           className="font-luxury-display mb-4 flex h-24 w-24 items-center justify-center rounded-full text-3xl font-semibold"
-          style={{ background: "var(--lux-bg-card-2)", border: "3px solid var(--lux-sage)", color: "var(--lux-sage)" }}
+          style={{ background: "var(--grad-hero)", border: "2px solid var(--gold)", color: "var(--gold)", boxShadow: "var(--elev-gold)" }}
         >
           {initial}
         </div>
@@ -86,6 +87,12 @@ export function LuxuryProfile({
           Beta member
         </div>
       </section>
+
+      {/* Directly under the header: the profile page should be about the
+          person before it is about settings. */}
+      <div className="lux-stagger-2">
+        <HealthProfileCard />
+      </div>
 
       {/* Replays the guided walkthrough — the "show me that again" path
        * for anyone demoing the product. Clears the seen-flag and reloads

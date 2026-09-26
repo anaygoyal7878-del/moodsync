@@ -19,7 +19,14 @@
  * has not earned.
  */
 
-export type EvidenceTopic = 'sleep-duration' | 'physical-activity' | 'hrv' | 'resting-heart-rate' | 'wearable-accuracy';
+export type EvidenceTopic =
+  | 'sleep-duration'
+  | 'physical-activity'
+  | 'hrv'
+  | 'resting-heart-rate'
+  | 'wearable-accuracy'
+  | 'max-heart-rate'
+  | 'body-composition';
 
 export interface EvidenceSource {
   id: string;
@@ -105,6 +112,30 @@ export const EVIDENCE_SOURCES: EvidenceSource[] = [
       'Wrist PPG agrees well with ECG for some HRV metrics and less well for others, with short-term variability and high-frequency components the weakest. PPG is additionally susceptible to motion artefact, skin contact and ambient light.',
     limits:
       'Agreement varies by metric and by condition. A wearable HRV number is not an ECG measurement and MoodSync must not present it as one.',
+  },
+  {
+    id: 'tanaka-max-hr',
+    title: 'Age-predicted maximal heart rate revisited',
+    organization: 'Journal of the American College of Cardiology (Tanaka, Monahan & Seals, 2001)',
+    url: 'https://www.jacc.org/doi/10.1016/S0735-1097(00)01054-8',
+    topic: 'max-heart-rate',
+    accessed: '2026-09-25',
+    supports:
+      'Meta-analysis of 351 studies and 18,712 subjects deriving maximum heart rate ≈ 208 − 0.7 × age, more accurate than 220 − age, particularly past 40.',
+    limits:
+      'A population regression. Individuals scatter roughly ±10–12 bpm around it, so zones derived from it are estimates — which is why a measured peak overrides it.',
+  },
+  {
+    id: 'cdc-bmi',
+    title: 'About Body Mass Index (BMI)',
+    organization: 'U.S. Centers for Disease Control and Prevention',
+    url: 'https://www.cdc.gov/bmi/about/index.html',
+    topic: 'body-composition',
+    accessed: '2026-09-25',
+    supports:
+      'BMI is a screening measure of weight relative to height. Adults 20 and older are read against weight-status categories; ages 2–19 against age-and-sex growth percentiles.',
+    limits:
+      'Not diagnostic. It does not distinguish fat, muscle and bone, or indicate fat type or location — and adult categories must not be applied to anyone under 20.',
   },
 ];
 

@@ -75,3 +75,4 @@ export {
   PROPOSAL_TTL_MINUTES,
   type EnvironmentSettings,
 } from './repositories/environmentRepository.js';
+export { healthProfileRepository } from './repositories/healthProfileRepository.js';

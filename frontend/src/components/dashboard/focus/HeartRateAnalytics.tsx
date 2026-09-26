@@ -5,6 +5,7 @@ import { HeartPulse } from "lucide-react";
 import { MetricAreaChart, type MetricPoint } from "@/components/ui/charts/MetricAreaChart";
 import { Metric, MetricRow } from "@/components/companion/CompanionPrimitives";
 import type { NormalizedBiometricReading } from "@moodsync/shared";
+import type { HealthProfileResponse } from "@/lib/types";
 
 /**
  * Heart-rate analytics, under the focus timer.
@@ -16,10 +17,11 @@ import type { NormalizedBiometricReading } from "@moodsync/shared";
  * resting baseline, then shows today's curve, then the week — narrowing
  * from now to context rather than the other way round.
  *
- * Deliberately absent: heart-rate *zones*. Zones are defined as
- * percentages of maximum heart rate, which needs age or a measured max,
- * and MoodSync stores neither. Zones computed off a guessed maximum
- * would put confident labels on arbitrary bands.
+ * Heart-rate zones appear once the person has entered a birthday on
+ * their profile: zones are percentages of maximum heart rate, which
+ * needs age or a measured max. Without one there is no zone line at all,
+ * rather than zones computed off a guessed maximum — confident labels on
+ * arbitrary bands.
  *
  * Every comparison is to this person's own history. A resting heart rate
  * of 58 is unremarkable for one person and worth noticing for another,
@@ -46,6 +48,8 @@ export function HeartRateAnalytics() {
   // rather than from Date.now() during render, which is impure and would
   // let the window shift on an unrelated re-render.
   const [loadedAt, setLoadedAt] = useState<number | null>(null);
+  const [zones, setZones] = useState<HealthProfileResponse["derived"]["zones"]>(null);
+  const [zoneBasis, setZoneBasis] = useState<"measured" | "tanaka-2001" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,6 +64,16 @@ export function HeartRateAnalytics() {
       .catch(() => {
         if (!cancelled) setError("Your heart-rate history couldn't be loaded right now.");
       });
+    // Zones are optional context: a failure here drops the zone line and
+    // nothing else.
+    fetch("/api/health-profile")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body: HealthProfileResponse | null) => {
+        if (cancelled || !body) return;
+        setZones(body.derived.zones);
+        setZoneBasis(body.derived.maxHeartRate?.basis ?? null);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -165,6 +179,27 @@ export function HeartRateAnalytics() {
               label="Range, 24h"
             />
           </MetricRow>
+
+          {zones && (() => {
+            const hr = analytics.latest!.heartRate as number;
+            const zone = [...zones].reverse().find((z) => hr >= z.minBpm) ?? null;
+            return (
+              <p className="-mt-2 text-[12px] leading-snug" style={{ color: "var(--lux-muted)" }}>
+                {zone ? (
+                  <>
+                    Latest reading is in{" "}
+                    <span style={{ color: zone.zone >= 4 ? "var(--gold)" : "var(--lux-ink)" }}>
+                      zone {zone.zone} · {zone.label.toLowerCase()}
+                    </span>{" "}
+                    ({zone.minBpm}–{zone.maxBpm} bpm).
+                  </>
+                ) : (
+                  <>Latest reading is below zone 1 — resting range.</>
+                )}{" "}
+                {zoneBasis === "measured" ? "Zones from your measured maximum." : "Zones estimated from your age."}
+              </p>
+            );
+          })()}
 
           {analytics.today.length >= 3 ? (
             <div>

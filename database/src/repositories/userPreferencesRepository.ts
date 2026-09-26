@@ -31,6 +31,22 @@ export const userPreferencesRepository = {
    * Environment guards (ai/src/environmentGuards.ts); defaults to true
    * for a user who has never opened preferences, matching the column
    * default. */
+  /** Display units. The column already existed and defaulted to
+   * imperial, but nothing read it — measurements are stored metric and
+   * this decides how they are shown. */
+  async getPreferredUnits(userId: string): Promise<'imperial' | 'metric'> {
+    const row = await prisma.userPreferences.findUnique({ where: { userId }, select: { preferredUnits: true } });
+    return row?.preferredUnits === 'metric' ? 'metric' : 'imperial';
+  },
+
+  async setPreferredUnits(userId: string, units: 'imperial' | 'metric'): Promise<void> {
+    await prisma.userPreferences.upsert({
+      where: { userId },
+      update: { preferredUnits: units },
+      create: { userId, preferredUnits: units },
+    });
+  },
+
   async getAutomationsEnabled(userId: string): Promise<boolean> {
     const row = await prisma.userPreferences.findUnique({ where: { userId }, select: { automationsEnabled: true } });
     return row?.automationsEnabled ?? true;

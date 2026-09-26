@@ -7,6 +7,7 @@ import {
   homeSnapshotRepository,
   userPreferencesRepository,
   pendingDeviceCommandRepository,
+  healthProfileRepository,
 } from '@moodsync/database';
 import {
   composeDailyBrief,
@@ -33,6 +34,7 @@ import {
   MEMORY_WINDOW_DAYS,
   buildRecoveryContext,
   sourceById,
+  ageFrom,
 } from '@moodsync/ai';
 import { userRepository } from '../../repositories/userRepository.js';
 import {
@@ -314,10 +316,10 @@ export default async function companionRoutes(app: FastifyInstance) {
     // the score was being asked to answer ("what should I do today")
     // with a state, explicit confidence, and the signals behind it.
     //
-    // `age` is null because MoodSync stores no birth date. That is not a
-    // gap to paper over — it means the adult sleep band applies and the
-    // engine says which band it used, rather than guessing an age from
-    // anything.
+    // Age comes from the health profile when the person has entered a
+    // birth date. Without one it stays null and the adult sleep band
+    // applies — the engine says which band it used rather than guessing
+    // an age from anything else.
     const latestReading = timezoneContext.latest;
     const sleepMinutes =
       latestReading &&
@@ -327,8 +329,11 @@ export default async function companionRoutes(app: FastifyInstance) {
         ? latestReading.deepSleepMinutes + latestReading.remSleepMinutes + latestReading.lightSleepMinutes
         : null;
 
+    const healthProfile = await healthProfileRepository.get(userId).catch(() => null);
+    const age = healthProfile?.birthDate ? ageFrom(healthProfile.birthDate) : null;
+
     const recoveryContext = baselines
-      ? buildRecoveryContext({ baselines, sleepMinutes, age: null })
+      ? buildRecoveryContext({ baselines, sleepMinutes, age })
       : null;
     const evidence = recoveryContext
       ? recoveryContext.sourceIds.map((id) => sourceById(id)).filter((s): s is NonNullable<typeof s> => s !== undefined)
