@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Personal Duty</title>
+<script>
+/* =====================================================================
+   ALL GAME TEXT LIVES IN THIS OBJECT. Edit wording here.
+   Project rule: no dashes of any kind in any visible text.
+   {work} is replaced with the character's workplace (farm, shop, trade).
+   effects: change to time, money, trust (resources stay between 0 and 100)
+   points:  duty points toward the score (best choices add up to 85;
+            the last 15 come from the personal cost you accepted)
+   ===================================================================== */
+const GAME = {
+  ui: {
+    brand: "PERSONAL DUTY",
+    defaultName: "CITIZEN",
+    namePlaceholder: "Your name (optional)",
+    pickPrompt: "Pick a character to begin",
+    begin: "BEGIN",
+    tapToContinue: "Tap to continue",
+    resources: { time: "TIME", money: "MONEY", trust: "COMMUNITY TRUST" },
+    resourcesShort: { time: "TIME", money: "MONEY", trust: "TRUST" },
+    plus: "plus",
+    minus: "minus",
+    stakes: ["Farm", "Town", "Country", "Community"],
+    nowSplash: "IT IS NOW.",
+    playAgain: "PLAY AGAIN"
+  },
+
+  definition: {
+    label: "PERSONAL DUTY",
+    text: "Putting the common good ahead of your own comfort or gain, even when it costs you."
+  },
+
+  characters: [
+    { id: "farmer", name: "FARMER", line: "You work the land from dawn to dusk.",
+      perks: ["More Money", "Less Time"], start: { time: 35, money: 65, trust: 50 }, work: "farm" },
+    { id: "shopkeeper", name: "SHOPKEEPER", line: "You sell goods to the whole town.",
+      perks: ["More Money", "Balanced Time"], start: { time: 50, money: 65, trust: 50 }, work: "shop" },
+    { id: "apprentice", name: "APPRENTICE", line: "You are learning a trade, coin by coin.",
+      perks: ["More Time", "Less Money"], start: { time: 65, money: 35, trust: 50 }, work: "trade" }
+  ],
+
+  screens: {
+    start: {
+      heading: "Who are you?",
+      context: "Republican ideology: a republic survives only if citizens put the public good ahead of private interest.",
+      source: "Federalist 55: a republic needs virtue in its people more than any other government."
+    },
+
+    april: {
+      stage: "Your Farm · April 1775",
+      stakes: [0],
+      heading: "April 1775.",
+      text: "You are trying to keep your household running as fighting approaches Massachusetts. Your neighbors are organizing with the local militia.",
+      source: "Patrick Henry, March 1775: “Give me liberty, or give me death!”",
+      choices: [
+        { id: "militia", label: "JOIN THE MILITIA", title: "JOINED THE MILITIA", echo: "joined the militia",
+          text: "You lose valuable work time and risk your life, but your neighbors see you accept a responsibility to the community.",
+          effects: { time: -15, money: -2, trust: 15 }, points: 25 },
+        { id: "tax", label: "PAY THE TAX AND STAY QUIET", title: "PAID THE TAX AND STAYED QUIET", echo: "paid the tax and stayed quiet",
+          text: "Your {work} stays safe, but your neighbors see you put your own gain ahead of their resistance.",
+          effects: { time: 0, money: -8, trust: -12 }, points: 5 },
+        { id: "neutral", label: "STAY NEUTRAL", title: "STAYED NEUTRAL", echo: "stayed neutral",
+          text: "You keep your time and your safety, but on April 19 your neighbors march to Lexington and Concord without you.",
+          effects: { time: 5, money: 0, trust: -6 }, points: 10 }
+      ]
+    },
+
+    cost: {
+      stage: "Your Town, then Your Country",
+      stakes: [1, 2],
+      heading: "Duty Has a Cost",
+      text: "Taxes and boycotts forced colonists to choose between private profit and resistance to British policy. Your town pledges to stop buying British goods.",
+      choices: [
+        { id: "boycott", label: "JOIN THE BOYCOTT", title: "JOINED THE BOYCOTT",
+          text: "You lose sales and wear homespun instead of British cloth, but your town trusts you.",
+          effects: { time: -3, money: -12, trust: 12 }, points: 25 },
+        { id: "protect", label: "PROTECT YOUR BUSINESS", title: "PROTECTED YOUR BUSINESS",
+          text: "You keep your profit, but the town committee names you an enemy of American liberty.",
+          effects: { time: 0, money: 8, trust: -12 }, points: 5 }
+      ],
+      after: "The same idea of sacrifice appeared after the Revolution, when George Washington gave up military power and later left the presidency after two terms.",
+      long: true
+    },
+
+    who: {
+      stage: "Your Country · Who Served?",
+      stakes: [2],
+      variant: "dark",
+      heading: "WHO GOT ASKED TO SERVE?",
+      text: "Black men, enslaved and free, served the Revolutionary cause, including at Lexington and Concord. Enslaved people were told the Revolution was about liberty while they remained enslaved. Women carried major burdens of the war without equal political rights.",
+      question: "Can a society demand civic duty from people it does not give full citizenship?",
+      choices: [
+        { id: "everyone", label: "DUTY SHOULD APPLY TO EVERYONE", title: "DUTY SHOULD APPLY TO EVERYONE",
+          text: "You hold the Revolution to its own promise: if everyone owes duty, everyone is owed rights.",
+          effects: { time: 0, money: 0, trust: 3 }, points: 0 },
+        { id: "unequal", label: "DUTY WAS UNEQUAL", title: "DUTY WAS UNEQUAL",
+          text: "You name the gap between what the Revolution promised and who it actually protected.",
+          effects: { time: 0, money: 0, trust: 3 }, points: 0 }
+      ],
+      after: "Prince Estabrook, an enslaved man, was wounded at Lexington fighting for a liberty he did not have.",
+      long: true
+    },
+
+    now: {
+      stage: "Your Community · Today",
+      stakes: [3],
+      heading: "IT IS NOW.",
+      text: "Your community still asks you to give something up for the public good. A jury summons lands on the same day as an important work shift. You need the money.",
+      source: "Sixth Amendment: the right to an impartial jury. That jury is people like you.",
+      long: true,
+      choices: [
+        { id: "serve", label: "SERVE", title: "YOU SERVED", echo: "served on a jury",
+          text: "You lose the shift, but you fulfill a civic responsibility.",
+          effects: { time: -8, money: -12, trust: 12 }, points: 25 },
+        { id: "skip", label: "SKIP", title: "YOU SKIPPED", echo: "skipped the summons",
+          text: "You protect your time, but ignoring a jury summons can have legal consequences and avoids a civic responsibility.",
+          effects: { time: 0, money: 10, trust: -12 }, points: 0 },
+        { id: "excused", label: "TRY TO GET EXCUSED", title: "YOU ASKED TO BE EXCUSED", echo: "asked the court through the official process",
+          text: "You protect your work obligation while using the official court process to request an excuse or postponement if you have a legitimate reason.",
+          effects: { time: -3, money: 5, trust: 5 }, points: 18 }
+      ],
+      echo: "In 1775 you {then}. Today you {now}."
+    },
+
+    action: {
+      stage: "Your Community · This Month",
+      stakes: [3],
+      heading: "DO SOMETHING THIS MONTH",
+      text: "Civic duty is not only an idea. Pick one real action.",
+      steps: [
+        "Find your county election office or court website.",
+        "Check the eligibility and application requirements.",
+        "Complete the official application or registration process."
+      ],
+      choices: [
+        { id: "whencalled", label: "SERVE WHEN CALLED", title: "YOU WILL SERVE WHEN CALLED",
+          text: "When a summons arrives, respond by the deadline. Ask for a new date only if you truly need one.",
+          effects: { time: -5, money: 0, trust: 5 }, points: 10 },
+        { id: "pollworker", label: "BECOME A POLL WORKER IF ELIGIBLE", title: "YOU WILL WORK THE POLLS",
+          text: "Election Day is November 3, 2026. Many states let high school students work the polls, and most counties pay.",
+          effects: { time: -5, money: 3, trust: 5 }, points: 10 }
+      ]
+    }
+  },
+
+  ending: {
+    scoreLabel: "YOUR CIVIC DUTY SCORE",
+    judgment: [
+      "American society has lived up to personal duty in some ways: colonists gave up time and money to resist Britain, and Washington gave up power he could have kept.",
+      "It has fallen short in others, because Black Americans and women were asked to carry the burdens of duty without equal political rights."
+    ],
+    juryLine: {
+      serve: "You gave up your shift for a jury, proof the virtue still works when people accept the cost, but who is asked to sacrifice still matters.",
+      excused: "You used the court's official process, proof the virtue can fit real lives, but who can afford to sacrifice still matters.",
+      skip: "You skipped the jury to protect your shift, which shows how easily the virtue slips, and why who is asked to sacrifice still matters."
+    },
+    scoreNote: "Your score measures the personal cost you accepted for civic responsibility, not which view of history is right."
+  },
+
+  /* Sources in MLA 9 style. The web address lives in "url" (it opens from the
+     "View source" link) so no dashes from web addresses show on screen.
+     Full citations with web addresses are in notes.txt. */
+  sources: {
+    label: "SOURCES",
+    citedLabel: "Works Cited",
+    consultedLabel: "Works Consulted",
+    linkText: "View source",
+    cited: [
+      { text: "Henry, Patrick. “Give Me Liberty or Give Me Death.” Speech to the Second Virginia Convention, 23 Mar. 1775. <i>Gilder Lehrman Institute of American History</i>. Accessed 28 Sept. 2026.",
+        url: "https://www.gilderlehrman.org/sites/default/files/2024-01/Speeches.pdf" },
+      { text: "Jefferson, Thomas, et al. “Declaration of Independence: A Transcription.” 4 July 1776. <i>National Archives</i>. Accessed 28 Sept. 2026.",
+        url: "https://www.archives.gov/founding-docs/declaration-transcript" },
+      { text: "Madison, James. “The Bill of Rights: A Transcription.” 1789. <i>National Archives</i>. Accessed 28 Sept. 2026.",
+        url: "https://www.archives.gov/founding-docs/bill-of-rights-transcript" },
+      { text: "Madison, James. “Federalist No. 55.” 1788. <i>National Constitution Center</i>. Accessed 28 Sept. 2026.",
+        url: "https://constitutioncenter.org/the-constitution/historic-document-library/detail/james-madison-federalist-no-55-1788" }
+    ],
+    consulted: [
+      { text: "Brutus [Robert Yates]. “Brutus No. 1.” 18 Oct. 1787. University of Texas at Austin. Accessed 28 Sept. 2026.",
+        url: "https://minio.la.utexas.edu/webeditor-files/coretexts/pdf/178720brutus201.pdf" },
+      { text: "Centinel [Samuel Bryan]. “Centinel 1.” 5 Oct. 1787. Edited by J. David Alvis, <i>Teaching American History</i>. Accessed 28 Sept. 2026.",
+        url: "https://teachingamericanhistory.org/document/centinel-i-2/" },
+      { text: "Madison, James. “Federalist No. 10.” 1787. <i>The Avalon Project</i>, Lillian Goldman Law Library, Yale Law School. Accessed 28 Sept. 2026.",
+        url: "https://avalon.law.yale.edu/18th_century/fed10.asp" },
+      { text: "Madison, James. “Federalist No. 51.” 1788. <i>National Constitution Center</i>. Accessed 28 Sept. 2026.",
+        url: "https://constitutioncenter.org/the-constitution/historic-document-library/detail/james-madison-federalist-no-51-1788" },
+      { text: "Morris, Gouverneur, et al. “The Constitution of the United States.” 17 Sept. 1787. <i>National Constitution Center</i>. Accessed 28 Sept. 2026.",
+        url: "https://constitutioncenter.org/the-constitution/full-text" },
+      { text: "Paine, Thomas. <i>Common Sense</i>. 1776. <i>Bill of Rights Institute</i>. Accessed 28 Sept. 2026.",
+        url: "https://billofrightsinstitute.org/primary-sources/common-sense/" }
+    ]
+  }
+};
+
+/* Timing in milliseconds. */
+const TIMING = { sceneOut: 160, sceneIn: 320, feedback: 300, count: 500, hold: 2400, holdLong: 3800, splash: 1000 };
+</script>
+<style>
+  :root {
+    --cream: #f5ecd6;
+    --cream-2: #fbf6ea;
+    --edge: #e8d9b6;
+    --navy: #1c2a44;
+    --navy-2: #2b3b5c;
+    --navy-soft: #4a5673;
+    --red: #a23e2e;
+    --red-dark: #82301f;
+    --brown: #8a6a44;
+    --brown-light: #cbb086;
+    --green: #3d6a45;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(28,42,68,.08), 0 8px 24px rgba(28,42,68,.12);
+    --ease: cubic-bezier(.2,.75,.25,1);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    color: var(--navy);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.5;
+    background-color: var(--cream);
+    background-image:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .45  0 0 0 0 .33  0 0 0 0 .18  0 0 0 .09 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+      radial-gradient(ellipse at 50% 0%, rgba(255,255,255,.55), transparent 60%),
+      radial-gradient(ellipse at 50% 100%, rgba(138,106,68,.16), transparent 65%);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; }
+  .game { height: 100dvh; display: grid; grid-template-rows: auto 1fr; }
+
+  /* ---------- HUD ---------- */
+  .hud {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    background: rgba(251,246,234,.86);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-bottom: 1.5px solid var(--brown-light);
+    box-shadow: 0 2px 12px rgba(28,42,68,.06);
+    position: relative;
+    z-index: 5;
+  }
+  .who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .portrait {
+    width: 42px; height: 42px; flex: none;
+    border-radius: 50%; overflow: hidden;
+    border: 2px solid var(--navy);
+    background: var(--edge);
+  }
+  .portrait svg { display: block; width: 100%; height: 100%; }
+  .portrait:empty::after {
+    content: "?"; display: grid; place-items: center; height: 100%;
+    font-family: var(--serif); font-size: 1.3rem; color: var(--navy-soft);
+  }
+  .brand { font-size: .72rem; font-weight: 800; letter-spacing: .14em; color: var(--red); }
+  .pname { font-family: var(--serif); font-weight: 700; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .progress {
+    font-weight: 800; font-size: .9rem; letter-spacing: .08em;
+    padding: 5px 12px; border-radius: 999px;
+    background: var(--navy); color: var(--cream-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .res { display: flex; justify-content: flex-end; gap: 14px; }
+  .r { position: relative; min-width: 84px; }
+  .r-top { display: flex; justify-content: space-between; gap: 8px; font-size: .68rem; font-weight: 800; letter-spacing: .08em; }
+  .r-top .short { display: none; }
+  .r-val { font-variant-numeric: tabular-nums; font-size: .82rem; }
+  .r-bar { height: 8px; margin-top: 3px; border-radius: 99px; background: var(--edge); border: 1px solid var(--brown-light); overflow: hidden; }
+  .r-fill { height: 100%; width: 50%; border-radius: 99px; transition: width .5s var(--ease); }
+  .r[data-k="time"] .r-fill { background: var(--navy-2); }
+  .r[data-k="money"] .r-fill { background: var(--green); }
+  .r[data-k="trust"] .r-fill { background: var(--red); }
+  .float {
+    position: absolute; right: 0; top: 100%; margin-top: 4px;
+    font-size: .72rem; font-weight: 800; white-space: nowrap;
+    padding: 2px 8px; border-radius: 99px; color: #fff;
+    animation: floatUp 1.1s var(--ease) forwards; pointer-events: none;
+  }
+  .float.up { background: var(--green); }
+  .float.down { background: var(--red); }
+  @keyframes floatUp { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-4px); } }
+
+  /* ---------- Stage ---------- */
+  .stage-wrap { overflow-y: auto; overflow-x: hidden; display: flex; }
+  #stage {
+    width: 100%; max-width: 920px; margin: 0 auto;
+    padding: 18px 20px 22px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  #stage.out { opacity: 0; transform: translateY(-6px); transition: opacity .16s ease, transform .16s ease; }
+  #stage.in { animation: sceneIn .32s var(--ease); }
+  @keyframes sceneIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  .panel {
+    background: var(--cream-2);
+    border: 1.5px solid var(--brown-light);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 18px 22px 20px;
+  }
+  .panel.dark { background: var(--navy); color: var(--cream-2); border-color: var(--navy); }
+  .art { margin: -4px -8px 6px; }
+  .art svg { display: block; width: 100%; height: auto; max-height: 22vh; }
+  .dark .art svg { max-height: 17vh; }
+  .stakes { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--navy-soft); }
+  .stakes li { padding: 3px 10px; border-radius: 99px; border: 1px solid var(--brown-light); }
+  .stakes li.on { background: var(--red); border-color: var(--red); color: #fff; }
+  .dark .stakes li { border-color: rgba(251,246,234,.35); color: rgba(251,246,234,.75); }
+  .dark .stakes li.on { color: #fff; }
+  .stage-tag { margin: 0; text-align: center; font-size: .78rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--brown); }
+  .dark .stage-tag { color: var(--brown-light); }
+  h1 {
+    margin: 2px 0 8px; text-align: center;
+    font-family: var(--serif); font-weight: 700;
+    font-size: clamp(1.7rem, 4.6vw, 2.5rem); line-height: 1.12; letter-spacing: .01em;
+  }
+  h1:focus { outline: none; }
+  .text { margin: 0 auto; max-width: 62ch; text-align: center; font-size: 1.05rem; }
+  .source {
+    margin: 12px auto 0; max-width: 60ch; text-align: center;
+    font-family: var(--serif); font-style: italic; font-size: .98rem; color: var(--navy-soft);
+  }
+  .source span { font-style: normal; font-family: var(--sans); font-size: .66rem; font-weight: 800; letter-spacing: .12em; color: var(--red); display: block; margin-bottom: 2px; }
+  .question {
+    margin: 14px auto 0; max-width: 46ch; text-align: center;
+    font-family: var(--serif); font-size: 1.25rem; font-weight: 700; line-height: 1.3;
+    padding: 12px 16px; border-top: 1px solid rgba(251,246,234,.3); border-bottom: 1px solid rgba(251,246,234,.3);
+  }
+
+  /* ---------- Definition ---------- */
+  .definition {
+    text-align: center; padding: 14px 18px;
+    border: 2px solid var(--navy); border-radius: var(--radius);
+    background: var(--cream);
+  }
+  .definition .dl { font-size: .72rem; font-weight: 800; letter-spacing: .16em; color: var(--red); }
+  .definition .dt { font-family: var(--serif); font-size: 1.2rem; line-height: 1.35; margin-top: 2px; }
+
+  /* ---------- Character cards ---------- */
+  .chars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .char {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 14px 12px 12px; text-align: center; cursor: pointer;
+    background: var(--cream-2); color: var(--navy);
+    border: 2px solid var(--brown-light); border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    transition: transform .2s var(--ease), border-color .2s, box-shadow .2s;
+  }
+  .char:hover { transform: translateY(-2px); border-color: var(--navy); }
+  .char:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
+  .char.sel { border-color: var(--red); box-shadow: 0 0 0 3px rgba(162,62,46,.25), var(--shadow); }
+  .char .pic { width: 76px; height: 76px; border-radius: 50%; overflow: hidden; border: 2px solid var(--navy); flex: none; }
+  .char .pic svg { display: block; width: 100%; height: 100%; }
+  .char .cn { font-weight: 800; letter-spacing: .1em; font-size: .92rem; }
+  .char .cl { font-family: var(--serif); font-size: .98rem; line-height: 1.3; }
+  .perks { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+  .perk { font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--edge); }
+  .char-body { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .name-row { display: flex; justify-content: center; }
+  .name-input {
+    width: 100%; max-width: 320px; padding: 12px 16px; font-size: 1rem;
+    border: 2px solid var(--brown-light); border-radius: 12px; background: var(--cream-2); color: var(--navy);
+    text-align: center;
+  }
+  .name-input:focus { outline: none; border-color: var(--navy); }
+  .context { text-align: center; font-size: 1rem; margin: 0 auto; max-width: 62ch; }
+
+  /* ---------- Buttons ---------- */
+  .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .choice, .primary {
+    min-height: 60px; padding: 14px 18px; cursor: pointer;
+    border: none; border-radius: 12px;
+    font-weight: 800; font-size: 1rem; letter-spacing: .06em; line-height: 1.25;
+    background: var(--navy); color: var(--cream-2);
+    box-shadow: 0 4px 0 #0e1628, 0 8px 18px rgba(28,42,68,.18);
+    transition: transform .12s var(--ease), box-shadow .12s, background .2s, opacity .3s;
+  }
+  .choice:hover:not(:disabled), .primary:hover:not(:disabled) { background: var(--red); box-shadow: 0 4px 0 #5e2216, 0 8px 18px rgba(28,42,68,.18); }
+  .choice:active:not(:disabled), .primary:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #0e1628; }
+  .choice:focus-visible, .primary:focus-visible { outline: 3px solid var(--red); outline-offset: 3px; }
+  .dark-actions .choice { background: var(--cream-2); color: var(--navy); box-shadow: 0 4px 0 var(--brown), 0 8px 18px rgba(0,0,0,.2); }
+  .dark-actions .choice:hover:not(:disabled) { background: #fff; color: var(--red); }
+  .choice.picked { animation: pick .3s var(--ease); background: var(--red); color: #fff; }
+  .choice.dim { opacity: .3; }
+  .choice:disabled { cursor: default; }
+  @keyframes pick { 50% { transform: scale(1.04); } }
+  .primary { width: 100%; background: var(--red); box-shadow: 0 4px 0 #5e2216, 0 8px 18px rgba(28,42,68,.18); font-size: 1.1rem; }
+  .primary:hover:not(:disabled) { background: var(--red-dark); }
+  .primary:disabled { background: var(--brown-light); color: var(--navy); box-shadow: none; cursor: not-allowed; opacity: .9; }
+
+  /* ---------- Consequence card ---------- */
+  .conseq {
+    grid-column: 1 / -1;
+    display: block; width: 100%; text-align: left; cursor: pointer;
+    padding: 16px 20px 12px; border-radius: var(--radius);
+    background: var(--cream-2); color: var(--navy);
+    border: 2px solid var(--navy); box-shadow: var(--shadow);
+    animation: cardIn .3s var(--ease);
+  }
+  .conseq:focus-visible { outline: 3px solid var(--red); outline-offset: 3px; }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+  .conseq > span { display: block; }
+  .c-title { font-weight: 800; letter-spacing: .1em; font-size: .9rem; color: var(--red); }
+  .c-text { font-family: var(--serif); font-size: 1.08rem; line-height: 1.4; margin-top: 4px; }
+  .c-after { font-size: .95rem; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--brown-light); color: var(--navy-soft); }
+  .c-echo { font-size: .95rem; margin-top: 8px; font-weight: 700; }
+  .deltas { display: flex !important; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { font-size: .76rem; font-weight: 800; letter-spacing: .05em; padding: 4px 10px; border-radius: 99px; color: #fff; }
+  .chip.up { background: var(--green); }
+  .chip.down { background: var(--red); }
+  .c-foot { display: flex !important; align-items: center; gap: 10px; margin-top: 10px; font-size: .75rem; color: var(--navy-soft); }
+  .timer { flex: 1; height: 4px; border-radius: 99px; background: var(--edge); overflow: hidden; }
+  .timer i { display: block; height: 100%; background: var(--navy); transform-origin: left; animation: drain linear forwards; }
+  @keyframes drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+  /* ---------- Steps ---------- */
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0 0; padding: 0; list-style: none; }
+  .steps li {
+    position: relative; padding: 16px 14px 14px; text-align: center;
+    background: var(--cream); border: 1.5px solid var(--brown-light); border-radius: var(--radius);
+    font-weight: 600; font-size: .98rem; line-height: 1.35;
+  }
+  .steps .num {
+    display: grid; place-items: center; width: 40px; height: 40px; margin: 0 auto 8px;
+    border-radius: 50%; background: var(--red); color: #fff; font-family: var(--serif); font-weight: 700; font-size: 1.25rem;
+  }
+  .steps svg { display: block; width: 34px; height: 34px; margin: 0 auto 6px; }
+
+  /* ---------- Ending ---------- */
+  .score-wrap { display: flex; align-items: center; justify-content: center; gap: 22px; flex-wrap: wrap; }
+  .ring { width: 150px; height: 150px; position: relative; flex: none; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring .track { stroke: var(--edge); }
+  .ring .arc { stroke: var(--red); transition: stroke-dashoffset .9s var(--ease); }
+  .ring .num { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+  .ring .num b { font-family: var(--serif); font-size: 2.8rem; line-height: 1; display: block; }
+  .ring .num small { font-weight: 800; letter-spacing: .08em; color: var(--navy-soft); }
+  .score-label { font-weight: 800; letter-spacing: .14em; font-size: .8rem; color: var(--red); }
+  .score-name { font-family: var(--serif); font-size: 1.5rem; font-weight: 700; }
+  .judgment { font-family: var(--serif); font-size: 1.08rem; line-height: 1.5; margin: 0; padding: 14px 18px; border-left: 4px solid var(--red); background: var(--cream); border-radius: 0 12px 12px 0; }
+  .note { margin: 0; font-size: .85rem; color: var(--navy-soft); text-align: center; }
+  .path { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 0; padding: 0; list-style: none; }
+  .path li { font-size: .74rem; font-weight: 700; letter-spacing: .04em; padding: 4px 10px; border-radius: 99px; background: var(--edge); }
+
+  .sources { background: var(--cream-2); border: 1.5px solid var(--brown-light); border-radius: 12px; padding: 10px 16px; }
+  .sources summary { cursor: pointer; font-weight: 800; letter-spacing: .14em; font-size: .8rem; color: var(--red); }
+  .sources h2 { font-family: var(--serif); font-size: 1.05rem; margin: 12px 0 6px; }
+  .sources ul { list-style: none; margin: 0; padding: 0; }
+  .sources li { font-family: var(--serif); font-size: .92rem; line-height: 1.45; padding-left: 2em; text-indent: -2em; margin-bottom: 8px; }
+  .sources a { font-family: var(--sans); font-size: .78rem; font-weight: 700; color: var(--red); white-space: nowrap; }
+
+  /* ---------- IT IS NOW splash ---------- */
+  .splash {
+    position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
+    background: var(--navy); color: var(--cream-2);
+    font-family: var(--serif); font-weight: 700; font-size: clamp(2.6rem, 11vw, 6rem); letter-spacing: .04em;
+    animation: splash 1s ease forwards; pointer-events: none;
+  }
+  .splash span { animation: splashText 1s var(--ease) forwards; }
+  @keyframes splash { 0% { opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes splashText { 0% { transform: scale(.92); letter-spacing: .3em; } 60% { transform: none; letter-spacing: .04em; } }
+
+  /* ---------- Small screens ---------- */
+  @media (max-width: 720px) {
+    body { font-size: 16px; }
+    .hud { grid-template-columns: 1fr auto; grid-template-areas: "who prog" "res res"; padding: 8px 14px 10px; gap: 8px 10px; }
+    .who { grid-area: who; } .progress { grid-area: prog; } .res { grid-area: res; justify-content: space-between; gap: 10px; }
+    .r { flex: 1; min-width: 0; }
+    .r-top .long { display: none; } .r-top .short { display: inline; }
+    #stage { padding: 14px 16px 18px; gap: 12px; }
+    .panel { padding: 14px 16px 16px; }
+    .chars { grid-template-columns: 1fr; gap: 8px; }
+    .char { flex-direction: row; text-align: left; padding: 10px 12px; gap: 12px; }
+    .char .pic { width: 56px; height: 56px; }
+    .char-body { align-items: flex-start; gap: 3px; }
+    .perks { justify-content: flex-start; }
+    .actions { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: 1fr; gap: 8px; }
+    .steps li { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 12px; }
+    .steps .num { margin: 0; flex: none; width: 34px; height: 34px; font-size: 1.05rem; }
+    .steps svg { display: none; }
+    .art svg { max-height: 20vh; }
+    .stakes { gap: 4px; font-size: .62rem; letter-spacing: .05em; }
+    .stakes li { padding: 2px 7px; }
+  }
+  @media (max-height: 700px) and (min-width: 721px) {
+    .art svg { max-height: 20vh; }
+    h1 { font-size: 2rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+<div class="game">
+  <header class="hud">
+    <div class="who">
+      <div class="portrait" id="hudPortrait" aria-hidden="true"></div>
+      <div style="min-width:0">
+        <div class="brand" id="hudBrand"></div>
+        <div class="pname" id="hudName"></div>
+      </div>
+    </div>
+    <div class="progress" id="progress" aria-label="Screen progress"></div>
+    <div class="res" id="res"></div>
+  </header>
+  <div class="stage-wrap" id="stageWrap">
+    <main id="stage" aria-live="polite"></main>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const UI = GAME.ui;
+  const KEYS = ["time", "money", "trust"];
+  const ORDER = ["start", "april", "cost", "who", "now", "action", "final"];
+  const stage = document.getElementById("stage");
+  const stageWrap = document.getElementById("stageWrap");
+
+  /* ---------- Illustrations (inline SVG, no external files) ---------- */
+  const N = "#1c2a44", C = "#fbf6ea", E = "#e8d9b6", R = "#a23e2e", B = "#8a6a44", BL = "#cbb086";
+  const ART = {
+    farmer:
+      '<svg viewBox="0 0 80 80" aria-hidden="true"><rect width="80" height="80" fill="' + E + '"/>' +
+      '<path d="M16 80c0-15 10-24 24-24s24 9 24 24z" fill="#5f7a52" stroke="' + N + '" stroke-width="2"/>' +
+      '<circle cx="40" cy="41" r="12" fill="#f0d9b5" stroke="' + N + '" stroke-width="2"/>' +
+      '<ellipse cx="40" cy="31" rx="21" ry="4.5" fill="#caa55c" stroke="' + N + '" stroke-width="2"/>' +
+      '<path d="M30 31c0-9 4-13 10-13s10 4 10 13z" fill="#caa55c" stroke="' + N + '" stroke-width="2"/>' +
+      '<path d="M67 34v46M61 24v10h12V24M67 24v10" fill="none" stroke="' + N + '" stroke-width="2.5" stroke-linecap="round"/></svg>',
+    shopkeeper:
+      '<svg viewBox="0 0 80 80" aria-hidden="true"><rect width="80" height="80" fill="' + E + '"/>' +
+      '<path d="M16 80c0-15 10-24 24-24s24 9 24 24z" fill="#44506a" stroke="' + N + '" stroke-width="2"/>' +
+      '<path d="M31 60h18v20H31z" fill="' + C + '" stroke="' + N + '" stroke-width="1.5"/>' +
+      '<circle cx="40" cy="41" r="12" fill="#f0d9b5" stroke="' + N + '" stroke-width="2"/>' +
+      '<circle cx="35.5" cy="42" r="3" fill="none" stroke="' + N + '" stroke-width="1.5"/><circle cx="44.5" cy="42" r="3" fill="none" stroke="' + N + '" stroke-width="1.5"/>' +
+      '<path d="M38.5 42h3" stroke="' + N + '" stroke-width="1.5"/>' +
+      '<path d="M21 33L40 20l19 13q-19 -5 -38 0z" fill="' + N + '" stroke="' + N + '" stroke-width="2" stroke-linejoin="round"/></svg>',
+    apprentice:
+      '<svg viewBox="0 0 80 80" aria-hidden="true"><rect width="80" height="80" fill="' + E + '"/>' +
+      '<path d="M16 80c0-15 10-24 24-24s24 9 24 24z" fill="' + R + '" stroke="' + N + '" stroke-width="2"/>' +
+      '<circle cx="40" cy="42" r="12" fill="#f0d9b5" stroke="' + N + '" stroke-width="2"/>' +
+      '<path d="M27 36c0-11 6-16 14-16 8 0 14 4 15 12-5 0-8 1-10 4z" fill="' + N + '" stroke="' + N + '" stroke-width="2" stroke-linejoin="round"/>' +
+      '<path d="M63 46l9 32" stroke="' + B + '" stroke-width="3.5" stroke-linecap="round"/>' +
+      '<rect x="55" y="39" width="16" height="8" rx="1.5" transform="rotate(-16 63 43)" fill="' + N + '"/></svg>',
+
+    april:
+      '<svg viewBox="0 0 480 170" aria-hidden="true">' +
+      '<circle cx="410" cy="42" r="20" fill="' + E + '"/>' +
+      '<path d="M0 124Q120 84 240 112T480 102V170H0z" fill="#e3d2a8" stroke="' + N + '" stroke-width="2"/>' +
+      '<path d="M0 150Q160 128 300 146T480 140V170H0z" fill="#d6c092"/>' +
+      '<path d="M50 76L96 44l46 32z" fill="' + N + '"/><rect x="58" y="76" width="76" height="52" fill="' + R + '" stroke="' + N + '" stroke-width="2"/>' +
+      '<rect x="84" y="96" width="24" height="32" fill="' + C + '" stroke="' + N + '" stroke-width="2"/><path d="M84 96l24 32M108 96l-24 32" stroke="' + N + '" stroke-width="1.5"/>' +
+      '<path d="M150 118h110M150 128h110" stroke="' + B + '" stroke-width="2"/>' +
+      [158, 182, 206, 230, 254].map(x => '<path d="M' + x + ' 110v24" stroke="' + B + '" stroke-width="3"/>').join("") +
+      '<rect x="296" y="72" width="16" height="30" fill="' + C + '" stroke="' + N + '" stroke-width="2"/><path d="M292 72l12 -24 12 24z" fill="' + N + '"/>' +
+      [340, 368, 396, 424, 452].map(x =>
+        '<g transform="translate(' + x + ' 128)" stroke="' + N + '" stroke-width="2.2" stroke-linecap="round" fill="none">' +
+        '<circle cx="0" cy="-38" r="5" fill="#f0d9b5"/><path d="M-8 -42L0 -49 8 -42z" fill="' + N + '"/>' +
+        '<path d="M0 -33V-14M0 -14L-5 0M0 -14L5 0M0 -28L-6 -20"/><path d="M-1 -28L11 -54" stroke="' + B + '" stroke-width="2.6"/></g>').join("") +
+      '</svg>',
+
+    cost:
+      '<svg viewBox="0 0 480 170" aria-hidden="true">' +
+      '<rect x="60" y="54" width="130" height="96" rx="4" fill="' + BL + '" stroke="' + N + '" stroke-width="2"/>' +
+      '<path d="M60 78h130M60 126h130" stroke="' + B + '" stroke-width="2"/>' +
+      '<text x="125" y="73" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="18" letter-spacing="4" fill="' + N + '">TEA</text>' +
+      '<g transform="rotate(-10 125 104)"><rect x="70" y="88" width="112" height="32" rx="4" fill="' + C + '" fill-opacity=".6" stroke="' + R + '" stroke-width="3"/>' +
+      '<text x="126" y="111" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="17" letter-spacing="2" fill="' + R + '">BOYCOTT</text></g>' +
+      '<g fill="' + E + '" stroke="' + N + '" stroke-width="2"><ellipse cx="240" cy="140" rx="20" ry="6"/><ellipse cx="240" cy="132" rx="20" ry="6"/><ellipse cx="240" cy="124" rx="20" ry="6"/></g>' +
+      '<g stroke="' + N + '" stroke-width="2.2" fill="none" stroke-linecap="round">' +
+      '<circle cx="360" cy="84" r="48"/><circle cx="360" cy="84" r="6" fill="' + N + '"/>' +
+      [0, 30, 60, 90, 120, 150].map(a => { const r = a * Math.PI / 180; return '<path d="M' + (360 + 48 * Math.cos(r)).toFixed(1) + ' ' + (84 + 48 * Math.sin(r)).toFixed(1) + 'L' + (360 - 48 * Math.cos(r)).toFixed(1) + ' ' + (84 - 48 * Math.sin(r)).toFixed(1) + '"/>'; }).join("") +
+      '<path d="M330 150l30 -66 30 66M300 150h120"/><path d="M420 150V70l20 -10" stroke="' + B + '"/></g></svg>',
+
+    who:
+      '<svg viewBox="0 0 480 170" aria-hidden="true"><g stroke="' + C + '" stroke-width="2.5" fill="none" stroke-linecap="round">' +
+      '<path d="M240 26V150M200 152h80"/><circle cx="240" cy="24" r="6" fill="' + C + '"/>' +
+      '<path d="M140 70L340 34"/>' +
+      '<path d="M140 70l-30 44M140 70l30 44M340 34l-30 44M340 34l30 44"/></g>' +
+      '<path d="M100 114h80q-6 18 -40 18t-40 -18z" fill="' + R + '" stroke="' + C + '" stroke-width="2"/>' +
+      '<path d="M300 78h80q-6 18 -40 18t-40 -18z" fill="' + E + '" stroke="' + C + '" stroke-width="2"/>' +
+      '<text x="140" y="154" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="15" letter-spacing="3" fill="' + C + '">DUTY</text>' +
+      '<text x="340" y="118" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="15" letter-spacing="3" fill="' + C + '">RIGHTS</text></svg>',
+
+    now:
+      '<svg viewBox="0 0 480 170" aria-hidden="true">' +
+      '<g transform="rotate(-5 140 90)"><rect x="60" y="36" width="160" height="104" rx="6" fill="' + C + '" stroke="' + N + '" stroke-width="2.2"/>' +
+      '<path d="M60 40l80 54 80 -54" fill="none" stroke="' + N + '" stroke-width="2"/>' +
+      '<text x="140" y="128" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="14" letter-spacing="2" fill="' + N + '">JURY SUMMONS</text>' +
+      '<circle cx="140" cy="94" r="11" fill="' + R + '"/></g>' +
+      '<rect x="272" y="26" width="150" height="126" rx="8" fill="' + C + '" stroke="' + N + '" stroke-width="2.2"/>' +
+      '<path d="M272 34a8 8 0 0 1 8 -8h134a8 8 0 0 1 8 8v22H272z" fill="' + R + '"/>' +
+      '<text x="347" y="48" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="14" letter-spacing="3" fill="#fff">FRIDAY</text>' +
+      '<text x="288" y="86" font-family="system-ui,sans-serif" font-weight="700" font-size="14" fill="' + N + '">9:00  Jury duty</text>' +
+      '<text x="288" y="120" font-family="system-ui,sans-serif" font-weight="700" font-size="14" fill="' + N + '">9:00  Work shift</text>' +
+      '<path d="M284 98h124" stroke="' + BL + '" stroke-width="1.5"/>' +
+      '<circle cx="436" cy="100" r="16" fill="' + R + '" stroke="' + N + '" stroke-width="2"/>' +
+      '<text x="436" y="107" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="20" fill="#fff">!</text></svg>',
+
+    stepIcons: [
+      '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="13" cy="13" r="8" fill="none" stroke="' + N + '" stroke-width="2.5"/><path d="M19 19l8 8" stroke="' + N + '" stroke-width="3" stroke-linecap="round"/></svg>',
+      '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="4" width="20" height="24" rx="3" fill="none" stroke="' + N + '" stroke-width="2.2"/><path d="M10 12l2 2 4 -4M10 20l2 2 4 -4M19 12h3M19 20h3" fill="none" stroke="' + N + '" stroke-width="2" stroke-linecap="round"/></svg>',
+      '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 26l2 -6L22 6l4 4L12 24z" fill="none" stroke="' + N + '" stroke-width="2.2" stroke-linejoin="round"/><path d="M19 9l4 4" stroke="' + N + '" stroke-width="2"/></svg>'
+    ]
+  };
+
+  /* ---------- State ---------- */
+  let S, advanceTimer = null, busy = false, navToken = 0;
+  function fresh() {
+    return { char: null, name: UI.defaultName, res: { time: 50, money: 50, trust: 50 }, points: 0, cost: 0, picks: {}, path: [] };
+  }
+
+  /* ---------- Helpers ---------- */
+  function h(tag, cls, html) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (html != null) n.innerHTML = html;
+    return n;
+  }
+  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+  function fill(s) {
+    const ch = S.char ? GAME.characters.find(c => c.id === S.char) : null;
+    return s.replace(/\{work\}/g, ch ? ch.work : "home").replace(/\{name\}/g, esc(S.name));
+  }
+  function clamp(v) { return Math.max(0, Math.min(100, v)); }
+  function deltaText(k, d) { return UI.resourcesShort[k] + " " + (d > 0 ? UI.plus : UI.minus) + " " + Math.abs(d); }
+
+  /* ---------- HUD ---------- */
+  function buildHud() {
+    document.getElementById("hudBrand").textContent = UI.brand;
+    const res = document.getElementById("res");
+    KEYS.forEach(k => {
+      const r = h("div", "r");
+      r.dataset.k = k;
+      r.innerHTML = '<div class="r-top"><span><span class="long">' + UI.resources[k] + '</span><span class="short">' + UI.resourcesShort[k] +
+        '</span></span><span class="r-val"></span></div><div class="r-bar"><div class="r-fill"></div></div>';
+      res.appendChild(r);
+    });
+  }
+  function updateHud() {
+    document.getElementById("hudName").textContent = S.name;
+    const p = document.getElementById("hudPortrait");
+    p.innerHTML = S.char ? ART[S.char] : "";
+  }
+  function paintRes(k, v) {
+    const r = document.querySelector('.r[data-k="' + k + '"]');
+    r.querySelector(".r-fill").style.width = v + "%";
+    r.querySelector(".r-val").textContent = v;
+    r.setAttribute("aria-label", UI.resources[k] + " " + v + " of 100");
+  }
+  function animateTo(target, showFloats) {
+    KEYS.forEach(k => {
+      const from = S.res[k], to = clamp(target[k]), d = to - from;
+      S.res[k] = to;
+      const r = document.querySelector('.r[data-k="' + k + '"]');
+      r.querySelector(".r-fill").style.width = to + "%";
+      if (showFloats && d !== 0) {
+        const f = h("span", "float " + (d > 0 ? "up" : "down"), (d > 0 ? UI.plus : UI.minus) + " " + Math.abs(d));
+        r.appendChild(f);
+        setTimeout(() => f.remove(), 1200);
+      }
+      const t0 = performance.now(), val = r.querySelector(".r-val");
+      (function tick(now) {
+        const p = Math.max(0, Math.min(1, (now - t0) / Math.max(1, TIMING.count)));
+        val.textContent = Math.round(from + d * (1 - Math.pow(1 - p, 3)));
+        if (p < 1) requestAnimationFrame(tick); else paintRes(k, to);
+      })(t0);
+    });
+  }
+
+  /* ---------- Screen flow ---------- */
+  function go(id) {
+    clearTimeout(advanceTimer);
+    const idx = ORDER.indexOf(id);
+    document.getElementById("progress").textContent = (idx + 1) + " / " + ORDER.length;
+    const token = ++navToken;
+    const draw = () => {
+      if (token !== navToken) return;
+      stage.innerHTML = "";
+      stage.classList.remove("out", "in");
+      if (id === "start") renderStart();
+      else if (id === "final") renderFinal();
+      else renderScene(id);
+      void stage.offsetWidth;
+      stage.classList.add("in");
+      stageWrap.scrollTop = 0;
+      const h1 = stage.querySelector("h1");
+      if (h1) h1.focus({ preventScroll: true });
+      busy = false;
+    };
+    busy = true;
+    if (!stage.childElementCount) return draw();
+    stage.classList.remove("in");
+    stage.classList.add("out");
+    setTimeout(() => {
+      if (id === "now") return splash(draw);
+      draw();
+    }, TIMING.sceneOut);
+  }
+  function splash(then) {
+    const s = h("div", "splash", "<span>" + UI.nowSplash + "</span>");
+    s.style.animationDuration = TIMING.splash + "ms";
+    s.firstChild.style.animationDuration = TIMING.splash + "ms";
+    document.body.appendChild(s);
+    setTimeout(then, TIMING.splash * 0.55);
+    setTimeout(() => s.remove(), TIMING.splash);
+  }
+
+  /* ---------- Screen 1 ---------- */
+  function renderStart() {
+    const sc = GAME.screens.start;
+    const panel = h("section", "panel");
+    const h1 = h("h1", null, sc.heading); h1.tabIndex = -1; panel.appendChild(h1);
+
+    const nameRow = h("div", "name-row");
+    const input = h("input", "name-input");
+    input.type = "text"; input.maxLength = 18; input.placeholder = UI.namePlaceholder; input.autocomplete = "off";
+    input.setAttribute("aria-label", UI.namePlaceholder);
+    input.addEventListener("input", () => {
+      const v = input.value.trim();
+      S.name = v ? v.toUpperCase() : UI.defaultName;
+      updateHud();
+    });
+    nameRow.appendChild(input);
+    panel.appendChild(nameRow);
+
+    const chars = h("div", "chars");
+    chars.style.marginTop = "12px";
+    chars.setAttribute("role", "radiogroup");
+    GAME.characters.forEach(c => {
+      const b = h("button", "char");
+      b.type = "button";
+      b.setAttribute("role", "radio");
+      b.setAttribute("aria-checked", "false");
+      b.innerHTML = '<div class="pic">' + ART[c.id] + '</div><div class="char-body"><div class="cn">' + c.name + '</div><div class="cl">' + c.line +
+        '</div><div class="perks">' + c.perks.map(p => '<span class="perk">' + p + '</span>').join("") + '</div></div>';
+      b.addEventListener("click", () => {
+        S.char = c.id;
+        chars.querySelectorAll(".char").forEach(x => { x.classList.toggle("sel", x === b); x.setAttribute("aria-checked", x === b ? "true" : "false"); });
+        animateTo(c.start, false);
+        updateHud();
+        begin.disabled = false;
+        begin.textContent = UI.begin;
+      });
+      chars.appendChild(b);
+    });
+    panel.appendChild(chars);
+    stage.appendChild(panel);
+
+    const def = h("div", "definition", '<div class="dl">' + GAME.definition.label + '</div><div class="dt">' + GAME.definition.text + '</div>');
+    stage.appendChild(def);
+    const ctx = h("p", "context", sc.context);
+    stage.appendChild(ctx);
+    stage.appendChild(h("p", "source", '<span>FOUNDING SOURCE</span>' + sc.source));
+
+    const begin = h("button", "primary", UI.pickPrompt);
+    begin.type = "button";
+    begin.disabled = true;
+    begin.addEventListener("click", () => { if (S.char && !busy) go("april"); });
+    stage.appendChild(begin);
+  }
+
+  /* ---------- Decision screens ---------- */
+  function renderScene(id) {
+    const sc = GAME.screens[id];
+    const panel = h("section", "panel" + (sc.variant === "dark" ? " dark" : ""));
+    const stakes = h("ol", "stakes");
+    UI.stakes.forEach((s, i) => stakes.appendChild(h("li", sc.stakes.includes(i) ? "on" : "", s)));
+    stakes.setAttribute("aria-label", "Rising stakes");
+    panel.appendChild(stakes);
+    if (ART[id]) panel.appendChild(h("div", "art", ART[id]));
+    panel.appendChild(h("p", "stage-tag", sc.stage));
+    const h1 = h("h1", null, sc.heading); h1.tabIndex = -1; panel.appendChild(h1);
+    panel.appendChild(h("p", "text", fill(sc.text)));
+    if (sc.source) panel.appendChild(h("p", "source", '<span>FOUNDING SOURCE</span>' + sc.source));
+    if (sc.question) panel.appendChild(h("p", "question", sc.question));
+    if (sc.steps) {
+      const ol = h("ol", "steps");
+      sc.steps.forEach((t, i) => ol.appendChild(h("li", null, '<div class="num">' + (i + 1) + '</div>' + ART.stepIcons[i] + '<div>' + t + '</div>')));
+      panel.appendChild(ol);
+    }
+    stage.appendChild(panel);
+
+    const actions = h("div", "actions" + (sc.variant === "dark" ? " dark-actions" : ""));
+    sc.choices.forEach(c => {
+      const b = h("button", "choice", c.label);
+      b.type = "button";
+      b.addEventListener("click", () => choose(id, sc, c, b, actions));
+      actions.appendChild(b);
+    });
+    stage.appendChild(actions);
+  }
+
+  function choose(id, sc, c, btn, actions) {
+    if (actions.dataset.locked) return;
+    actions.dataset.locked = "1";
+    actions.querySelectorAll(".choice").forEach(b => { b.disabled = true; b.classList.add(b === btn ? "picked" : "dim"); });
+
+    const target = {};
+    KEYS.forEach(k => target[k] = S.res[k] + (c.effects[k] || 0));
+    animateTo(target, true);
+    S.points += c.points;
+    if (c.points >= 10) KEYS.forEach(k => { if ((c.effects[k] || 0) < 0 && k !== "trust") S.cost += -c.effects[k]; });
+    S.picks[id] = c;
+    S.path.push(c.title);
+
+    setTimeout(() => {
+      actions.innerHTML = "";
+      const card = h("button", "conseq");
+      card.type = "button";
+      card.appendChild(h("span", "c-title", c.title));
+      card.appendChild(h("span", "c-text", fill(c.text)));
+      if (sc.after) card.appendChild(h("span", "c-after", sc.after));
+      if (sc.echo && S.picks.april) {
+        card.appendChild(h("span", "c-echo", sc.echo.replace("{then}", S.picks.april.echo).replace("{now}", c.echo)));
+      }
+      const chips = h("span", "deltas");
+      KEYS.forEach(k => {
+        const d = c.effects[k] || 0;
+        if (d) chips.appendChild(h("span", "chip " + (d > 0 ? "up" : "down"), deltaText(k, d)));
+      });
+      card.appendChild(chips);
+      const hold = sc.long ? TIMING.holdLong : TIMING.hold;
+      const foot = h("span", "c-foot", '<span class="timer"><i style="animation-duration:' + hold + 'ms"></i></span><span>' + UI.tapToContinue + '</span>');
+      card.appendChild(foot);
+      actions.appendChild(card);
+      card.focus({ preventScroll: true });
+      card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      const next = ORDER[ORDER.indexOf(id) + 1];
+      let done = false;
+      const advance = () => { if (done) return; done = true; busy = false; go(next); };
+      card.addEventListener("click", advance);
+      advanceTimer = setTimeout(advance, hold);
+    }, TIMING.feedback);
+  }
+
+  /* ---------- Final screen ---------- */
+  function score() {
+    const costPts = Math.min(15, Math.round(S.cost * 15 / 50));
+    return Math.max(0, Math.min(100, S.points + costPts));
+  }
+  function renderFinal() {
+    const E = GAME.ending, total = score();
+    const panel = h("section", "panel");
+    const wrap = h("div", "score-wrap");
+    const C2 = 2 * Math.PI * 64;
+    const ring = h("div", "ring",
+      '<svg viewBox="0 0 150 150" aria-hidden="true"><circle class="track" cx="75" cy="75" r="64" fill="none" stroke-width="12"/>' +
+      '<circle class="arc" cx="75" cy="75" r="64" fill="none" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + C2.toFixed(1) + '" stroke-dashoffset="' + C2.toFixed(1) + '"/></svg>' +
+      '<div class="num"><div><b>0</b><small>/ 100</small></div></div>');
+    wrap.appendChild(ring);
+    const lab = h("div");
+    lab.appendChild(h("div", "score-label", E.scoreLabel));
+    const nm = h("div", "score-name"); nm.textContent = S.name; lab.appendChild(nm);
+    const h1 = h("h1", null, total + " / 100");
+    h1.tabIndex = -1;
+    h1.style.cssText = "position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)";
+    lab.appendChild(h1);
+    wrap.appendChild(lab);
+    panel.appendChild(wrap);
+    stage.appendChild(panel);
+
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      ring.querySelector(".arc").style.strokeDashoffset = (C2 * (1 - total / 100)).toFixed(1);
+    }));
+    const numEl = ring.querySelector("b"), t0 = performance.now();
+    (function tick(now) {
+      const p = Math.max(0, Math.min(1, (now - t0) / 900));
+      numEl.textContent = Math.round(total * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(tick);
+    })(t0);
+
+    stage.appendChild(h("div", "definition", '<div class="dl">' + GAME.definition.label + '</div><div class="dt">' + GAME.definition.text + '</div>'));
+    const jury = S.picks.now ? S.picks.now.id : "excused";
+    stage.appendChild(h("p", "judgment", E.judgment.concat(E.juryLine[jury]).join(" ")));
+
+    const path = h("ul", "path");
+    S.path.forEach(t => path.appendChild(h("li", null, t)));
+    stage.appendChild(path);
+    stage.appendChild(h("p", "note", E.scoreNote));
+    stage.appendChild(sourcesBlock());
+
+    const again = h("button", "primary", UI.playAgain);
+    again.type = "button";
+    again.addEventListener("click", () => { if (!busy) start(); });
+    stage.appendChild(again);
+  }
+
+  function sourcesBlock() {
+    const SRC = GAME.sources;
+    const d = h("details", "sources");
+    d.appendChild(h("summary", null, SRC.label));
+    [[SRC.citedLabel, SRC.cited], [SRC.consultedLabel, SRC.consulted]].forEach(([label, list]) => {
+      d.appendChild(h("h2", null, label));
+      const ul = h("ul");
+      list.forEach(s => {
+        const li = h("li", null, s.text + " ");
+        const a = h("a", null, SRC.linkText);
+        a.href = s.url; a.target = "_blank"; a.rel = "noopener";
+        li.appendChild(a);
+        ul.appendChild(li);
+      });
+      d.appendChild(ul);
+    });
+    return d;
+  }
+
+  /* ---------- Boot ---------- */
+  function start() {
+    S = fresh();
+    KEYS.forEach(k => paintRes(k, S.res[k]));
+    updateHud();
+    go("start");
+  }
+  document.title = "Personal Duty";
+  buildHud();
+  start();
+})();
+</script>
+</body>
+</html>

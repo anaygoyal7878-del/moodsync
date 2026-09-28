@@ -27,9 +27,15 @@ const nextConfig: NextConfig = {
    * already matches.
    */
   async rewrites() {
+    // Static single-file page in public/duty-game (a school project, not part
+    // of MoodSync); lets /duty-game resolve without typing index.html.
+    const staticPages = [
+      { source: "/duty-game", destination: "/duty-game/index.html" },
+    ];
     const backendUrl = process.env.ALEXA_TUNNEL_BACKEND_URL;
-    if (!backendUrl) return [];
+    if (!backendUrl) return staticPages;
     return [
+      ...staticPages,
       { source: "/api/alexa/skill", destination: `${backendUrl}/api/alexa/skill` },
       { source: "/api/integrations/alexa/token", destination: `${backendUrl}/api/integrations/alexa/token` },
     ];
