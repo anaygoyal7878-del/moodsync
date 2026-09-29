@@ -8,26 +8,44 @@
 /* =====================================================================
    ALL GAME TEXT LIVES IN THIS OBJECT. Edit wording here.
    Project rule: no dashes of any kind in any visible text.
-   {work} is replaced with the character's workplace (farm, shop, trade).
-   effects: change to time, money, trust (resources stay between 0 and 100)
-   points:  duty points toward the score (best choices add up to 85;
-            the last 15 come from the personal cost you accepted)
+   Each encounter choice:
+     kind   = "duty" | "balance" | "self"  (used for the ending summary)
+     fx     = change to time, money, trust, duty (each stays between 0 and 100)
+     result = the consequence shown for about a second after the choice
+   "url" fields are web addresses; they are never shown as text.
    ===================================================================== */
 const GAME = {
   ui: {
     brand: "PERSONAL DUTY",
     defaultName: "CITIZEN",
     namePlaceholder: "Your name (optional)",
-    pickPrompt: "Pick a character to begin",
-    begin: "BEGIN",
-    tapToContinue: "Tap to continue",
-    resources: { time: "TIME", money: "MONEY", trust: "COMMUNITY TRUST" },
-    resourcesShort: { time: "TIME", money: "MONEY", trust: "TRUST" },
-    plus: "plus",
-    minus: "minus",
-    stakes: ["Farm", "Town", "Country", "Community"],
-    nowSplash: "IT IS NOW.",
-    playAgain: "PLAY AGAIN"
+    chooseTitle: "Who are you?",
+    controls: ["The journey moves on its own", "Answer with ↑ ↓ and ENTER, or click", "Hold → or SPACE to hurry"],
+    start: "START THE JOURNEY",
+    pickPrompt: "Pick a character to start",
+    decisions: "DECISIONS",
+    whatNow: "WHAT DO YOU DO?",
+    versus: "VS",
+    sourceLabel: "SOURCE",
+    viewSource: "VIEW SOURCE",
+    langLabel: "AP LANG CONNECTION",
+    yourChoice: "YOUR CHOICE",
+    hurry: "Hold → or SPACE to hurry",
+    arrived: "YOU HAVE ARRIVED IN",
+    youAreIn: "YOU ARE IN",
+    clothes: "Your clothes:",
+    resources: { time: "TIME", money: "MONEY", trust: "COMMUNITY TRUST", duty: "CIVIC DUTY" },
+    resourcesShort: { time: "TIME", money: "MONEY", trust: "TRUST", duty: "DUTY" },
+    stakes: ["YOURSELF", "YOUR COMMUNITY", "THE NATION", "TODAY"],
+    journeyTitle: "YOUR JOURNEY",
+    scoreLabel: "FINAL SCORE",
+    scoreOutOf: "out of 100",
+    decisionsLabel: "Your decisions",
+    actionsLabel: "Three things you can do this month",
+    playAgain: "PLAY AGAIN",
+    sourcesLabel: "SOURCES",
+    citedLabel: "Works Cited",
+    consultedLabel: "Works Consulted"
   },
 
   definition: {
@@ -37,467 +55,525 @@ const GAME = {
 
   characters: [
     { id: "farmer", name: "FARMER", line: "You work the land from dawn to dusk.",
-      perks: ["More Money", "Less Time"], start: { time: 35, money: 65, trust: 50 }, work: "farm" },
+      perks: ["More Money", "Less Time"], start: { time: 35, money: 65 } },
     { id: "shopkeeper", name: "SHOPKEEPER", line: "You sell goods to the whole town.",
-      perks: ["More Money", "Balanced Time"], start: { time: 50, money: 65, trust: 50 }, work: "shop" },
+      perks: ["More Money", "Balanced Time"], start: { time: 50, money: 65 } },
     { id: "apprentice", name: "APPRENTICE", line: "You are learning a trade, coin by coin.",
-      perks: ["More Time", "Less Money"], start: { time: 65, money: 35, trust: 50 }, work: "trade" }
+      perks: ["More Time", "Less Money"], start: { time: 65, money: 35 } }
+  ],
+  startTrust: 30,
+  startDuty: 10,
+
+  /* The six parts of the journey. The world changes as you pass through them. */
+  sections: [
+    { name: "COLONIAL FARM", year: "1774", gate: "1774", outfit: "Linen work clothes" },
+    { name: "COLONIAL TOWN", year: "1775", gate: "1775", outfit: "Waistcoat, breeches, and a tricorn hat" },
+    { name: "REVOLUTIONARY COMMUNITY", year: "1776", gate: "1776", outfit: "A blue wool coat and tricorn hat" },
+    { name: "FOUNDING ERA", year: "1787", gate: "1787", outfit: "A long frock coat and cravat" },
+    { name: "CONSTITUTIONAL DEBATE", year: "1788 to 1791", gate: "1788", outfit: "A frock coat and powdered hair" },
+    { name: "TODAY", year: "Your community now", gate: "TODAY", outfit: "A hoodie, jeans, and sneakers" }
   ],
 
-  screens: {
-    start: {
-      heading: "Who are you?",
-      context: "Republican ideology: a republic survives only if citizens put the public good ahead of private interest.",
-      source: "Federalist 55: a republic needs virtue in its people more than any other government."
-    },
-
-    april: {
-      stage: "Your Farm · April 1775",
-      stakes: [0],
-      heading: "April 1775.",
-      text: "You are trying to keep your household running as fighting approaches Massachusetts. Your neighbors are organizing with the local militia.",
-      source: "Patrick Henry, March 1775: “Give me liberty, or give me death!”",
+  /* The 10 encounters, in the order you pass them. "sign" is the label above the object. */
+  encounters: [
+    {
+      place: "FARM", sign: "FARM", stake: 0, year: "1774", contrast: ["TIME", "DUTY"], showDefinition: true,
+      text: "Your town needs every family to repair the bridge. Your own field is waiting.",
+      ask: "What do you owe your community?",
       choices: [
-        { id: "militia", label: "JOIN THE MILITIA", title: "JOINED THE MILITIA", echo: "joined the militia",
-          text: "You lose valuable work time and risk your life, but your neighbors see you accept a responsibility to the community.",
-          effects: { time: -15, money: -2, trust: 15 }, points: 25 },
-        { id: "tax", label: "PAY THE TAX AND STAY QUIET", title: "PAID THE TAX AND STAYED QUIET", echo: "paid the tax and stayed quiet",
-          text: "Your {work} stays safe, but your neighbors see you put your own gain ahead of their resistance.",
-          effects: { time: 0, money: -8, trust: -12 }, points: 5 },
-        { id: "neutral", label: "STAY NEUTRAL", title: "STAYED NEUTRAL", echo: "stayed neutral",
-          text: "You keep your time and your safety, but on April 19 your neighbors march to Lexington and Concord without you.",
-          effects: { time: 5, money: 0, trust: -6 }, points: 10 }
-      ]
-    },
-
-    cost: {
-      stage: "Your Town, then Your Country",
-      stakes: [1, 2],
-      heading: "Duty Has a Cost",
-      text: "Taxes and boycotts forced colonists to choose between private profit and resistance to British policy. Your town pledges to stop buying British goods.",
-      choices: [
-        { id: "boycott", label: "JOIN THE BOYCOTT", title: "JOINED THE BOYCOTT",
-          text: "You lose sales and wear homespun instead of British cloth, but your town trusts you.",
-          effects: { time: -3, money: -12, trust: 12 }, points: 25 },
-        { id: "protect", label: "PROTECT YOUR BUSINESS", title: "PROTECTED YOUR BUSINESS",
-          text: "You keep your profit, but the town committee names you an enemy of American liberty.",
-          effects: { time: 0, money: 8, trust: -12 }, points: 5 }
+        { label: "Fix the bridge all day", kind: "duty", fx: { time: -12, money: -5, trust: 8, duty: 8 },
+          result: "Your field waits. The town can reach market." },
+        { label: "Help for half a day", kind: "balance", fx: { time: -5, money: -2, trust: 2, duty: 2 },
+          result: "A fair split between town and field." },
+        { label: "Tend your own field", kind: "self", fx: { time: 8, money: 5, trust: -15, duty: -15 },
+          result: "Your neighbors did your share." }
       ],
-      after: "The same idea of sacrifice appeared after the Revolution, when George Washington gave up military power and later left the presidency after two terms.",
-      long: true
+      sources: [{ cite: "Thomas Paine, Common Sense, 1776", quote: "Society in every state is a blessing.", url: "https://billofrightsinstitute.org/primary-sources/common-sense/" }],
+      lang: "Rhetorical question: it makes you answer for yourself before you choose."
     },
-
-    who: {
-      stage: "Your Country · Who Served?",
-      stakes: [2],
-      variant: "dark",
-      heading: "WHO GOT ASKED TO SERVE?",
-      text: "Black men, enslaved and free, served the Revolutionary cause, including at Lexington and Concord. Enslaved people were told the Revolution was about liberty while they remained enslaved. Women carried major burdens of the war without equal political rights.",
-      question: "Can a society demand civic duty from people it does not give full citizenship?",
+    {
+      place: "MILITIA", sign: "MILITIA MUSTER", stake: 1, year: "Spring 1775", contrast: ["LIBERTY", "SAFETY"],
+      text: "Patrick Henry urged Virginia to arm. Your militia needs volunteers. Your family needs you.",
+      ask: "Is your safety worth more than liberty?",
       choices: [
-        { id: "everyone", label: "DUTY SHOULD APPLY TO EVERYONE", title: "DUTY SHOULD APPLY TO EVERYONE",
-          text: "You hold the Revolution to its own promise: if everyone owes duty, everyone is owed rights.",
-          effects: { time: 0, money: 0, trust: 3 }, points: 0 },
-        { id: "unequal", label: "DUTY WAS UNEQUAL", title: "DUTY WAS UNEQUAL",
-          text: "You name the gap between what the Revolution promised and who it actually protected.",
-          effects: { time: 0, money: 0, trust: 3 }, points: 0 }
+        { label: "Join the militia", kind: "duty", fx: { time: -15, money: -5, trust: 10, duty: 10 },
+          result: "You risk your safety. Your town notices." },
+        { label: "Drill on weekends", kind: "balance", fx: { time: -6, trust: 2, duty: 2 },
+          result: "Family and town each get part of you." },
+        { label: "Stay home", kind: "self", fx: { time: 8, money: 3, trust: -15, duty: -15 },
+          result: "Safe at home. Others march for you." }
       ],
-      after: "Prince Estabrook, an enslaved man, was wounded at Lexington fighting for a liberty he did not have.",
-      long: true
+      sources: [{ cite: "Patrick Henry, “Give Me Liberty or Give Me Death,” 1775", quote: "Is life so dear, or peace so sweet, as to be purchased at the price of chains and slavery?", url: "https://www.gilderlehrman.org/sites/default/files/2024-01/Speeches.pdf" }],
+      lang: "Henry pairs a rhetorical question with the antithesis of liberty and death, so comfort starts to sound like surrender."
     },
-
-    now: {
-      stage: "Your Community · Today",
-      stakes: [3],
-      heading: "IT IS NOW.",
-      text: "Your community still asks you to give something up for the public good. A jury summons lands on the same day as an important work shift. You need the money.",
-      source: "Sixth Amendment: the right to an impartial jury. That jury is people like you.",
-      long: true,
+    {
+      place: "PRINT SHOP", sign: "PRINT SHOP", stake: 1, year: "1776", contrast: ["FREEDOM", "RESPONSIBILITY"],
+      text: "You run the press. Printing Common Sense could anger officials.",
+      ask: null,
       choices: [
-        { id: "serve", label: "SERVE", title: "YOU SERVED", echo: "served on a jury",
-          text: "You lose the shift, but you fulfill a civic responsibility.",
-          effects: { time: -8, money: -12, trust: 12 }, points: 25 },
-        { id: "skip", label: "SKIP", title: "YOU SKIPPED", echo: "skipped the summons",
-          text: "You protect your time, but ignoring a jury summons can have legal consequences and avoids a civic responsibility.",
-          effects: { time: 0, money: 10, trust: -12 }, points: 0 },
-        { id: "excused", label: "TRY TO GET EXCUSED", title: "YOU ASKED TO BE EXCUSED", echo: "asked the court through the official process",
-          text: "You protect your work obligation while using the official court process to request an excuse or postponement if you have a legitimate reason.",
-          effects: { time: -3, money: 5, trust: 5 }, points: 18 }
+        { label: "Print it and sign it", kind: "duty", fx: { time: -5, money: -8, trust: 8, duty: 8 },
+          result: "Risky and public. Some customers stop coming." },
+        { label: "Print it unsigned", kind: "balance", fx: { time: -4, money: 4, trust: 2, duty: 2 },
+          result: "Like Paine's first edition, it spreads unsigned." },
+        { label: "Refuse the job", kind: "self", fx: { time: 5, money: -5, trust: -15, duty: -15 },
+          result: "No trouble. Another printer takes it." }
       ],
-      echo: "In 1775 you {then}. Today you {now}."
+      sources: [{ cite: "Thomas Paine, Common Sense, 1776", quote: "government even in its best state is but a necessary evil", url: "https://billofrightsinstitute.org/primary-sources/common-sense/" }],
+      lang: "Antithesis: society as a blessing set against government as a necessary evil."
     },
-
-    action: {
-      stage: "Your Community · This Month",
-      stakes: [3],
-      heading: "DO SOMETHING THIS MONTH",
-      text: "Civic duty is not only an idea. Pick one real action.",
-      steps: [
-        "Find your county election office or court website.",
-        "Check the eligibility and application requirements.",
-        "Complete the official application or registration process."
-      ],
+    {
+      place: "DECLARATION", sign: "DECLARATION OF INDEPENDENCE", stake: 1, year: "July 1776", contrast: ["RIGHTS", "RESPONSIBILITY"],
+      text: "The Declaration says all men are created equal. Enslaved people and women lack those rights.",
+      ask: "Does that promise create a duty?",
       choices: [
-        { id: "whencalled", label: "SERVE WHEN CALLED", title: "YOU WILL SERVE WHEN CALLED",
-          text: "When a summons arrives, respond by the deadline. Ask for a new date only if you truly need one.",
-          effects: { time: -5, money: 0, trust: 5 }, points: 10 },
-        { id: "pollworker", label: "BECOME A POLL WORKER IF ELIGIBLE", title: "YOU WILL WORK THE POLLS",
-          text: "Election Day is November 3, 2026. Many states let high school students work the polls, and most counties pay.",
-          effects: { time: -5, money: 3, trust: 5 }, points: 10 }
-      ]
+        { label: "Speak up for them", kind: "duty", fx: { time: -8, trust: -6, duty: 10 },
+          result: "Some neighbors turn cold. You kept faith." },
+        { label: "Raise it later", kind: "balance", fx: { time: -2, trust: 2, duty: -4 },
+          result: "The crowd stays calm. The contradiction waits." },
+        { label: "Say nothing", kind: "self", fx: { time: 2, trust: -5, duty: -15 },
+          result: "Those left out notice your silence." }
+      ],
+      sources: [{ cite: "Declaration of Independence, 1776", quote: "all men are created equal", url: "https://www.archives.gov/founding-docs/declaration-transcript" }],
+      lang: "Juxtaposition: the words of equality set beside the people they left out."
+    },
+    {
+      place: "CONVENTION", sign: "CONSTITUTIONAL CONVENTION", stake: 2, year: "1787", contrast: ["YOUR STATE", "GENERAL WELFARE"],
+      text: "You are a delegate in Philadelphia. The nation needs a compromise. Your state wants more.",
+      ask: null,
+      choices: [
+        { label: "Compromise for the nation", kind: "duty", fx: { time: -10, trust: 6, duty: 8 },
+          result: "Your state grumbles. The Union holds." },
+        { label: "Push, then compromise", kind: "balance", fx: { time: -8, trust: 2, duty: 2 },
+          result: "You defend your voters and the nation." },
+        { label: "Walk out", kind: "self", fx: { time: 8, trust: -15, duty: -15 },
+          result: "The nation loses your voice." }
+      ],
+      sources: [{ cite: "Constitution of the United States, Preamble, 1787", quote: "promote the general Welfare", url: "https://constitutioncenter.org/the-constitution/full-text" }],
+      lang: "Concession: representing your state is a real duty, so the best answer weighs both."
+    },
+    {
+      place: "TOWN MEETING", sign: "TOWN MEETING", stake: 2, year: "1787", contrast: ["PRIVATE INTEREST", "PUBLIC GOOD"],
+      text: "Debtors and lenders want laws for their own side. You are on one side.",
+      ask: null,
+      choices: [
+        { label: "Seek a fair law", kind: "duty", fx: { time: -10, money: -4, trust: 8, duty: 8 },
+          result: "You give up an edge. Both sides respect you." },
+        { label: "Vote with your side", kind: "self", fx: { time: -2, money: 8, trust: -15, duty: -15 },
+          result: "You win. The town splits." },
+        { label: "Skip the meeting", kind: "self", fx: { time: 8, trust: -15, duty: -15 },
+          result: "Others decide for you." }
+      ],
+      sources: [{ cite: "James Madison, Federalist No. 10, 1787", quote: "Liberty is to faction what air is to fire.", url: "https://avalon.law.yale.edu/18th_century/fed10.asp" }],
+      lang: "Antithesis: your side against the whole community, the way Madison framed faction."
+    },
+    {
+      place: "FEDERALIST NEWSPAPER", sign: "THE FEDERALIST", stake: 2, year: "1788", contrast: ["POWER", "LIMITS"],
+      text: "You hold office. Federalist 51 says power needs checks. An ally offers a way around yours.",
+      ask: null,
+      choices: [
+        { label: "Respect the limit", kind: "duty", fx: { time: -6, trust: 8, duty: 8 },
+          result: "Slower for you. Safer for all." },
+        { label: "Ask for a review", kind: "balance", fx: { time: -8, trust: 2, duty: 2 },
+          result: "You let others check you." },
+        { label: "Bend it once", kind: "self", fx: { time: 6, money: 5, trust: -15, duty: -15 },
+          result: "It works today. It sets a precedent." }
+      ],
+      sources: [{ cite: "James Madison, Federalist No. 51, 1788", quote: "If men were angels, no government would be necessary.", url: "https://constitutioncenter.org/the-constitution/historic-document-library/detail/james-madison-federalist-no-51-1788" }],
+      lang: "Antithesis: angels against ordinary people, and power against the limits that check it."
+    },
+    {
+      place: "FIRST FEDERAL ELECTION", sign: "FIRST FEDERAL ELECTION", stake: 2, year: "1788", contrast: ["YOUR TIME", "REPRESENTATION"],
+      text: "Neighbors ask you to run for Congress. It pays little and takes you from home.",
+      ask: "Who speaks for you otherwise?",
+      choices: [
+        { label: "Run for the seat", kind: "duty", fx: { time: -15, money: -8, trust: 10, duty: 10 },
+          result: "Months away. Your district has a voice." },
+        { label: "Back a better candidate", kind: "balance", fx: { time: -6, trust: 2, duty: 2 },
+          result: "You help choose good leaders." },
+        { label: "Stay out of it", kind: "self", fx: { time: 8, trust: -15, duty: -15 },
+          result: "Someone else speaks for you." }
+      ],
+      sources: [{ cite: "James Madison, Federalist No. 55, 1788", quote: "Republican government presupposes the existence of these qualities in a higher degree than any other form.", url: "https://constitutioncenter.org/the-constitution/historic-document-library/detail/james-madison-federalist-no-55-1788" }],
+      lang: "Second person: you, not a famous founder, decide whether to serve."
+    },
+    {
+      place: "BILL OF RIGHTS", sign: "BILL OF RIGHTS", stake: 2, year: "1789", contrast: ["EFFECTIVE GOVERNMENT", "INDIVIDUAL LIBERTY"],
+      text: "Brutus warned of too much federal power. Congress proposes a Bill of Rights.",
+      ask: "How much power is too much?",
+      choices: [
+        { label: "Ratify it", kind: "duty", fx: { time: -6, trust: 8, duty: 8 },
+          result: "Strong government, rights in writing." },
+        { label: "Demand stricter limits", kind: "balance", fx: { time: -8, trust: 2, duty: 2 },
+          result: "Liberty guarded. Government slowed." },
+        { label: "Leave it to others", kind: "self", fx: { time: 6, trust: -15, duty: -15 },
+          result: "Others decide your rights." }
+      ],
+      sources: [
+        { cite: "Brutus No. 1, 1787", quote: "In every free government, the people must give their assent to the laws by which they are governed.", url: "https://minio.la.utexas.edu/webeditor-files/coretexts/pdf/178720brutus201.pdf" },
+        { cite: "Bill of Rights, First Amendment, 1791", quote: "Congress shall make no law", url: "https://www.archives.gov/founding-docs/bill-of-rights-transcript" }
+      ],
+      lang: "Antithesis: effective government set against individual liberty."
+    },
+    {
+      place: "COURTHOUSE", sign: "COURTHOUSE", stake: 3, year: "Today", contrast: ["YOUR OBLIGATION", "JURY DUTY"],
+      text: "It is now. A jury summons falls on the day of a shift you promised to work.",
+      ask: "If everyone skips, who decides?",
+      choices: [
+        { id: "serve", label: "SERVE", kind: "duty", fx: { time: -12, money: -10, trust: 12, duty: 12 },
+          result: "You lose the shift but fulfill your duty." },
+        { id: "skip", label: "SKIP", kind: "self", fx: { time: 8, money: 10, trust: -15, duty: -15 },
+          result: "You keep the pay, but ignoring a summons can bring legal trouble." },
+        { id: "excuse", label: "REQUEST AN EXCUSE THROUGH THE OFFICIAL PROCESS", kind: "balance", fx: { time: 2, trust: 4, duty: 5 },
+          result: "You respect both the court and your job." }
+      ],
+      sources: [{ cite: "Bill of Rights, Sixth Amendment, 1791", quote: "an impartial jury", url: "https://www.archives.gov/founding-docs/bill-of-rights-transcript" }],
+      lang: "Juxtaposition: the founding era's question arrives in your own mailbox."
+    }
+  ],
+
+  ending: {
+    duty: {
+      high: "You consistently accepted reasonable personal costs when your community needed you.",
+      mid: "You accepted personal costs when the stakes felt high, and protected your own interests when they felt small.",
+      low: "You usually chose your own convenience over what your community asked of you."
+    },
+    balanceNote: "You also weighed real competing obligations instead of sacrificing everything, which is part of responsible judgment.",
+    trust: {
+      high: "People recognize your participation.",
+      mid: "Your neighbors trust you, with some reservations.",
+      low: "Your community has become less willing to rely on you."
+    },
+    jury: {
+      serve: "Today, you gave up a shift to serve on a jury.",
+      excuse: "Today, you used the court's official process instead of ignoring your summons.",
+      skip: "Today, you skipped your summons and left the duty to others."
+    },
+    conclusion: "American society has practiced personal duty in meaningful ways, from militias and boycotts to citizens who still serve on juries. Yet the same founding era demanded service from enslaved people and women while denying them full political rights. Civic responsibility can require sacrifice, but it also depends on who is asked to serve and who is allowed to share the rights.",
+    actions: [
+      "Check if you can be a paid student poll worker through your county election office.",
+      "If a jury summons comes, answer it by the deadline instead of ignoring it.",
+      "Attend or watch one city council or school board meeting."
+    ],
+    scoreNote: "Your score comes from your Civic Duty and Community Trust. It measures the personal costs you accepted, not whether you are a good person."
+  },
+
+  /* Civic personality shown at the end. The game checks these rules in order
+     and uses the first one that fits (see personalityFor in the code):
+       bystander   6 or more convenient choices
+       minuteman   8 or more duty choices
+       compromiser 5 or more middle path choices, 2 or fewer convenient choices
+       reformer    spoke up at the Declaration and made 5 or more duty choices
+       watchdog    demanded stricter limits at the Bill of Rights, 3 or fewer convenient choices
+       compromiser 4 or more middle path choices, 2 or fewer convenient choices
+       pragmatist  everyone else */
+  personality: {
+    label: "YOUR CIVIC PERSONALITY",
+    basedOn: "Based on your 10 decisions: {duty} duty, {balance} middle path, {self} convenience.",
+    strengthLabel: "Strength",
+    blindLabel: "Blind spot",
+    historyLabel: "In history",
+    traits: { duty: "Sacrifice", balance: "Balance", self: "Self interest" },
+    types: {
+      minuteman: {
+        name: "THE MINUTEMAN", tagline: "You answer the call.",
+        text: "When your community needed you, you showed up almost every time, even when it cost you time, money, or safety.",
+        strength: "People know they can count on you.",
+        blind: "You can give so much that your own family and obligations fall behind.",
+        history: "Minutemen were Massachusetts militia members expected to be ready to march at a minute's notice."
+      },
+      reformer: {
+        name: "THE REFORMER", tagline: "You hold the promise to its words.",
+        text: "You served your community, and you also insisted that the rights it promised should reach the people it left out.",
+        strength: "You make a society live up to its own ideals.",
+        blind: "Speaking up can cost you the trust of neighbors who want to keep the peace.",
+        history: "In 1776, Abigail Adams asked John Adams to “remember the ladies” when writing new laws."
+      },
+      watchdog: {
+        name: "THE WATCHDOG", tagline: "You keep power honest.",
+        text: "You took part, but you kept a close eye on power and pushed for written limits to protect individual liberty.",
+        strength: "You protect everyone's rights from leaders who reach too far.",
+        blind: "Too many limits can slow a government that needs to act.",
+        history: "Brutus warned in 1787 that the new national government could grow too powerful, and his side helped win the Bill of Rights."
+      },
+      compromiser: {
+        name: "THE COMPROMISER", tagline: "You find the path that holds everyone together.",
+        text: "You weighed your own obligations against your community's needs and usually found a middle path both could live with.",
+        strength: "You keep people working together when they disagree.",
+        blind: "Sometimes a moment calls for full sacrifice, not a split.",
+        history: "Roger Sherman's Connecticut Compromise in 1787 settled how states would be represented in Congress."
+      },
+      pragmatist: {
+        name: "THE PRAGMATIST", tagline: "You serve when it matters most.",
+        text: "You stepped up when the stakes felt high and protected your own time and money when they felt small.",
+        strength: "You are realistic about what you can give.",
+        blind: "Duty that depends on convenience can disappear right when it is needed.",
+        history: "Many colonists' support for the Revolution rose and fell with what it cost them."
+      },
+      bystander: {
+        name: "THE BYSTANDER", tagline: "You let others carry the load.",
+        text: "You mostly protected your own time, money, and safety, and left the civic work to your neighbors.",
+        strength: "You protect what is yours.",
+        blind: "A republic cannot survive if most citizens watch from the side.",
+        history: "Many colonists tried to stay neutral and wait to see which side would win."
+      }
     }
   },
 
-  ending: {
-    scoreLabel: "YOUR CIVIC DUTY SCORE",
-    judgment: [
-      "American society has lived up to personal duty in some ways: colonists gave up time and money to resist Britain, and Washington gave up power he could have kept.",
-      "It has fallen short in others, because Black Americans and women were asked to carry the burdens of duty without equal political rights."
-    ],
-    juryLine: {
-      serve: "You gave up your shift for a jury, proof the virtue still works when people accept the cost, but who is asked to sacrifice still matters.",
-      excused: "You used the court's official process, proof the virtue can fit real lives, but who can afford to sacrifice still matters.",
-      skip: "You skipped the jury to protect your shift, which shows how easily the virtue slips, and why who is asked to sacrifice still matters."
-    },
-    scoreNote: "Your score measures the personal cost you accepted for civic responsibility, not which view of history is right."
-  },
-
-  /* Sources in MLA 9 style. The web address lives in "url" (it opens from the
-     "View source" link) so no dashes from web addresses show on screen.
-     Full citations with web addresses are in notes.txt. */
+  /* Citations in MLA 9 style for the ending screen. */
   sources: {
-    label: "SOURCES",
-    citedLabel: "Works Cited",
-    consultedLabel: "Works Consulted",
     linkText: "View source",
     cited: [
-      { text: "Henry, Patrick. “Give Me Liberty or Give Me Death.” Speech to the Second Virginia Convention, 23 Mar. 1775. <i>Gilder Lehrman Institute of American History</i>. Accessed 28 Sept. 2026.",
-        url: "https://www.gilderlehrman.org/sites/default/files/2024-01/Speeches.pdf" },
-      { text: "Jefferson, Thomas, et al. “Declaration of Independence: A Transcription.” 4 July 1776. <i>National Archives</i>. Accessed 28 Sept. 2026.",
-        url: "https://www.archives.gov/founding-docs/declaration-transcript" },
-      { text: "Madison, James. “The Bill of Rights: A Transcription.” 1789. <i>National Archives</i>. Accessed 28 Sept. 2026.",
-        url: "https://www.archives.gov/founding-docs/bill-of-rights-transcript" },
-      { text: "Madison, James. “Federalist No. 55.” 1788. <i>National Constitution Center</i>. Accessed 28 Sept. 2026.",
-        url: "https://constitutioncenter.org/the-constitution/historic-document-library/detail/james-madison-federalist-no-55-1788" }
+      { text: "Brutus [Robert Yates]. “Brutus No. 1.” 18 Oct. 1787. University of Texas at Austin. Accessed 28 Sept. 2026.", url: "https://minio.la.utexas.edu/webeditor-files/coretexts/pdf/178720brutus201.pdf" },
+      { text: "Henry, Patrick. “Give Me Liberty or Give Me Death.” Speech to the Second Virginia Convention, 23 Mar. 1775. <i>Gilder Lehrman Institute of American History</i>. Accessed 28 Sept. 2026.", url: "https://www.gilderlehrman.org/sites/default/files/2024-01/Speeches.pdf" },
+      { text: "Jefferson, Thomas, et al. “Declaration of Independence: A Transcription.” 4 July 1776. <i>National Archives</i>. Accessed 28 Sept. 2026.", url: "https://www.archives.gov/founding-docs/declaration-transcript" },
+      { text: "Madison, James. “The Bill of Rights: A Transcription.” 1789. <i>National Archives</i>. Accessed 28 Sept. 2026.", url: "https://www.archives.gov/founding-docs/bill-of-rights-transcript" },
+      { text: "Madison, James. “Federalist No. 10.” 1787. <i>The Avalon Project</i>, Lillian Goldman Law Library, Yale Law School. Accessed 28 Sept. 2026.", url: "https://avalon.law.yale.edu/18th_century/fed10.asp" },
+      { text: "Madison, James. “Federalist No. 51.” 1788. <i>National Constitution Center</i>. Accessed 28 Sept. 2026.", url: "https://constitutioncenter.org/the-constitution/historic-document-library/detail/james-madison-federalist-no-51-1788" },
+      { text: "Madison, James. “Federalist No. 55.” 1788. <i>National Constitution Center</i>. Accessed 28 Sept. 2026.", url: "https://constitutioncenter.org/the-constitution/historic-document-library/detail/james-madison-federalist-no-55-1788" },
+      { text: "Morris, Gouverneur, et al. “The Constitution of the United States.” 17 Sept. 1787. <i>National Constitution Center</i>. Accessed 28 Sept. 2026.", url: "https://constitutioncenter.org/the-constitution/full-text" },
+      { text: "Paine, Thomas. <i>Common Sense</i>. 1776. <i>Bill of Rights Institute</i>. Accessed 28 Sept. 2026.", url: "https://billofrightsinstitute.org/primary-sources/common-sense/" }
     ],
     consulted: [
-      { text: "Brutus [Robert Yates]. “Brutus No. 1.” 18 Oct. 1787. University of Texas at Austin. Accessed 28 Sept. 2026.",
-        url: "https://minio.la.utexas.edu/webeditor-files/coretexts/pdf/178720brutus201.pdf" },
-      { text: "Centinel [Samuel Bryan]. “Centinel 1.” 5 Oct. 1787. Edited by J. David Alvis, <i>Teaching American History</i>. Accessed 28 Sept. 2026.",
-        url: "https://teachingamericanhistory.org/document/centinel-i-2/" },
-      { text: "Madison, James. “Federalist No. 10.” 1787. <i>The Avalon Project</i>, Lillian Goldman Law Library, Yale Law School. Accessed 28 Sept. 2026.",
-        url: "https://avalon.law.yale.edu/18th_century/fed10.asp" },
-      { text: "Madison, James. “Federalist No. 51.” 1788. <i>National Constitution Center</i>. Accessed 28 Sept. 2026.",
-        url: "https://constitutioncenter.org/the-constitution/historic-document-library/detail/james-madison-federalist-no-51-1788" },
-      { text: "Morris, Gouverneur, et al. “The Constitution of the United States.” 17 Sept. 1787. <i>National Constitution Center</i>. Accessed 28 Sept. 2026.",
-        url: "https://constitutioncenter.org/the-constitution/full-text" },
-      { text: "Paine, Thomas. <i>Common Sense</i>. 1776. <i>Bill of Rights Institute</i>. Accessed 28 Sept. 2026.",
-        url: "https://billofrightsinstitute.org/primary-sources/common-sense/" }
+      { text: "Centinel [Samuel Bryan]. “Centinel 1.” 5 Oct. 1787. Edited by J. David Alvis, <i>Teaching American History</i>. Accessed 28 Sept. 2026.", url: "https://teachingamericanhistory.org/document/centinel-i-2/" }
     ]
   }
 };
 
-/* Timing in milliseconds. */
-const TIMING = { sceneOut: 160, sceneIn: 320, feedback: 300, count: 500, hold: 2400, holdLong: 3800, splash: 1000 };
+/* Tuning. Speed is in world units per second (the ground is 600 units tall on screen). */
+const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhead: 170, resultHold: 1000, banner: 1800 };
 </script>
 <style>
   :root {
-    --cream: #f5ecd6;
-    --cream-2: #fbf6ea;
-    --edge: #e8d9b6;
-    --navy: #1c2a44;
-    --navy-2: #2b3b5c;
-    --navy-soft: #4a5673;
-    --red: #a23e2e;
-    --red-dark: #82301f;
-    --brown: #8a6a44;
-    --brown-light: #cbb086;
-    --green: #3d6a45;
+    --cream: #f5ecd6; --cream-2: #fbf6ea; --edge: #e8d9b6;
+    --navy: #1c2a44; --navy-2: #2b3b5c; --navy-soft: #4a5673;
+    --red: #b5402c; --red-dark: #8e3221; --brown: #8a6a44; --brown-light: #cbb086;
+    --green: #3d7a4d; --gold: #c9921f;
     --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --radius: 14px;
-    --shadow: 0 1px 2px rgba(28,42,68,.08), 0 8px 24px rgba(28,42,68,.12);
     --ease: cubic-bezier(.2,.75,.25,1);
+    --shadow: 0 1px 2px rgba(28,42,68,.08), 0 12px 32px rgba(28,42,68,.22);
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body {
-    margin: 0;
-    color: var(--navy);
-    font-family: var(--sans);
-    font-size: 17px;
-    line-height: 1.5;
-    background-color: var(--cream);
-    background-image:
-      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .45  0 0 0 0 .33  0 0 0 0 .18  0 0 0 .09 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
-      radial-gradient(ellipse at 50% 0%, rgba(255,255,255,.55), transparent 60%),
-      radial-gradient(ellipse at 50% 100%, rgba(138,106,68,.16), transparent 65%);
-    -webkit-font-smoothing: antialiased;
-  }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--cream); color: var(--navy); font-family: var(--sans); overflow: hidden; -webkit-font-smoothing: antialiased; touch-action: manipulation; }
   button { font: inherit; }
-  .game { height: 100dvh; display: grid; grid-template-rows: auto 1fr; }
+  .app { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr; }
 
   /* ---------- HUD ---------- */
-  .hud {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 20px;
-    background: rgba(251,246,234,.86);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    border-bottom: 1.5px solid var(--brown-light);
-    box-shadow: 0 2px 12px rgba(28,42,68,.06);
-    position: relative;
-    z-index: 5;
-  }
+  .hud { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 14px; padding: 8px 18px; z-index: 10;
+    background: rgba(251,246,234,.97); border-bottom: 1px solid var(--brown-light); box-shadow: 0 2px 14px rgba(28,42,68,.1); }
   .who { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .portrait {
-    width: 42px; height: 42px; flex: none;
-    border-radius: 50%; overflow: hidden;
-    border: 2px solid var(--navy);
-    background: var(--edge);
-  }
+  .portrait { width: 40px; height: 40px; flex: none; border-radius: 50%; overflow: hidden; border: 2px solid var(--navy); background: var(--edge); }
   .portrait svg { display: block; width: 100%; height: 100%; }
-  .portrait:empty::after {
-    content: "?"; display: grid; place-items: center; height: 100%;
-    font-family: var(--serif); font-size: 1.3rem; color: var(--navy-soft);
-  }
-  .brand { font-size: .72rem; font-weight: 800; letter-spacing: .14em; color: var(--red); }
-  .pname { font-family: var(--serif); font-weight: 700; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .progress {
-    font-weight: 800; font-size: .9rem; letter-spacing: .08em;
-    padding: 5px 12px; border-radius: 999px;
-    background: var(--navy); color: var(--cream-2);
-    font-variant-numeric: tabular-nums;
-  }
-  .res { display: flex; justify-content: flex-end; gap: 14px; }
-  .r { position: relative; min-width: 84px; }
-  .r-top { display: flex; justify-content: space-between; gap: 8px; font-size: .68rem; font-weight: 800; letter-spacing: .08em; }
+  .brand { font-size: .66rem; font-weight: 800; letter-spacing: .14em; color: var(--red); }
+  .pname { font-family: var(--serif); font-weight: 700; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tracker { text-align: center; padding: 4px 14px; border-radius: 12px; background: var(--navy); color: var(--cream-2); }
+  .tracker .tl { font-size: .58rem; font-weight: 800; letter-spacing: .16em; opacity: .8; }
+  .tracker .tv { font-weight: 800; font-size: 1.1rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .tracker.bump { animation: bump .5s var(--ease); }
+  @keyframes bump { 40% { transform: scale(1.12); background: var(--red); } }
+  .res { display: grid; grid-template-columns: repeat(4, minmax(64px, 104px)); gap: 12px; justify-content: end; }
+  .r { position: relative; }
+  .r-top { display: flex; justify-content: space-between; gap: 6px; font-size: .6rem; font-weight: 800; letter-spacing: .06em; }
   .r-top .short { display: none; }
-  .r-val { font-variant-numeric: tabular-nums; font-size: .82rem; }
-  .r-bar { height: 8px; margin-top: 3px; border-radius: 99px; background: var(--edge); border: 1px solid var(--brown-light); overflow: hidden; }
+  .r-val { font-variant-numeric: tabular-nums; font-size: .8rem; transition: transform .25s var(--ease), color .25s; }
+  .r-bar { height: 7px; margin-top: 3px; border-radius: 99px; background: var(--edge); overflow: hidden; }
   .r-fill { height: 100%; width: 50%; border-radius: 99px; transition: width .5s var(--ease); }
   .r[data-k="time"] .r-fill { background: var(--navy-2); }
   .r[data-k="money"] .r-fill { background: var(--green); }
   .r[data-k="trust"] .r-fill { background: var(--red); }
-  .float {
-    position: absolute; right: 0; top: 100%; margin-top: 4px;
-    font-size: .72rem; font-weight: 800; white-space: nowrap;
-    padding: 2px 8px; border-radius: 99px; color: #fff;
-    animation: floatUp 1.1s var(--ease) forwards; pointer-events: none;
-  }
-  .float.up { background: var(--green); }
-  .float.down { background: var(--red); }
+  .r[data-k="duty"] .r-fill { background: var(--gold); }
+  .r.up .r-val { color: var(--green); transform: scale(1.35); }
+  .r.down .r-val { color: var(--red); transform: scale(1.35); }
+  .r.down { animation: shake .4s; }
+  @keyframes shake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+  .float { position: absolute; right: 0; top: 100%; margin-top: 3px; font-size: .7rem; font-weight: 800; padding: 2px 7px; border-radius: 99px; color: #fff; white-space: nowrap; animation: floatUp 1.1s var(--ease) forwards; pointer-events: none; }
+  .float.up { background: var(--green); } .float.down { background: var(--red); }
   @keyframes floatUp { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-4px); } }
 
-  /* ---------- Stage ---------- */
-  .stage-wrap { overflow-y: auto; overflow-x: hidden; display: flex; }
-  #stage {
-    width: 100%; max-width: 920px; margin: 0 auto;
-    padding: 18px 20px 22px;
-    display: flex; flex-direction: column; gap: 14px;
-  }
-  #stage.out { opacity: 0; transform: translateY(-6px); transition: opacity .16s ease, transform .16s ease; }
-  #stage.in { animation: sceneIn .32s var(--ease); }
-  @keyframes sceneIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  /* ---------- World ---------- */
+  .world { position: relative; overflow: hidden; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .world::after { content: ""; position: absolute; inset: 0; background: rgba(28,42,68,.32); opacity: 0; transition: opacity .3s; pointer-events: none; }
+  .world.dim::after { opacity: 1; }
+  .banner { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); text-align: center; padding: 8px 20px; border-radius: 14px;
+    background: rgba(251,246,234,.95); box-shadow: var(--shadow); animation: bannerIn .45s var(--ease); pointer-events: none; transition: opacity .5s; z-index: 2; white-space: nowrap; }
+  .banner small { display: block; font-size: .62rem; font-weight: 800; letter-spacing: .16em; color: var(--red); }
+  .banner b { font-family: var(--serif); font-size: 1.25rem; letter-spacing: .03em; }
+  .banner span { display: block; font-size: .78rem; color: var(--navy-soft); }
+  @keyframes bannerIn { from { opacity: 0; transform: translate(-50%, -10px); } }
+  .era { position: absolute; left: 14px; top: 14px; z-index: 2; padding: 8px 14px 9px; border-radius: 14px; background: rgba(28,42,68,.9); color: var(--cream-2);
+    box-shadow: var(--shadow); pointer-events: none; min-width: 150px; }
+  .era small { display: block; font-size: .56rem; font-weight: 800; letter-spacing: .16em; color: #f5d48a; }
+  .era b { display: block; font-family: var(--serif); font-size: 1.7rem; line-height: 1.05; }
+  .era span { display: block; font-size: .66rem; font-weight: 800; letter-spacing: .1em; opacity: .85; }
+  .era.shift { animation: eraShift .8s var(--ease); }
+  @keyframes eraShift { 0% { transform: scale(1); } 30% { transform: scale(1.12); background: var(--red); } 100% { transform: scale(1); } }
+  .timeline { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(620px, calc(100% - 28px)); height: 34px; z-index: 2; pointer-events: none; }
+  .timeline .track { position: absolute; left: 0; right: 0; top: 8px; height: 4px; border-radius: 99px; background: rgba(28,42,68,.25); }
+  .timeline .fill { position: absolute; left: 0; top: 8px; height: 4px; border-radius: 99px; background: var(--red); width: 0; }
+  .timeline .node { position: absolute; top: 3px; transform: translateX(-50%); text-align: center; }
+  .timeline .node i { display: block; width: 14px; height: 14px; margin: 0 auto; border-radius: 50%; background: #fbf6ea; border: 2px solid rgba(28,42,68,.45); }
+  .timeline .node span { display: block; margin-top: 2px; font-size: .6rem; font-weight: 800; letter-spacing: .06em; color: rgba(28,42,68,.75); }
+  .timeline .node.past i { background: var(--red); border-color: var(--red); }
+  .timeline .node.now i { background: #f5d48a; border-color: var(--navy); transform: scale(1.3); }
+  .timeline .node.now span { color: var(--navy); }
+  .timeline .you { position: absolute; top: 1px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; background: var(--navy); border: 3px solid #fbf6ea; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+  .banner em { display: block; font-style: normal; font-size: .72rem; margin-top: 2px; color: var(--navy-soft); }
+  .banner .big { display: block; font-family: var(--serif); font-size: 2.3rem; line-height: 1; color: var(--red); }
+  .hurry { position: absolute; right: 14px; top: 14px; font-size: .72rem; font-weight: 700; letter-spacing: .04em; color: rgba(28,42,68,.6); pointer-events: none; }
+  .touchgo { display: none; position: absolute; right: 14px; bottom: 14px; width: 64px; height: 64px; border-radius: 50%; border: none; background: rgba(28,42,68,.8); color: #fff; font-size: 1.4rem; touch-action: none; user-select: none; -webkit-user-select: none; z-index: 2; }
+  .touchgo.on { display: block; }
 
-  .panel {
-    background: var(--cream-2);
-    border: 1.5px solid var(--brown-light);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    padding: 18px 22px 20px;
-  }
-  .panel.dark { background: var(--navy); color: var(--cream-2); border-color: var(--navy); }
-  .art { margin: -4px -8px 6px; }
-  .art svg { display: block; width: 100%; height: auto; max-height: 22vh; }
-  .dark .art svg { max-height: 17vh; }
-  .stakes { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--navy-soft); }
-  .stakes li { padding: 3px 10px; border-radius: 99px; border: 1px solid var(--brown-light); }
-  .stakes li.on { background: var(--red); border-color: var(--red); color: #fff; }
-  .dark .stakes li { border-color: rgba(251,246,234,.35); color: rgba(251,246,234,.75); }
-  .dark .stakes li.on { color: #fff; }
-  .stage-tag { margin: 0; text-align: center; font-size: .78rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--brown); }
-  .dark .stage-tag { color: var(--brown-light); }
-  h1 {
-    margin: 2px 0 8px; text-align: center;
-    font-family: var(--serif); font-weight: 700;
-    font-size: clamp(1.7rem, 4.6vw, 2.5rem); line-height: 1.12; letter-spacing: .01em;
-  }
-  h1:focus { outline: none; }
-  .text { margin: 0 auto; max-width: 62ch; text-align: center; font-size: 1.05rem; }
-  .source {
-    margin: 12px auto 0; max-width: 60ch; text-align: center;
-    font-family: var(--serif); font-style: italic; font-size: .98rem; color: var(--navy-soft);
-  }
-  .source span { font-style: normal; font-family: var(--sans); font-size: .66rem; font-weight: 800; letter-spacing: .12em; color: var(--red); display: block; margin-bottom: 2px; }
-  .question {
-    margin: 14px auto 0; max-width: 46ch; text-align: center;
-    font-family: var(--serif); font-size: 1.25rem; font-weight: 700; line-height: 1.3;
-    padding: 12px 16px; border-top: 1px solid rgba(251,246,234,.3); border-bottom: 1px solid rgba(251,246,234,.3);
-  }
+  /* ---------- Encounter card ---------- */
+  .card { position: absolute; z-index: 5; right: 22px; top: 50%; transform: translateY(-50%); width: min(520px, 48%); max-height: calc(100% - 24px); overflow-y: auto;
+    background: var(--cream-2); border-radius: 18px; box-shadow: var(--shadow); padding: 16px 18px 14px; animation: cardIn .3s var(--ease); }
+  @keyframes cardIn { from { opacity: 0; transform: translate(24px, -50%); } }
+  .card.out { animation: cardOut .25s var(--ease) forwards; }
+  @keyframes cardOut { to { opacity: 0; transform: translate(24px, -50%); } }
+  .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .place { font-family: var(--serif); font-weight: 700; font-size: 1.35rem; letter-spacing: .02em; line-height: 1.15; }
+  .year { font-size: .72rem; font-weight: 800; letter-spacing: .1em; color: var(--brown); white-space: nowrap; }
+  .stakes { display: flex; gap: 4px; margin: 6px 0 8px; flex-wrap: wrap; }
+  .stakes span { font-size: .56rem; font-weight: 800; letter-spacing: .08em; padding: 3px 8px; border-radius: 99px; background: var(--edge); color: var(--navy-soft); }
+  .stakes span.on { background: var(--red); color: #fff; }
+  .contrast { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin: 0 0 10px; }
+  .contrast span { text-align: center; font-size: .68rem; font-weight: 800; letter-spacing: .08em; padding: 6px 8px; border-radius: 10px; }
+  .contrast .a { background: var(--navy); color: var(--cream-2); }
+  .contrast .b { background: var(--red); color: #fff; }
+  .contrast i { font-style: normal; font-weight: 800; font-size: .7rem; color: var(--brown); }
+  .def { margin: 0 0 8px; padding: 8px 10px; border-radius: 10px; background: var(--cream); border: 1.5px solid var(--navy); font-size: .9rem; }
+  .def b { display: block; font-size: .6rem; letter-spacing: .14em; color: var(--red); }
+  .q-text { font-family: var(--serif); font-size: 1.05rem; line-height: 1.4; margin: 0; }
+  .q-ask { margin: 8px 0 10px; font-weight: 800; letter-spacing: .06em; font-size: .8rem; color: var(--red); }
+  .q-ask.rq { font-family: var(--serif); font-style: italic; font-weight: 700; letter-spacing: 0; font-size: 1.1rem; color: var(--navy); }
+  .answers { display: grid; gap: 8px; }
+  .answer { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 50px; padding: 11px 14px; text-align: left; cursor: pointer;
+    border: 2px solid transparent; border-radius: 12px; background: var(--navy); color: var(--cream-2); font-weight: 700; font-size: .98rem; line-height: 1.25;
+    transition: transform .12s, background .15s, border-color .15s; }
+  .answer kbd { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; background: rgba(255,255,255,.16); font-family: var(--sans); font-size: .78rem; }
+  .answer:hover, .answer.sel { background: var(--red); }
+  .answer.sel { border-color: var(--gold); transform: translateX(4px); }
+  .answer:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  .meta { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--edge); font-size: .74rem; line-height: 1.35; color: var(--navy-soft); }
+  .meta b { display: block; font-size: .58rem; letter-spacing: .14em; color: var(--red); margin-bottom: 2px; }
+  .meta .src + .src { margin-top: 6px; }
+  .meta q { display: block; font-family: var(--serif); font-style: italic; color: var(--navy); quotes: "\201C" "\201D"; }
+  .meta a { color: var(--red); font-weight: 800; font-size: .64rem; letter-spacing: .08em; text-decoration: none; white-space: nowrap; }
+  .meta a:hover { text-decoration: underline; }
+  .consequence { text-align: center; padding: 8px 4px 4px; animation: pop .3s var(--ease); }
+  @keyframes pop { from { opacity: 0; transform: scale(.96); } }
+  .consequence small { font-size: .62rem; font-weight: 800; letter-spacing: .16em; color: var(--red); }
+  .consequence .picked { font-weight: 800; font-size: 1rem; margin: 4px 0 6px; }
+  .consequence p { margin: 0; font-family: var(--serif); font-size: 1.08rem; line-height: 1.4; }
+  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px; }
+  .chip { font-size: .78rem; font-weight: 800; letter-spacing: .05em; padding: 4px 10px; border-radius: 99px; color: #fff; }
+  .chip.up { background: var(--green); } .chip.down { background: var(--red); }
+  .timer { height: 3px; margin-top: 10px; border-radius: 99px; background: var(--edge); overflow: hidden; }
+  .timer i { display: block; height: 100%; background: var(--navy); transform-origin: left; animation: drain linear forwards; }
+  @keyframes drain { to { transform: scaleX(0); } }
 
-  /* ---------- Definition ---------- */
-  .definition {
-    text-align: center; padding: 14px 18px;
-    border: 2px solid var(--navy); border-radius: var(--radius);
-    background: var(--cream);
-  }
-  .definition .dl { font-size: .72rem; font-weight: 800; letter-spacing: .16em; color: var(--red); }
-  .definition .dt { font-family: var(--serif); font-size: 1.2rem; line-height: 1.35; margin-top: 2px; }
-
-  /* ---------- Character cards ---------- */
-  .chars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .char {
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
-    padding: 14px 12px 12px; text-align: center; cursor: pointer;
-    background: var(--cream-2); color: var(--navy);
-    border: 2px solid var(--brown-light); border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    transition: transform .2s var(--ease), border-color .2s, box-shadow .2s;
-  }
+  /* ---------- Full screen panels ---------- */
+  .screen { position: absolute; inset: 0; z-index: 20; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; padding: 18px 14px 28px;
+    background: rgba(28,42,68,.35); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  .panel { width: min(760px, 100%); margin: auto 0; background: var(--cream-2); border-radius: 20px; box-shadow: var(--shadow); padding: 20px 22px 22px;
+    animation: pop .4s var(--ease); display: flex; flex-direction: column; gap: 12px; }
+  .panel h1 { margin: 0; text-align: center; font-family: var(--serif); font-size: clamp(1.6rem, 4.5vw, 2.3rem); }
+  .definition { text-align: center; padding: 10px 14px; border: 2px solid var(--navy); border-radius: 14px; background: var(--cream); }
+  .definition .dl { font-size: .66rem; font-weight: 800; letter-spacing: .16em; color: var(--red); }
+  .definition .dt { font-family: var(--serif); font-size: 1.1rem; line-height: 1.35; }
+  .name-input { display: block; width: 100%; max-width: 300px; margin: 0 auto; padding: 10px 14px; font-size: 1rem; text-align: center;
+    border: 2px solid var(--edge); border-radius: 12px; background: var(--cream); color: var(--navy); }
+  .name-input:focus { outline: none; border-color: var(--navy); }
+  .chars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .char { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 12px 10px; cursor: pointer; text-align: center;
+    background: var(--cream); color: var(--navy); border: 2px solid var(--edge); border-radius: 14px; transition: transform .2s var(--ease), border-color .2s; }
   .char:hover { transform: translateY(-2px); border-color: var(--navy); }
   .char:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
-  .char.sel { border-color: var(--red); box-shadow: 0 0 0 3px rgba(162,62,46,.25), var(--shadow); }
-  .char .pic { width: 76px; height: 76px; border-radius: 50%; overflow: hidden; border: 2px solid var(--navy); flex: none; }
+  .char.sel { border-color: var(--red); box-shadow: 0 0 0 3px rgba(181,64,44,.2); }
+  .char .pic { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; border: 2px solid var(--navy); flex: none; }
   .char .pic svg { display: block; width: 100%; height: 100%; }
-  .char .cn { font-weight: 800; letter-spacing: .1em; font-size: .92rem; }
-  .char .cl { font-family: var(--serif); font-size: .98rem; line-height: 1.3; }
-  .perks { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
-  .perk { font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--edge); }
-  .char-body { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  .name-row { display: flex; justify-content: center; }
-  .name-input {
-    width: 100%; max-width: 320px; padding: 12px 16px; font-size: 1rem;
-    border: 2px solid var(--brown-light); border-radius: 12px; background: var(--cream-2); color: var(--navy);
-    text-align: center;
-  }
-  .name-input:focus { outline: none; border-color: var(--navy); }
-  .context { text-align: center; font-size: 1rem; margin: 0 auto; max-width: 62ch; }
-
-  /* ---------- Buttons ---------- */
-  .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-  .choice, .primary {
-    min-height: 60px; padding: 14px 18px; cursor: pointer;
-    border: none; border-radius: 12px;
-    font-weight: 800; font-size: 1rem; letter-spacing: .06em; line-height: 1.25;
-    background: var(--navy); color: var(--cream-2);
-    box-shadow: 0 4px 0 #0e1628, 0 8px 18px rgba(28,42,68,.18);
-    transition: transform .12s var(--ease), box-shadow .12s, background .2s, opacity .3s;
-  }
-  .choice:hover:not(:disabled), .primary:hover:not(:disabled) { background: var(--red); box-shadow: 0 4px 0 #5e2216, 0 8px 18px rgba(28,42,68,.18); }
-  .choice:active:not(:disabled), .primary:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #0e1628; }
-  .choice:focus-visible, .primary:focus-visible { outline: 3px solid var(--red); outline-offset: 3px; }
-  .dark-actions .choice { background: var(--cream-2); color: var(--navy); box-shadow: 0 4px 0 var(--brown), 0 8px 18px rgba(0,0,0,.2); }
-  .dark-actions .choice:hover:not(:disabled) { background: #fff; color: var(--red); }
-  .choice.picked { animation: pick .3s var(--ease); background: var(--red); color: #fff; }
-  .choice.dim { opacity: .3; }
-  .choice:disabled { cursor: default; }
-  @keyframes pick { 50% { transform: scale(1.04); } }
-  .primary { width: 100%; background: var(--red); box-shadow: 0 4px 0 #5e2216, 0 8px 18px rgba(28,42,68,.18); font-size: 1.1rem; }
+  .char .cn { font-weight: 800; letter-spacing: .1em; font-size: .88rem; }
+  .char .cl { font-family: var(--serif); font-size: .93rem; line-height: 1.3; }
+  .char-body { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .perks { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
+  .perk { font-size: .68rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--edge); }
+  .controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .controls li { font-size: .76rem; font-weight: 700; padding: 6px 12px; border-radius: 99px; background: var(--edge); }
+  .primary { width: 100%; min-height: 56px; border: none; border-radius: 14px; cursor: pointer; font-weight: 800; font-size: 1.08rem; letter-spacing: .08em;
+    background: var(--red); color: #fff; transition: transform .12s, background .2s; }
   .primary:hover:not(:disabled) { background: var(--red-dark); }
-  .primary:disabled { background: var(--brown-light); color: var(--navy); box-shadow: none; cursor: not-allowed; opacity: .9; }
-
-  /* ---------- Consequence card ---------- */
-  .conseq {
-    grid-column: 1 / -1;
-    display: block; width: 100%; text-align: left; cursor: pointer;
-    padding: 16px 20px 12px; border-radius: var(--radius);
-    background: var(--cream-2); color: var(--navy);
-    border: 2px solid var(--navy); box-shadow: var(--shadow);
-    animation: cardIn .3s var(--ease);
-  }
-  .conseq:focus-visible { outline: 3px solid var(--red); outline-offset: 3px; }
-  @keyframes cardIn { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
-  .conseq > span { display: block; }
-  .c-title { font-weight: 800; letter-spacing: .1em; font-size: .9rem; color: var(--red); }
-  .c-text { font-family: var(--serif); font-size: 1.08rem; line-height: 1.4; margin-top: 4px; }
-  .c-after { font-size: .95rem; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--brown-light); color: var(--navy-soft); }
-  .c-echo { font-size: .95rem; margin-top: 8px; font-weight: 700; }
-  .deltas { display: flex !important; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-  .chip { font-size: .76rem; font-weight: 800; letter-spacing: .05em; padding: 4px 10px; border-radius: 99px; color: #fff; }
-  .chip.up { background: var(--green); }
-  .chip.down { background: var(--red); }
-  .c-foot { display: flex !important; align-items: center; gap: 10px; margin-top: 10px; font-size: .75rem; color: var(--navy-soft); }
-  .timer { flex: 1; height: 4px; border-radius: 99px; background: var(--edge); overflow: hidden; }
-  .timer i { display: block; height: 100%; background: var(--navy); transform-origin: left; animation: drain linear forwards; }
-  @keyframes drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
-
-  /* ---------- Steps ---------- */
-  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0 0; padding: 0; list-style: none; }
-  .steps li {
-    position: relative; padding: 16px 14px 14px; text-align: center;
-    background: var(--cream); border: 1.5px solid var(--brown-light); border-radius: var(--radius);
-    font-weight: 600; font-size: .98rem; line-height: 1.35;
-  }
-  .steps .num {
-    display: grid; place-items: center; width: 40px; height: 40px; margin: 0 auto 8px;
-    border-radius: 50%; background: var(--red); color: #fff; font-family: var(--serif); font-weight: 700; font-size: 1.25rem;
-  }
-  .steps svg { display: block; width: 34px; height: 34px; margin: 0 auto 6px; }
-
-  /* ---------- Ending ---------- */
-  .score-wrap { display: flex; align-items: center; justify-content: center; gap: 22px; flex-wrap: wrap; }
-  .ring { width: 150px; height: 150px; position: relative; flex: none; }
+  .primary:active:not(:disabled) { transform: scale(.99); }
+  .primary:disabled { background: var(--edge); color: var(--navy-soft); cursor: not-allowed; }
+  .primary:focus-visible { outline: 3px solid var(--navy); outline-offset: 3px; }
+  .score-row { display: flex; align-items: center; justify-content: center; gap: 22px; flex-wrap: wrap; }
+  .ring { width: 140px; height: 140px; position: relative; flex: none; }
   .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-  .ring .track { stroke: var(--edge); }
-  .ring .arc { stroke: var(--red); transition: stroke-dashoffset .9s var(--ease); }
+  .ring .track { stroke: var(--edge); } .ring .arc { stroke: var(--red); transition: stroke-dashoffset 1s var(--ease); }
   .ring .num { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
-  .ring .num b { font-family: var(--serif); font-size: 2.8rem; line-height: 1; display: block; }
-  .ring .num small { font-weight: 800; letter-spacing: .08em; color: var(--navy-soft); }
-  .score-label { font-weight: 800; letter-spacing: .14em; font-size: .8rem; color: var(--red); }
-  .score-name { font-family: var(--serif); font-size: 1.5rem; font-weight: 700; }
-  .judgment { font-family: var(--serif); font-size: 1.08rem; line-height: 1.5; margin: 0; padding: 14px 18px; border-left: 4px solid var(--red); background: var(--cream); border-radius: 0 12px 12px 0; }
-  .note { margin: 0; font-size: .85rem; color: var(--navy-soft); text-align: center; }
-  .path { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 0; padding: 0; list-style: none; }
-  .path li { font-size: .74rem; font-weight: 700; letter-spacing: .04em; padding: 4px 10px; border-radius: 99px; background: var(--edge); }
-
-  .sources { background: var(--cream-2); border: 1.5px solid var(--brown-light); border-radius: 12px; padding: 10px 16px; }
-  .sources summary { cursor: pointer; font-weight: 800; letter-spacing: .14em; font-size: .8rem; color: var(--red); }
-  .sources h2 { font-family: var(--serif); font-size: 1.05rem; margin: 12px 0 6px; }
+  .ring .num b { font-family: var(--serif); font-size: 2.6rem; line-height: 1; display: block; }
+  .ring .num small { font-weight: 800; font-size: .66rem; letter-spacing: .08em; color: var(--navy-soft); }
+  .ring .lbl { position: absolute; left: 0; right: 0; bottom: -18px; text-align: center; font-size: .6rem; font-weight: 800; letter-spacing: .14em; color: var(--red); }
+  .finals { display: grid; grid-template-columns: repeat(2, minmax(140px, 1fr)); gap: 10px 18px; min-width: 260px; }
+  .finals .r-top { font-size: .68rem; }
+  .finals .r-bar { height: 9px; }
+  .persona { border-radius: 18px; padding: 16px 18px; background: var(--navy); color: var(--cream-2); display: flex; flex-direction: column; gap: 10px; animation: pop .5s var(--ease); }
+  .persona-head { display: flex; align-items: center; gap: 14px; }
+  .badge { width: 68px; height: 68px; flex: none; border-radius: 50%; background: var(--red); display: grid; place-items: center; box-shadow: 0 0 0 4px rgba(245,212,138,.35); }
+  .badge svg { width: 44px; height: 44px; }
+  .persona-label { font-size: .62rem; font-weight: 800; letter-spacing: .16em; color: #f5d48a; }
+  .persona-name { font-family: var(--serif); font-weight: 700; font-size: clamp(1.5rem, 4.5vw, 2rem); line-height: 1.1; }
+  .persona-tag { font-family: var(--serif); font-style: italic; opacity: .85; }
+  .persona-text { margin: 0; font-family: var(--serif); font-size: 1.04rem; line-height: 1.45; }
+  .traits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .trait-top { display: flex; justify-content: space-between; font-size: .66rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+  .trait-bar { height: 8px; margin-top: 4px; border-radius: 99px; background: rgba(255,255,255,.15); overflow: hidden; }
+  .trait-bar i { display: block; height: 100%; border-radius: 99px; }
+  .trait.duty i { background: #f5d48a; } .trait.balance i { background: #9cc7e8; } .trait.self i { background: #e8836f; }
+  .persona-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: .86rem; line-height: 1.4; }
+  .persona-facts div { padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.08); }
+  .persona-facts b { display: block; font-size: .6rem; letter-spacing: .14em; text-transform: uppercase; color: #f5d48a; margin-bottom: 3px; }
+  .persona-basis { margin: 0; font-size: .74rem; opacity: .75; }
+  .pattern { margin: 0; font-family: var(--serif); font-size: 1.03rem; line-height: 1.5; padding: 12px 16px; border-left: 4px solid var(--red); background: var(--cream); border-radius: 0 12px 12px 0; }
+  .conclusion { margin: 0; font-family: var(--serif); font-size: 1rem; line-height: 1.5; }
+  .section-label { margin: 0; font-weight: 800; letter-spacing: .14em; font-size: .7rem; color: var(--red); }
+  .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0; padding: 0; list-style: none; counter-reset: a; }
+  .actions li { counter-increment: a; padding: 12px 12px 12px 48px; position: relative; border-radius: 12px; background: var(--cream); font-size: .9rem; font-weight: 600; line-height: 1.35; }
+  .actions li::before { content: counter(a); position: absolute; left: 12px; top: 12px; width: 26px; height: 26px; border-radius: 50%; background: var(--red); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: .85rem; }
+  .path { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+  .path li { font-size: .7rem; font-weight: 700; padding: 4px 10px; border-radius: 99px; background: var(--edge); }
+  .path li.duty { background: #d9ead9; } .path li.self { background: #f4d8d0; }
+  .note { margin: 0; font-size: .8rem; color: var(--navy-soft); text-align: center; }
+  .sources { background: var(--cream); border-radius: 12px; padding: 10px 14px; }
+  .sources summary { cursor: pointer; font-weight: 800; letter-spacing: .14em; font-size: .74rem; color: var(--red); }
+  .sources h2 { font-family: var(--serif); font-size: 1rem; margin: 10px 0 6px; }
   .sources ul { list-style: none; margin: 0; padding: 0; }
-  .sources li { font-family: var(--serif); font-size: .92rem; line-height: 1.45; padding-left: 2em; text-indent: -2em; margin-bottom: 8px; }
-  .sources a { font-family: var(--sans); font-size: .78rem; font-weight: 700; color: var(--red); white-space: nowrap; }
+  .sources li { font-family: var(--serif); font-size: .88rem; line-height: 1.45; padding-left: 2em; text-indent: -2em; margin-bottom: 7px; }
+  .sources a { font-family: var(--sans); font-size: .74rem; font-weight: 700; color: var(--red); white-space: nowrap; }
 
-  /* ---------- IT IS NOW splash ---------- */
-  .splash {
-    position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
-    background: var(--navy); color: var(--cream-2);
-    font-family: var(--serif); font-weight: 700; font-size: clamp(2.6rem, 11vw, 6rem); letter-spacing: .04em;
-    animation: splash 1s ease forwards; pointer-events: none;
-  }
-  .splash span { animation: splashText 1s var(--ease) forwards; }
-  @keyframes splash { 0% { opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
-  @keyframes splashText { 0% { transform: scale(.92); letter-spacing: .3em; } 60% { transform: none; letter-spacing: .04em; } }
-
-  /* ---------- Small screens ---------- */
-  @media (max-width: 720px) {
-    body { font-size: 16px; }
-    .hud { grid-template-columns: 1fr auto; grid-template-areas: "who prog" "res res"; padding: 8px 14px 10px; gap: 8px 10px; }
-    .who { grid-area: who; } .progress { grid-area: prog; } .res { grid-area: res; justify-content: space-between; gap: 10px; }
-    .r { flex: 1; min-width: 0; }
+  @media (max-width: 820px) {
+    .hud { grid-template-columns: 1fr auto; grid-template-areas: "who track" "res res"; gap: 6px 10px; padding: 6px 12px 8px; }
+    .who { grid-area: who; } .tracker { grid-area: track; } .res { grid-area: res; grid-template-columns: repeat(4, 1fr); }
     .r-top .long { display: none; } .r-top .short { display: inline; }
-    #stage { padding: 14px 16px 18px; gap: 12px; }
-    .panel { padding: 14px 16px 16px; }
+    .card { left: 10px; right: 10px; top: auto; bottom: 10px; transform: none; width: auto; max-height: calc(100% - 20px); padding: 12px 14px; }
+    @keyframes cardIn { from { opacity: 0; transform: translateY(20px); } }
+    @keyframes cardOut { to { opacity: 0; transform: translateY(20px); } }
+    .meta { grid-template-columns: 1fr; }
     .chars { grid-template-columns: 1fr; gap: 8px; }
-    .char { flex-direction: row; text-align: left; padding: 10px 12px; gap: 12px; }
-    .char .pic { width: 56px; height: 56px; }
+    .char { flex-direction: row; text-align: left; padding: 8px 10px; gap: 12px; }
+    .char .pic { width: 52px; height: 52px; }
     .char-body { align-items: flex-start; gap: 3px; }
     .perks { justify-content: flex-start; }
+    .finals { grid-template-columns: 1fr 1fr; min-width: 0; width: 100%; }
     .actions { grid-template-columns: 1fr; }
-    .steps { grid-template-columns: 1fr; gap: 8px; }
-    .steps li { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 12px; }
-    .steps .num { margin: 0; flex: none; width: 34px; height: 34px; font-size: 1.05rem; }
-    .steps svg { display: none; }
-    .art svg { max-height: 20vh; }
-    .stakes { gap: 4px; font-size: .62rem; letter-spacing: .05em; }
-    .stakes li { padding: 2px 7px; }
-  }
-  @media (max-height: 700px) and (min-width: 721px) {
-    .art svg { max-height: 20vh; }
-    h1 { font-size: 2rem; }
+    .persona-facts { grid-template-columns: 1fr; }
+    .traits { gap: 6px; }
+    .hurry { display: none; }
+    .era { padding: 6px 10px; min-width: 0; } .era b { font-size: 1.3rem; }
+    .timeline { bottom: 10px; }
+    .timeline .node span { font-size: .52rem; }
+    .touchgo { bottom: 58px; }
+    .banner b { font-size: 1.05rem; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
@@ -505,20 +581,22 @@ const TIMING = { sceneOut: 160, sceneIn: 320, feedback: 300, count: 500, hold: 2
 </style>
 </head>
 <body>
-<div class="game">
+<div class="app">
   <header class="hud">
     <div class="who">
       <div class="portrait" id="hudPortrait" aria-hidden="true"></div>
-      <div style="min-width:0">
-        <div class="brand" id="hudBrand"></div>
-        <div class="pname" id="hudName"></div>
-      </div>
+      <div style="min-width:0"><div class="brand" id="hudBrand"></div><div class="pname" id="hudName"></div></div>
     </div>
-    <div class="progress" id="progress" aria-label="Screen progress"></div>
+    <div class="tracker" id="tracker" aria-live="polite"><div class="tl" id="trackLabel"></div><div class="tv" id="trackVal"></div></div>
     <div class="res" id="res"></div>
   </header>
-  <div class="stage-wrap" id="stageWrap">
-    <main id="stage" aria-live="polite"></main>
+  <div class="world" id="world">
+    <canvas id="canvas" aria-label="Your journey through American civic history"></canvas>
+    <div class="era" id="era" aria-live="polite"></div>
+    <div class="timeline" id="timeline" aria-hidden="true"></div>
+    <div class="hurry" id="hurry"></div>
+    <button class="touchgo" id="touchgo" aria-label="Hurry">&#9654;&#9654;</button>
+    <div id="layer"></div>
   </div>
 </div>
 
@@ -526,409 +604,811 @@ const TIMING = { sceneOut: 160, sceneIn: 320, feedback: 300, count: 500, hold: 2
 (function () {
   "use strict";
   const UI = GAME.ui;
-  const KEYS = ["time", "money", "trust"];
-  const ORDER = ["start", "april", "cost", "who", "now", "action", "final"];
-  const stage = document.getElementById("stage");
-  const stageWrap = document.getElementById("stageWrap");
+  const RES = ["time", "money", "trust", "duty"];
+  const ENC = GAME.encounters;
+  const SPACING = TUNING.spacing, FIRST = TUNING.firstAt;
+  const encX = i => FIRST + i * SPACING;
+  const END_X = encX(ENC.length - 1) + 650;
+  /* World x where each section starts (section 5 is TODAY). */
+  const SECTION_START = [0, encX(1) - 400, encX(2) - 400, encX(4) - 400, encX(6) - 400, encX(9) - 380];
+  const GROUND = 470; /* design units, screen is 600 units tall */
 
-  /* ---------- Illustrations (inline SVG, no external files) ---------- */
-  const N = "#1c2a44", C = "#fbf6ea", E = "#e8d9b6", R = "#a23e2e", B = "#8a6a44", BL = "#cbb086";
-  const ART = {
-    farmer:
-      '<svg viewBox="0 0 80 80" aria-hidden="true"><rect width="80" height="80" fill="' + E + '"/>' +
-      '<path d="M16 80c0-15 10-24 24-24s24 9 24 24z" fill="#5f7a52" stroke="' + N + '" stroke-width="2"/>' +
-      '<circle cx="40" cy="41" r="12" fill="#f0d9b5" stroke="' + N + '" stroke-width="2"/>' +
-      '<ellipse cx="40" cy="31" rx="21" ry="4.5" fill="#caa55c" stroke="' + N + '" stroke-width="2"/>' +
-      '<path d="M30 31c0-9 4-13 10-13s10 4 10 13z" fill="#caa55c" stroke="' + N + '" stroke-width="2"/>' +
-      '<path d="M67 34v46M61 24v10h12V24M67 24v10" fill="none" stroke="' + N + '" stroke-width="2.5" stroke-linecap="round"/></svg>',
-    shopkeeper:
-      '<svg viewBox="0 0 80 80" aria-hidden="true"><rect width="80" height="80" fill="' + E + '"/>' +
-      '<path d="M16 80c0-15 10-24 24-24s24 9 24 24z" fill="#44506a" stroke="' + N + '" stroke-width="2"/>' +
-      '<path d="M31 60h18v20H31z" fill="' + C + '" stroke="' + N + '" stroke-width="1.5"/>' +
-      '<circle cx="40" cy="41" r="12" fill="#f0d9b5" stroke="' + N + '" stroke-width="2"/>' +
-      '<circle cx="35.5" cy="42" r="3" fill="none" stroke="' + N + '" stroke-width="1.5"/><circle cx="44.5" cy="42" r="3" fill="none" stroke="' + N + '" stroke-width="1.5"/>' +
-      '<path d="M38.5 42h3" stroke="' + N + '" stroke-width="1.5"/>' +
-      '<path d="M21 33L40 20l19 13q-19 -5 -38 0z" fill="' + N + '" stroke="' + N + '" stroke-width="2" stroke-linejoin="round"/></svg>',
-    apprentice:
-      '<svg viewBox="0 0 80 80" aria-hidden="true"><rect width="80" height="80" fill="' + E + '"/>' +
-      '<path d="M16 80c0-15 10-24 24-24s24 9 24 24z" fill="' + R + '" stroke="' + N + '" stroke-width="2"/>' +
-      '<circle cx="40" cy="42" r="12" fill="#f0d9b5" stroke="' + N + '" stroke-width="2"/>' +
-      '<path d="M27 36c0-11 6-16 14-16 8 0 14 4 15 12-5 0-8 1-10 4z" fill="' + N + '" stroke="' + N + '" stroke-width="2" stroke-linejoin="round"/>' +
-      '<path d="M63 46l9 32" stroke="' + B + '" stroke-width="3.5" stroke-linecap="round"/>' +
-      '<rect x="55" y="39" width="16" height="8" rx="1.5" transform="rotate(-16 63 43)" fill="' + N + '"/></svg>',
+  /* ================= State ================= */
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  const worldEl = document.getElementById("world");
+  const layer = document.getElementById("layer");
+  let S, viewW = 0, viewH = 0, dpr = 1, k = 1;
+  let hurrying = false;
+  function fresh() {
+    return { mode: "start", char: null, name: UI.defaultName,
+      res: { time: 50, money: 50, trust: GAME.startTrust, duty: GAME.startDuty },
+      x: 0, next: 0, picks: [], jury: null, section: 0, shiftAt: -1e9, walk: 0, cardAt: 0, sel: 0, locked: false };
+  }
 
-    april:
-      '<svg viewBox="0 0 480 170" aria-hidden="true">' +
-      '<circle cx="410" cy="42" r="20" fill="' + E + '"/>' +
-      '<path d="M0 124Q120 84 240 112T480 102V170H0z" fill="#e3d2a8" stroke="' + N + '" stroke-width="2"/>' +
-      '<path d="M0 150Q160 128 300 146T480 140V170H0z" fill="#d6c092"/>' +
-      '<path d="M50 76L96 44l46 32z" fill="' + N + '"/><rect x="58" y="76" width="76" height="52" fill="' + R + '" stroke="' + N + '" stroke-width="2"/>' +
-      '<rect x="84" y="96" width="24" height="32" fill="' + C + '" stroke="' + N + '" stroke-width="2"/><path d="M84 96l24 32M108 96l-24 32" stroke="' + N + '" stroke-width="1.5"/>' +
-      '<path d="M150 118h110M150 128h110" stroke="' + B + '" stroke-width="2"/>' +
-      [158, 182, 206, 230, 254].map(x => '<path d="M' + x + ' 110v24" stroke="' + B + '" stroke-width="3"/>').join("") +
-      '<rect x="296" y="72" width="16" height="30" fill="' + C + '" stroke="' + N + '" stroke-width="2"/><path d="M292 72l12 -24 12 24z" fill="' + N + '"/>' +
-      [340, 368, 396, 424, 452].map(x =>
-        '<g transform="translate(' + x + ' 128)" stroke="' + N + '" stroke-width="2.2" stroke-linecap="round" fill="none">' +
-        '<circle cx="0" cy="-38" r="5" fill="#f0d9b5"/><path d="M-8 -42L0 -49 8 -42z" fill="' + N + '"/>' +
-        '<path d="M0 -33V-14M0 -14L-5 0M0 -14L5 0M0 -28L-6 -20"/><path d="M-1 -28L11 -54" stroke="' + B + '" stroke-width="2.6"/></g>').join("") +
-      '</svg>',
+  /* ================= Helpers ================= */
+  const $ = id => document.getElementById(id);
+  function h(tag, cls, html) { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function fxText(key, d) { return UI.resourcesShort[key] + " " + (d > 0 ? "+" : "−") + Math.abs(d); }
+  function sectionAt(x) { let s = 0; for (let i = 0; i < SECTION_START.length; i++) if (x >= SECTION_START[i]) s = i; return s; }
 
-    cost:
-      '<svg viewBox="0 0 480 170" aria-hidden="true">' +
-      '<rect x="60" y="54" width="130" height="96" rx="4" fill="' + BL + '" stroke="' + N + '" stroke-width="2"/>' +
-      '<path d="M60 78h130M60 126h130" stroke="' + B + '" stroke-width="2"/>' +
-      '<text x="125" y="73" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="18" letter-spacing="4" fill="' + N + '">TEA</text>' +
-      '<g transform="rotate(-10 125 104)"><rect x="70" y="88" width="112" height="32" rx="4" fill="' + C + '" fill-opacity=".6" stroke="' + R + '" stroke-width="3"/>' +
-      '<text x="126" y="111" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="17" letter-spacing="2" fill="' + R + '">BOYCOTT</text></g>' +
-      '<g fill="' + E + '" stroke="' + N + '" stroke-width="2"><ellipse cx="240" cy="140" rx="20" ry="6"/><ellipse cx="240" cy="132" rx="20" ry="6"/><ellipse cx="240" cy="124" rx="20" ry="6"/></g>' +
-      '<g stroke="' + N + '" stroke-width="2.2" fill="none" stroke-linecap="round">' +
-      '<circle cx="360" cy="84" r="48"/><circle cx="360" cy="84" r="6" fill="' + N + '"/>' +
-      [0, 30, 60, 90, 120, 150].map(a => { const r = a * Math.PI / 180; return '<path d="M' + (360 + 48 * Math.cos(r)).toFixed(1) + ' ' + (84 + 48 * Math.sin(r)).toFixed(1) + 'L' + (360 - 48 * Math.cos(r)).toFixed(1) + ' ' + (84 - 48 * Math.sin(r)).toFixed(1) + '"/>'; }).join("") +
-      '<path d="M330 150l30 -66 30 66M300 150h120"/><path d="M420 150V70l20 -10" stroke="' + B + '"/></g></svg>',
-
-    who:
-      '<svg viewBox="0 0 480 170" aria-hidden="true"><g stroke="' + C + '" stroke-width="2.5" fill="none" stroke-linecap="round">' +
-      '<path d="M240 26V150M200 152h80"/><circle cx="240" cy="24" r="6" fill="' + C + '"/>' +
-      '<path d="M140 70L340 34"/>' +
-      '<path d="M140 70l-30 44M140 70l30 44M340 34l-30 44M340 34l30 44"/></g>' +
-      '<path d="M100 114h80q-6 18 -40 18t-40 -18z" fill="' + R + '" stroke="' + C + '" stroke-width="2"/>' +
-      '<path d="M300 78h80q-6 18 -40 18t-40 -18z" fill="' + E + '" stroke="' + C + '" stroke-width="2"/>' +
-      '<text x="140" y="154" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="15" letter-spacing="3" fill="' + C + '">DUTY</text>' +
-      '<text x="340" y="118" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="15" letter-spacing="3" fill="' + C + '">RIGHTS</text></svg>',
-
-    now:
-      '<svg viewBox="0 0 480 170" aria-hidden="true">' +
-      '<g transform="rotate(-5 140 90)"><rect x="60" y="36" width="160" height="104" rx="6" fill="' + C + '" stroke="' + N + '" stroke-width="2.2"/>' +
-      '<path d="M60 40l80 54 80 -54" fill="none" stroke="' + N + '" stroke-width="2"/>' +
-      '<text x="140" y="128" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="14" letter-spacing="2" fill="' + N + '">JURY SUMMONS</text>' +
-      '<circle cx="140" cy="94" r="11" fill="' + R + '"/></g>' +
-      '<rect x="272" y="26" width="150" height="126" rx="8" fill="' + C + '" stroke="' + N + '" stroke-width="2.2"/>' +
-      '<path d="M272 34a8 8 0 0 1 8 -8h134a8 8 0 0 1 8 8v22H272z" fill="' + R + '"/>' +
-      '<text x="347" y="48" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="14" letter-spacing="3" fill="#fff">FRIDAY</text>' +
-      '<text x="288" y="86" font-family="system-ui,sans-serif" font-weight="700" font-size="14" fill="' + N + '">9:00  Jury duty</text>' +
-      '<text x="288" y="120" font-family="system-ui,sans-serif" font-weight="700" font-size="14" fill="' + N + '">9:00  Work shift</text>' +
-      '<path d="M284 98h124" stroke="' + BL + '" stroke-width="1.5"/>' +
-      '<circle cx="436" cy="100" r="16" fill="' + R + '" stroke="' + N + '" stroke-width="2"/>' +
-      '<text x="436" y="107" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="20" fill="#fff">!</text></svg>',
-
-    stepIcons: [
-      '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="13" cy="13" r="8" fill="none" stroke="' + N + '" stroke-width="2.5"/><path d="M19 19l8 8" stroke="' + N + '" stroke-width="3" stroke-linecap="round"/></svg>',
-      '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="4" width="20" height="24" rx="3" fill="none" stroke="' + N + '" stroke-width="2.2"/><path d="M10 12l2 2 4 -4M10 20l2 2 4 -4M19 12h3M19 20h3" fill="none" stroke="' + N + '" stroke-width="2" stroke-linecap="round"/></svg>',
-      '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 26l2 -6L22 6l4 4L12 24z" fill="none" stroke="' + N + '" stroke-width="2.2" stroke-linejoin="round"/><path d="M19 9l4 4" stroke="' + N + '" stroke-width="2"/></svg>'
-    ]
+  /* ================= Portraits ================= */
+  const N = "#1c2a44", E = "#e8d9b6", R = "#b5402c", BR = "#8a6a44";
+  const PORTRAIT = {
+    farmer: '<svg viewBox="0 0 80 80"><rect width="80" height="80" fill="' + E + '"/><path d="M16 80c0-15 10-24 24-24s24 9 24 24z" fill="#5f7a52"/><circle cx="40" cy="41" r="12" fill="#f0d0a8"/><ellipse cx="40" cy="31" rx="21" ry="4.5" fill="#d6ad5c"/><path d="M30 31c0-9 4-13 10-13s10 4 10 13z" fill="#d6ad5c"/><path d="M67 34v46M61 24v10h12V24M67 24v10" fill="none" stroke="' + N + '" stroke-width="3" stroke-linecap="round"/></svg>',
+    shopkeeper: '<svg viewBox="0 0 80 80"><rect width="80" height="80" fill="' + E + '"/><path d="M16 80c0-15 10-24 24-24s24 9 24 24z" fill="#3c4a68"/><path d="M31 60h18v20H31z" fill="#fbf6ea"/><circle cx="40" cy="41" r="12" fill="#f0d0a8"/><circle cx="35.5" cy="42" r="3" fill="none" stroke="' + N + '" stroke-width="1.5"/><circle cx="44.5" cy="42" r="3" fill="none" stroke="' + N + '" stroke-width="1.5"/><path d="M21 33L40 20l19 13q-19 -5 -38 0z" fill="' + N + '"/></svg>',
+    apprentice: '<svg viewBox="0 0 80 80"><rect width="80" height="80" fill="' + E + '"/><path d="M16 80c0-15 10-24 24-24s24 9 24 24z" fill="' + R + '"/><circle cx="40" cy="42" r="12" fill="#f0d0a8"/><path d="M27 36c0-11 6-16 14-16 8 0 14 4 15 12-5 0-8 1-10 4z" fill="' + N + '"/><path d="M63 46l9 32" stroke="' + BR + '" stroke-width="4" stroke-linecap="round"/><rect x="55" y="39" width="16" height="8" rx="2" transform="rotate(-16 63 43)" fill="' + N + '"/></svg>'
   };
 
-  /* ---------- State ---------- */
-  let S, advanceTimer = null, busy = false, navToken = 0;
-  function fresh() {
-    return { char: null, name: UI.defaultName, res: { time: 50, money: 50, trust: 50 }, points: 0, cost: 0, picks: {}, path: [] };
+  /* ================= Palettes per section ================= */
+  const PAL = [
+    { skyA: "#bfe0ec", skyB: "#f6ecd4", hill: "#b9cc8f", hill2: "#a6bd7c", ground: "#9dbb66", road: "#dcc493", edge: "#c6ab76" },
+    { skyA: "#c6e2ea", skyB: "#f5ead2", hill: "#b4c78e", hill2: "#9fb77b", ground: "#98b666", road: "#d5bd8e", edge: "#bfa274" },
+    { skyA: "#f1cfa0", skyB: "#f8ead0", hill: "#c9b98a", hill2: "#b5a778", ground: "#a3b468", road: "#d2b88a", edge: "#b99c6d" },
+    { skyA: "#cbdce7", skyB: "#f3ead8", hill: "#b1c2a0", hill2: "#9db08d", ground: "#96b16c", road: "#c79a7a", edge: "#a97c5f" },
+    { skyA: "#c3d3e2", skyB: "#efe7d6", hill: "#a9b9a6", hill2: "#96a894", ground: "#92ad6e", road: "#bd9377", edge: "#9d765d" },
+    { skyA: "#8cc9ef", skyB: "#e4f3fb", hill: "#a8cfa8", hill2: "#8fbf93", ground: "#86c06d", road: "#5d636b", edge: "#d9d9d4" }
+  ];
+  function mix(a, b, t) {
+    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+    const r = Math.round(((pa >> 16) & 255) * (1 - t) + ((pb >> 16) & 255) * t);
+    const g = Math.round(((pa >> 8) & 255) * (1 - t) + ((pb >> 8) & 255) * t);
+    const bl = Math.round((pa & 255) * (1 - t) + (pb & 255) * t);
+    return "rgb(" + r + "," + g + "," + bl + ")";
+  }
+  function paletteAt(x) {
+    const s = sectionAt(x);
+    const nextStart = SECTION_START[s + 1];
+    const t = nextStart ? clamp((x - (nextStart - 350)) / 350, 0, 1) : 0;
+    const A = PAL[s], B2 = PAL[Math.min(s + 1, PAL.length - 1)];
+    const out = {}; Object.keys(A).forEach(key => out[key] = t > 0 ? mix(A[key], B2[key], t) : A[key]);
+    return out;
   }
 
-  /* ---------- Helpers ---------- */
-  function h(tag, cls, html) {
-    const n = document.createElement(tag);
-    if (cls) n.className = cls;
-    if (html != null) n.innerHTML = html;
-    return n;
-  }
-  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
-  function fill(s) {
-    const ch = S.char ? GAME.characters.find(c => c.id === S.char) : null;
-    return s.replace(/\{work\}/g, ch ? ch.work : "home").replace(/\{name\}/g, esc(S.name));
-  }
-  function clamp(v) { return Math.max(0, Math.min(100, v)); }
-  function deltaText(k, d) { return UI.resourcesShort[k] + " " + (d > 0 ? UI.plus : UI.minus) + " " + Math.abs(d); }
+  /* ================= Scenery (generated once) ================= */
+  const DECOR = [];
+  (function buildDecor() {
+    let seed = 11; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+    const busy = x => ENC.some((e, i) => Math.abs(encX(i) - x) < 260) || SECTION_START.some((g, i) => i > 0 && Math.abs(g - x) < 140);
+    for (let x = -200; x < END_X + 1400; x += 110 + rnd() * 120) {
+      if (busy(x)) continue;
+      const s = sectionAt(x), r = rnd();
+      let type;
+      if (s === 0) type = r < .45 ? "tree" : r < .7 ? "fence" : r < .85 ? "hay" : "cow";
+      else if (s === 5) type = r < .35 ? "tower" : r < .55 ? "tree" : r < .75 ? "lamp" : r < .9 ? "person" : "car";
+      else if (s >= 3) type = r < .4 ? "row" : r < .6 ? "tree" : r < .8 ? "person" : "lampOld";
+      else type = r < .4 ? "house" : r < .65 ? "tree" : r < .85 ? "person" : "fence";
+      DECOR.push({ x, type, s, v: rnd(), h: rnd() });
+    }
+  })();
 
-  /* ---------- HUD ---------- */
+  /* ================= Drawing primitives ================= */
+  function rr(x, y, w, hh, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + hh, r); ctx.arcTo(x + w, y + hh, x, y + hh, r); ctx.arcTo(x, y + hh, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function box(x, y, w, hh, c) { ctx.fillStyle = c; ctx.fillRect(x, y, w, hh); }
+  function circ(x, y, r, c) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+  function poly(pts, c) { ctx.fillStyle = c; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); ctx.fill(); }
+  function softShadow(x, w) { ctx.fillStyle = "rgba(40,50,30,.16)"; ctx.beginPath(); ctx.ellipse(x, GROUND + 4, w / 2, 7, 0, 0, Math.PI * 2); ctx.fill(); }
+  function label(x, y, text) {
+    ctx.font = "800 13px system-ui, -apple-system, Segoe UI, sans-serif";
+    const w = ctx.measureText(text).width + 22;
+    ctx.fillStyle = "rgba(28,42,68,.9)"; rr(x - w / 2, y - 13, w, 26, 13); ctx.fill();
+    ctx.fillStyle = "#fbf6ea"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(text, x, y + 1);
+  }
+
+  /* Who walks the street in each section: [style A, style B] */
+  const PEOPLE = [["colonial", "woman"], ["colonial", "woman"], ["continental", "woman"], ["gentleman", "lady"], ["gentleman", "lady"], ["modern", "modern2"]];
+  /* people: style = colonial | woman | militia | crier | continental | gentleman | lady | modern | modern2 */
+  function person(x, style, t, flip) {
+    const bob = Math.sin(t / 380 + x) * 1.2;
+    const y = GROUND;
+    const coat = { colonial: "#46597a", woman: "#8a4f6a", militia: "#6b5a3e", modern: "#3f7fb5", modern2: "#d0633f", crier: "#7a2e22", continental: "#2e4a7d", gentleman: "#2f3a2f", lady: "#5f79a8" }[style] || "#46597a";
+    const period = style === "continental" || style === "gentleman";
+    ctx.save(); ctx.translate(x, 0); if (flip) ctx.scale(-1, 1);
+    softShadow(0, 28);
+    if (style === "woman" || style === "lady") poly([[style === "lady" ? -16 : -12, y], [style === "lady" ? 16 : 12, y], [7, y - 42], [-7, y - 42]], coat);
+    else if (period) { box(-7, y - 26, 5, 12, style === "continental" ? "#d9c49a" : "#2b2b2b"); box(2, y - 26, 5, 12, style === "continental" ? "#d9c49a" : "#2b2b2b"); box(-7, y - 14, 5, 14, "#f1ece0"); box(2, y - 14, 5, 14, "#f1ece0"); }
+    else { box(-7, y - 26, 5, 26, style.startsWith("modern") ? "#2f3d57" : "#3b3024"); box(2, y - 26, 5, 26, style.startsWith("modern") ? "#2f3d57" : "#3b3024"); }
+    if (style === "gentleman") poly([[-10, y - 30 + bob], [-14, y - 12], [-2, y - 22 + bob]], coat);
+    rr(-10, y - 50 + bob, 20, 28, 7); ctx.fillStyle = coat; ctx.fill();
+    if (style === "continental") box(-2, y - 49 + bob, 4, 26, "#e8d7a8");
+    if (style === "gentleman" || style === "lady") poly([[-4, y - 50 + bob], [4, y - 50 + bob], [0, y - 43 + bob]], "#fbf6ea");
+    circ(0, y - 59 + bob, 9, "#f0d0a8");
+    if (style === "colonial" || style === "crier" || style === "militia" || style === "continental" || style === "gentleman") poly([[-13, y - 63 + bob], [0, y - 74 + bob], [13, y - 63 + bob]], "#1c2a44");
+    else if (style === "woman") { circ(0, y - 63 + bob, 10, "#f4ecdc"); }
+    else if (style === "lady") { circ(0, y - 64 + bob, 9, "#8a6a44"); circ(-7, y - 60 + bob, 5, "#8a6a44"); }
+    else circ(0, y - 64 + bob, 8, style === "modern" ? "#3b2a1c" : "#1c1c1c");
+    if (style === "militia") { ctx.strokeStyle = "#5a3d2a"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(8, y - 30); ctx.lineTo(14, y - 78); ctx.stroke(); }
+    ctx.restore();
+  }
+  function tree(x, v, modern) {
+    const hgt = 110 + v * 50;
+    softShadow(x, 50);
+    box(x - 5, GROUND - hgt * .45, 10, hgt * .45, "#7a5a3a");
+    circ(x, GROUND - hgt * .62, 30 + v * 10, modern ? "#4f9a5a" : "#6d9449");
+    circ(x - 20, GROUND - hgt * .5, 22 + v * 6, modern ? "#5aa865" : "#7ba355");
+    circ(x + 18, GROUND - hgt * .72, 22 + v * 6, modern ? "#63b06d" : "#86ad5e");
+  }
+  function colonialHouse(x, v, brick) {
+    const w = 110 + v * 40, hh = 80 + v * 20, c = brick ? "#b86b4f" : ["#e7dcc4", "#dfe6ea", "#e9d6b8"][Math.floor(v * 3)];
+    softShadow(x, w + 10);
+    box(x - w / 2, GROUND - hh, w, hh, c);
+    poly([[x - w / 2 - 8, GROUND - hh], [x, GROUND - hh - 46], [x + w / 2 + 8, GROUND - hh]], brick ? "#6d3d30" : "#5b6679");
+    box(x + w / 4 - 6, GROUND - hh - 40, 12, 26, brick ? "#6d3d30" : "#8a5a44");
+    box(x - 10, GROUND - 38, 20, 38, "#5a3d2a");
+    [x - w / 2 + 14, x + w / 2 - 32].forEach(wx => { box(wx, GROUND - hh + 16, 18, 22, "#a9c7d6"); box(wx + 8, GROUND - hh + 16, 2, 22, "#fbf6ea"); });
+  }
+  function rowHouses(x, v) {
+    for (let i = 0; i < 3; i++) {
+      const hh = 120 + ((i * 37 + v * 50) % 40), w = 60, bx = x - 90 + i * 60;
+      box(bx, GROUND - hh, w, hh, ["#b86b4f", "#a95f47", "#c27a5c"][i]);
+      box(bx, GROUND - hh - 8, w, 8, "#5b3a2e");
+      for (let r = 0; r < 3; r++) box(bx + 12, GROUND - hh + 16 + r * 32, 14, 18, "#bcd3dc"), box(bx + 34, GROUND - hh + 16 + r * 32, 14, 18, "#bcd3dc");
+    }
+    box(x - 10 - 50, GROUND - 30, 16, 30, "#3b2a1c");
+  }
+  function tower(x, v) {
+    const w = 90 + v * 40, hh = 170 + v * 110;
+    box(x - w / 2, GROUND - hh, w, hh, ["#9fb8cc", "#c9d3dc", "#b7c7b6"][Math.floor(v * 3)]);
+    ctx.fillStyle = "rgba(255,255,255,.45)";
+    for (let yy = GROUND - hh + 14; yy < GROUND - 30; yy += 22) for (let xx = x - w / 2 + 10; xx < x + w / 2 - 14; xx += 20) ctx.fillRect(xx, yy, 12, 12);
+    box(x - 14, GROUND - 32, 28, 32, "#3f4d5f");
+  }
+
+  /* ================= Encounter objects ================= */
+  function drawEncounter(i, x, t) {
+    const G = GROUND;
+    switch (i) {
+      case 0: { /* farm with a farmer */
+        for (let r = 0; r < 5; r++) box(x - 190, G - 6 - r * 7, 170, 4, r % 2 ? "#8c7a42" : "#a08c4c");
+        softShadow(x + 80, 160); box(x + 10, G - 110, 140, 110, "#b5402c");
+        poly([[x, G - 110], [x + 80, G - 165], [x + 160, G - 110]], "#7a2e22");
+        box(x + 60, G - 60, 40, 60, "#f5ecd6"); box(x + 64, G - 56, 32, 56, "#8e3221");
+        ctx.strokeStyle = "#f5ecd6"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + 64, G - 56); ctx.lineTo(x + 96, G); ctx.moveTo(x + 96, G - 56); ctx.lineTo(x + 64, G); ctx.stroke();
+        person(x - 90, "colonial", t);
+        ctx.strokeStyle = "#7a5a3a"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 80, G - 40); ctx.lineTo(x - 60, G - 2); ctx.stroke();
+        return G - 185;
+      }
+      case 1: { /* militia muster */
+        box(x + 110, G - 170, 5, 170, "#5a3d2a");
+        const wave = Math.sin(t / 300) * 4;
+        poly([[x + 115, G - 168], [x + 175, G - 160 + wave], [x + 115, G - 130]], "#b5402c");
+        [-80, -35, 10, 55].forEach((dx, j) => person(x + dx, "militia", t + j * 200));
+        circ(x + 90, G - 22, 16, "#c9921f"); box(x + 74, G - 26, 32, 8, "#8e3221");
+        return G - 190;
+      }
+      case 2: { /* print shop */
+        softShadow(x, 200);
+        box(x - 95, G - 150, 190, 150, "#e3d2b0");
+        poly([[x - 105, G - 150], [x, G - 200], [x + 105, G - 150]], "#5b6679");
+        box(x - 60, G - 120, 120, 30, "#1c2a44");
+        ctx.fillStyle = "#fbf6ea"; ctx.font = "800 14px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("PRINTER", x, G - 104);
+        box(x - 70, G - 72, 40, 72, "#5a3d2a"); box(x + 10, G - 76, 60, 34, "#a9c7d6");
+        /* press out front */
+        box(x + 120, G - 70, 8, 70, "#5a3d2a"); box(x + 164, G - 70, 8, 70, "#5a3d2a"); box(x + 116, G - 76, 60, 10, "#5a3d2a"); box(x + 124, G - 40, 44, 8, "#fbf6ea");
+        for (let j = 0; j < 4; j++) box(x - 150, G - 10 - j * 6, 34, 5, j % 2 ? "#fbf6ea" : "#efe6d0");
+        return G - 220;
+      }
+      case 3: { /* Declaration read aloud */
+        box(x - 18, G - 60, 36, 60, "#7a5a3a");
+        rr(x - 70, G - 210, 140, 160, 6); ctx.fillStyle = "#f6ecd2"; ctx.fill();
+        circ(x - 70, G - 210, 8, "#e1cfa6"); circ(x + 70, G - 210, 8, "#e1cfa6");
+        ctx.fillStyle = "#1c2a44"; ctx.font = "italic 700 12px Georgia, serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("IN CONGRESS,", x, G - 190); ctx.fillText("July 4, 1776.", x, G - 175);
+        ctx.fillStyle = "rgba(28,42,68,.35)"; for (let j = 0; j < 7; j++) ctx.fillRect(x - 52, G - 158 + j * 12, 104 - (j % 3) * 16, 3);
+        person(x - 110, "crier", t); person(x + 110, "woman", t, true); person(x + 150, "colonial", t, true);
+        return G - 235;
+      }
+      case 4: { /* Constitutional Convention hall */
+        softShadow(x, 280);
+        box(x - 140, G - 140, 280, 140, "#b86b4f");
+        box(x - 36, G - 240, 72, 100, "#b86b4f"); box(x - 30, G - 300, 60, 60, "#f3efe4");
+        poly([[x - 22, G - 300], [x, G - 360], [x + 22, G - 300]], "#f3efe4");
+        circ(x, G - 270, 14, "#fbf6ea"); ctx.strokeStyle = N; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, G - 270); ctx.lineTo(x, G - 279); ctx.moveTo(x, G - 270); ctx.lineTo(x + 7, G - 270); ctx.stroke();
+        for (let j = 0; j < 6; j++) { const wx = x - 124 + j * 44 + (j > 2 ? 22 : 0); if (j === 3) continue; box(wx, G - 118, 20, 34, "#cfe0e8"); box(wx, G - 66, 20, 34, "#cfe0e8"); }
+        box(x - 16, G - 64, 32, 64, "#f3efe4"); box(x - 11, G - 58, 22, 58, "#5a3d2a");
+        return G - 380;
+      }
+      case 5: { /* town meeting */
+        softShadow(x, 210);
+        box(x - 100, G - 130, 200, 130, "#f3efe4");
+        poly([[x - 110, G - 130], [x, G - 185], [x + 110, G - 130]], "#6b7280");
+        box(x - 16, G - 230, 32, 60, "#f3efe4"); poly([[x - 18, G - 230], [x, G - 268], [x + 18, G - 230]], "#6b7280");
+        box(x - 14, G - 60, 28, 60, "#5a3d2a");
+        [-70, 70].forEach(dx => box(x + dx - 12, G - 100, 24, 36, "#a9c7d6"));
+        [[-150, "colonial"], [-120, "woman"], [130, "colonial"], [160, "crier"]].forEach(([dx, s], j) => person(x + dx, s, t + j * 90, dx > 0));
+        [[-135, G - 110], [145, G - 110]].forEach(([dx, yy]) => { rr(x + dx - 14, yy - 16, 28, 22, 8); ctx.fillStyle = "#fff"; ctx.fill(); ctx.fillStyle = R; ctx.font = "800 15px system-ui"; ctx.textAlign = "center"; ctx.fillText("!", x + dx, yy - 4); });
+        return G - 290;
+      }
+      case 6: { /* newspaper board */
+        box(x - 80, G - 18, 8, 18, "#5a3d2a"); box(x + 72, G - 18, 8, 18, "#5a3d2a");
+        rr(x - 90, G - 210, 180, 194, 6); ctx.fillStyle = "#f6f1e3"; ctx.fill();
+        ctx.fillStyle = N; ctx.font = "700 17px Georgia, serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("THE FEDERALIST.", x, G - 186); ctx.font = "italic 13px Georgia, serif"; ctx.fillText("No. LI.", x, G - 166);
+        box(x - 76, G - 156, 152, 2, N);
+        ctx.fillStyle = "rgba(28,42,68,.4)"; for (let c2 = 0; c2 < 2; c2++) for (let j = 0; j < 9; j++) ctx.fillRect(x - 72 + c2 * 76, G - 146 + j * 13, 66 - (j % 4) * 6, 3);
+        person(x + 130, "colonial", t, true);
+        return G - 235;
+      }
+      case 7: { /* first federal election stage */
+        box(x - 110, G - 40, 220, 40, "#8a6a44");
+        for (let j = 0; j < 5; j++) poly([[x - 110 + j * 44, G - 40], [x - 66 + j * 44, G - 40], [x - 88 + j * 44, G - 16]], j % 2 ? "#fbf6ea" : "#b5402c");
+        box(x - 20, G - 92, 40, 52, "#6b4a38");
+        person(x, "colonial", t);
+        [[-160, "colonial"], [-130, "woman"], [150, "colonial"]].forEach(([dx, s], j) => person(x + dx, s, t + j * 70, dx > 0));
+        box(x + 170, G - 150, 5, 150, "#5a3d2a");
+        poly([[x + 175, G - 148], [x + 225, G - 140 + Math.sin(t / 300) * 3], [x + 175, G - 118]], "#1c2a44");
+        return G - 180;
+      }
+      case 8: { /* Bill of Rights on an easel */
+        ctx.strokeStyle = "#5a3d2a"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(x - 60, G); ctx.lineTo(x - 30, G - 220); ctx.moveTo(x + 60, G); ctx.lineTo(x + 30, G - 220); ctx.stroke();
+        rr(x - 80, G - 240, 160, 190, 6); ctx.fillStyle = "#f6ecd2"; ctx.fill();
+        ctx.fillStyle = N; ctx.font = "700 16px Georgia, serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("BILL OF RIGHTS", x, G - 214);
+        ctx.fillStyle = "rgba(28,42,68,.38)"; for (let j = 0; j < 10; j++) ctx.fillRect(x - 64, G - 196 + j * 13, 128 - (j % 3) * 22, 3);
+        box(x + 90, G - 30, 22, 30, "#1c2a44"); ctx.strokeStyle = "#f4ecdc"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + 101, G - 30); ctx.lineTo(x + 122, G - 80); ctx.stroke();
+        return G - 265;
+      }
+      case 9: { /* modern courthouse */
+        softShadow(x, 320);
+        box(x - 160, G - 24, 320, 24, "#d9dde2"); box(x - 150, G - 34, 300, 10, "#e6e9ec");
+        box(x - 140, G - 180, 280, 146, "#eef0f2");
+        poly([[x - 160, G - 180], [x, G - 250], [x + 160, G - 180]], "#dfe3e8");
+        for (let j = 0; j < 6; j++) { const cx = x - 120 + j * 48; box(cx, G - 172, 18, 138, "#ffffff"); box(cx - 3, G - 176, 24, 6, "#cfd4da"); }
+        box(x - 30, G - 110, 60, 76, "#6d9fc0"); box(x - 1, G - 110, 2, 76, "#fbf6ea");
+        box(x + 190, G - 220, 5, 220, "#9aa3ad");
+        box(x + 195, G - 218, 56, 32, "#b22234");
+        for (let j = 0; j < 4; j++) box(x + 195, G - 214 + j * 8, 56, 3, "#fff");
+        box(x + 195, G - 218, 24, 17, "#3c3b6e");
+        person(x - 200, "modern", t); person(x + 250, "modern2", t, true);
+        return G - 270;
+      }
+    }
+    return G - 200;
+  }
+
+  /* ================= Player ================= */
+  /* The player's clothes change with the time period (section) they are walking through. */
+  function outfitFor(era, role) {
+    const accent = { farmer: "#5f7a52", shopkeeper: "#3c4a68", apprentice: "#b5402c" }[role];
+    const W = "#f1ece0";
+    switch (era) {
+      case 0: return { body: accent, arm: accent, upper: "#6b5238", lower: "#6b5238", shoe: "#3b2a1c", hat: role === "farmer" ? "straw" : role === "shopkeeper" ? "tricorn" : "cap", apron: role === "shopkeeper" };
+      case 1: return { body: accent, arm: W, upper: "#c9b38a", lower: W, shoe: "#1c1c1c", hat: "tricorn", shirt: true };
+      case 2: return { body: "#2e4a7d", arm: "#2e4a7d", upper: "#d9c49a", lower: W, shoe: "#1c1c1c", hat: "tricorn", facings: true };
+      case 3: return { body: "#2f3a2f", arm: "#2f3a2f", upper: "#2b2b2b", lower: W, shoe: "#1c1c1c", hat: "tricorn", tails: true, cravat: true };
+      case 4: return { body: "#6e2a35", arm: "#6e2a35", upper: "#d9c49a", lower: W, shoe: "#1c1c1c", hat: "powdered", tails: true, cravat: true };
+      default: return { body: accent, arm: accent, upper: "#3d5a8a", lower: "#3d5a8a", shoe: "#fbfbfb", hat: "hair", hoodie: true, backpack: true };
+    }
+  }
+  function leg(x, y, ang, O, back) {
+    const kx = x + Math.sin(ang) * 15, ky = y + Math.cos(ang) * 15;
+    const fx = x + Math.sin(ang) * 30, fy = y + Math.cos(ang) * 30;
+    limb(x, y, ang, 15, back ? shade(O.upper) : O.upper, 7);
+    ctx.strokeStyle = back ? shade(O.lower) : O.lower; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(fx, fy); ctx.stroke();
+    ctx.fillStyle = O.shoe; ctx.beginPath(); ctx.ellipse(fx + 4, fy + 1, 7, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  function drawPlayer(px, t) {
+    const moving = S.mode === "run";
+    const ph = S.walk * (hurrying ? 16 : 12);
+    const y = GROUND;
+    const bob = moving ? Math.abs(Math.sin(ph)) * 4 : Math.sin(t / 500) * 1;
+    const O = outfitFor(sectionAt(S.x), S.char || "farmer");
+    ctx.save(); ctx.translate(px, 0);
+    ctx.fillStyle = "rgba(20,25,15,.22)"; ctx.beginPath(); ctx.ellipse(0, y + 3, 20, 6, 0, 0, Math.PI * 2); ctx.fill();
+    const swing = moving ? Math.sin(ph) * 0.7 : 0;
+    ctx.lineCap = "round";
+    if (O.backpack) { rr(-22, y - 62 - bob, 12, 28, 5); ctx.fillStyle = "#2b3b5c"; ctx.fill(); }
+    if (O.tails) poly([[-11, y - 40 - bob], [-19, y - 16 - bob + swing * 3], [-3, y - 26 - bob]], shade(O.body));
+    /* back leg and arm */
+    leg(-2, y - 30 - bob, swing, O, true);
+    limb(0, y - 58 - bob, -swing * .9, 24, shade(O.arm), 6);
+    /* body */
+    rr(-13, y - 64 - bob, 26, 36, 9); ctx.fillStyle = O.body; ctx.fill();
+    if (O.apron) { rr(-8, y - 50 - bob, 16, 22, 4); ctx.fillStyle = "#fbf6ea"; ctx.fill(); }
+    if (O.shirt) { rr(-3, y - 63 - bob, 6, 16, 2); ctx.fillStyle = "#f1ece0"; ctx.fill(); }
+    if (O.facings) { box(2, y - 63 - bob, 5, 32, "#e8d7a8"); for (let b = 0; b < 3; b++) circ(4.5, y - 56 - bob + b * 9, 1.6, "#c9921f"); }
+    if (O.cravat) poly([[-4, y - 64 - bob], [6, y - 64 - bob], [1, y - 54 - bob]], "#fbf6ea");
+    if (O.hoodie) { ctx.strokeStyle = "rgba(0,0,0,.25)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-8, y - 40 - bob); ctx.lineTo(10, y - 40 - bob); ctx.stroke(); box(-2, y - 62 - bob, 1.5, 9, "#fbf6ea"); box(4, y - 62 - bob, 1.5, 9, "#fbf6ea"); }
+    /* front leg and arm */
+    leg(2, y - 30 - bob, -swing, O, false);
+    limb(2, y - 58 - bob, swing * .9, 24, O.arm, 6);
+    if (O.backpack) { ctx.strokeStyle = "#2b3b5c"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-9, y - 62 - bob); ctx.lineTo(-4, y - 40 - bob); ctx.stroke(); }
+    /* head */
+    if (O.hoodie) { ctx.fillStyle = shade(O.body); ctx.beginPath(); ctx.arc(-4, y - 70 - bob, 11, Math.PI * .5, Math.PI * 1.4); ctx.fill(); }
+    circ(2, y - 76 - bob, 12, "#f0d0a8");
+    circ(8, y - 78 - bob, 1.8, N);
+    const hy = y - 82 - bob;
+    switch (O.hat) {
+      case "tricorn": poly([[-14, hy], [2, hy - 14], [18, hy]], N); box(-12, hy - 2, 28, 4, N); break;
+      case "cap": ctx.fillStyle = N; ctx.beginPath(); ctx.arc(2, hy, 12, Math.PI, 0); ctx.fill(); box(8, hy - 2, 10, 4, N); break;
+      case "straw": ctx.fillStyle = "#d6ad5c"; ctx.beginPath(); ctx.ellipse(2, hy - 2, 19, 4.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(2, hy - 3, 9, Math.PI, 0); ctx.fill(); break;
+      case "powdered": ctx.fillStyle = "#f4f1ea"; ctx.beginPath(); ctx.arc(1, hy + 2, 12, Math.PI * .95, Math.PI * 2.05); ctx.fill(); circ(-10, hy + 8, 5, "#f4f1ea"); box(-15, hy + 8, 5, 8, "#1c2a44"); break;
+      case "hair": ctx.fillStyle = "#4a3222"; ctx.beginPath(); ctx.arc(2, hy + 3, 12.5, Math.PI * .95, Math.PI * 2.02); ctx.fill(); break;
+    }
+    ctx.restore();
+  }
+  function limb(x, y, ang, len, c, wdt) { ctx.strokeStyle = c; ctx.lineWidth = wdt; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.sin(ang) * len, y + Math.cos(ang) * len); ctx.stroke(); }
+  function shade(hex) { return mix(hex, "#000000", .25); }
+
+  /* ================= Frame render ================= */
+  function resize() {
+    const r = worldEl.getBoundingClientRect();
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    viewW = r.width; viewH = r.height;
+    canvas.width = Math.round(viewW * dpr); canvas.height = Math.round(viewH * dpr);
+    k = viewH / 600;
+  }
+  function render(t) {
+    const unitsW = viewW / k;
+    const playerScreen = unitsW * (viewW < 700 ? .24 : .3);
+    const cam = S.x - playerScreen;
+    const pal = paletteAt(S.x);
+    ctx.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
+
+    /* sky */
+    const g = ctx.createLinearGradient(0, 0, 0, GROUND);
+    g.addColorStop(0, pal.skyA); g.addColorStop(1, pal.skyB);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, unitsW, 600);
+    const sec = sectionAt(S.x);
+    circ(unitsW * .82, 90, 34, sec === 2 ? "rgba(255,210,140,.9)" : "rgba(255,245,210,.9)");
+
+    /* clouds (slow parallax) */
+    for (let i = 0; i < 7; i++) {
+      const cx = ((i * 420 - cam * .12) % (unitsW + 400) + unitsW + 400) % (unitsW + 400) - 200, cy = 60 + (i * 53) % 110;
+      ctx.fillStyle = "rgba(255,255,255,.8)"; rr(cx, cy, 120, 28, 14); ctx.fill(); circ(cx + 40, cy + 2, 20, "rgba(255,255,255,.8)"); circ(cx + 70, cy - 4, 24, "rgba(255,255,255,.8)");
+    }
+    /* far hills */
+    ctx.fillStyle = pal.hill2; ctx.beginPath(); ctx.moveTo(0, GROUND);
+    for (let x = 0; x <= unitsW + 40; x += 40) ctx.lineTo(x, GROUND - 120 - Math.sin((x + cam * .25) / 190) * 40 - Math.sin((x + cam * .25) / 70) * 10);
+    ctx.lineTo(unitsW, GROUND); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = pal.hill; ctx.beginPath(); ctx.moveTo(0, GROUND);
+    for (let x = 0; x <= unitsW + 40; x += 40) ctx.lineTo(x, GROUND - 60 - Math.sin((x + cam * .45) / 150) * 26);
+    ctx.lineTo(unitsW, GROUND); ctx.closePath(); ctx.fill();
+
+    /* ground */
+    box(0, GROUND, unitsW, 600 - GROUND, pal.ground);
+
+    ctx.save(); ctx.translate(-cam, 0);
+    /* road surface changes with each time period */
+    for (let si = 0; si < SECTION_START.length; si++) {
+      const a = Math.max(si === 0 ? -1e9 : SECTION_START[si], cam - 60), b = Math.min(SECTION_START[si + 1] || 1e9, cam + unitsW + 60);
+      if (a < b) drawRoad(si, a, b);
+    }
+    /* time gates between periods */
+    for (let si = 1; si < SECTION_START.length; si++) {
+      const gx = SECTION_START[si];
+      if (gx > cam - 200 && gx < cam + unitsW + 200) drawGate(gx, si);
+    }
+    /* scenery behind */
+    DECOR.forEach(d => {
+      if (d.x < cam - 250 || d.x > cam + unitsW + 250) return;
+      switch (d.type) {
+        case "tree": tree(d.x, d.v, d.s === 5); break;
+        case "house": colonialHouse(d.x, d.v, false); break;
+        case "row": rowHouses(d.x, d.v); break;
+        case "tower": tower(d.x, d.v); break;
+        case "fence": ctx.fillStyle = "#8a6a44"; for (let j = 0; j < 5; j++) ctx.fillRect(d.x - 60 + j * 30, GROUND - 34, 5, 34); ctx.fillRect(d.x - 62, GROUND - 28, 130, 4); ctx.fillRect(d.x - 62, GROUND - 14, 130, 4); break;
+        case "hay": circ(d.x, GROUND - 20, 22, "#d8b25a"); box(d.x - 22, GROUND - 20, 44, 20, "#d8b25a"); break;
+        case "cow": rr(d.x - 30, GROUND - 42, 60, 28, 10); ctx.fillStyle = "#f4efe6"; ctx.fill(); circ(d.x - 8, GROUND - 32, 7, "#3b3024"); rr(d.x + 24, GROUND - 50, 18, 16, 6); ctx.fillStyle = "#f4efe6"; ctx.fill(); box(d.x - 24, GROUND - 16, 5, 16, "#e8dfd0"); box(d.x + 18, GROUND - 16, 5, 16, "#e8dfd0"); break;
+        case "lamp": box(d.x - 2, GROUND - 120, 4, 120, "#4b5057"); rr(d.x - 12, GROUND - 124, 24, 6, 3); ctx.fillStyle = "#4b5057"; ctx.fill(); circ(d.x, GROUND - 116, 5, "#fff4c2"); break;
+        case "lampOld": box(d.x - 2, GROUND - 100, 4, 100, "#2b2419"); rr(d.x - 8, GROUND - 118, 16, 20, 3); ctx.fillStyle = "#f3d27a"; ctx.fill(); break;
+        case "person": person(d.x, PEOPLE[d.s][d.v > .5 ? 0 : 1], t, d.h > .5); break;
+        case "car": rr(d.x - 44, GROUND + 6, 88, 26, 10); ctx.fillStyle = ["#3f6ea8", "#c24b3a", "#e0b43b"][Math.floor(d.v * 3)]; ctx.fill(); rr(d.x - 26, GROUND - 8, 50, 18, 8); ctx.fill(); box(d.x - 20, GROUND - 4, 18, 10, "#cfe6f2"); box(d.x + 2, GROUND - 4, 18, 10, "#cfe6f2"); circ(d.x - 26, GROUND + 32, 8, "#222"); circ(d.x + 26, GROUND + 32, 8, "#222"); break;
+      }
+    });
+    /* encounters */
+    ENC.forEach((e, i) => {
+      const x = encX(i);
+      if (x < cam - 400 || x > cam + unitsW + 400) return;
+      const topY = drawEncounter(i, x, t);
+      label(x, topY - 20, e.sign);
+      if (i < S.next) { circ(x + 0, topY - 50, 12, "#3d7a4d"); ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 5, topY - 50); ctx.lineTo(x - 1, topY - 46); ctx.lineTo(x + 6, topY - 55); ctx.stroke(); }
+      else if (i === S.next) { const b = Math.sin(t / 250) * 4; circ(x, topY - 52 + b, 14, "#c9921f"); ctx.fillStyle = "#fff"; ctx.font = "800 16px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("?", x, topY - 51 + b); }
+    });
+    /* finish line */
+    const fx = END_X - 120;
+    if (fx < cam + unitsW + 100) { box(fx, GROUND - 130, 6, 130, "#1c2a44"); box(fx + 6, GROUND - 128, 70, 40, "#b5402c"); ctx.fillStyle = "#fff"; ctx.font = "800 13px system-ui"; ctx.textAlign = "center"; ctx.fillText("YOUR JOURNEY", fx + 41, GROUND - 107); }
+    ctx.restore();
+
+    drawPlayer(playerScreen, t);
+
+    /* flash of light when you cross into a new time period */
+    const sp = (performance.now() - S.shiftAt) / 900;
+    if (sp >= 0 && sp < 1) {
+      ctx.fillStyle = "rgba(255,244,214," + (0.55 * (1 - sp)).toFixed(3) + ")"; ctx.fillRect(0, 0, unitsW, 600);
+      for (let q = 0; q < 12; q++) {
+        const ang = q / 12 * Math.PI * 2 + sp * 2, rad = 20 + sp * 90;
+        circ(playerScreen + Math.cos(ang) * rad, GROUND - 50 + Math.sin(ang) * rad * .7, 4 * (1 - sp) + 1, "rgba(201,146,31," + (1 - sp).toFixed(2) + ")");
+      }
+    }
+  }
+  function drawRoad(si, a, b) {
+    const top = GROUND, hgt = 46;
+    if (si === 0) {
+      box(a, top, b - a, hgt, "#dcc493"); box(a, top, b - a, 5, "#c6ab76");
+      ctx.fillStyle = "rgba(90,60,30,.12)";
+      for (let x = Math.floor(a / 23) * 23; x < b; x += 23) ctx.fillRect(x, top + 12 + (Math.abs(x) % 3) * 9, 8, 3);
+    } else if (si <= 2) {
+      box(a, top, b - a, hgt, "#bfae8e"); box(a, top, b - a, 5, "#a8966f");
+      ctx.fillStyle = "rgba(255,255,255,.28)";
+      for (let row = 0; row < 3; row++) for (let x = Math.floor(a / 26) * 26 + (row % 2) * 13; x < b; x += 26) { rr(x + 2, top + 8 + row * 12, 20, 9, 4); ctx.fill(); }
+    } else if (si <= 4) {
+      box(a, top, b - a, hgt, "#b27c60"); box(a, top, b - a, 5, "#8f5f47");
+      ctx.fillStyle = "rgba(90,40,25,.35)";
+      for (let row = 0; row < 4; row++) { ctx.fillRect(a, top + 8 + row * 10, b - a, 1.5); for (let x = Math.floor(a / 30) * 30 + (row % 2) * 15; x < b; x += 30) ctx.fillRect(x, top + 8 + row * 10, 1.5, 10); }
+    } else {
+      box(a, top, b - a, 12, "#d9d9d4"); box(a, top + 12, b - a, hgt - 12, "#5d636b");
+      ctx.fillStyle = "rgba(255,255,255,.6)";
+      for (let x = Math.floor(a / 60) * 60; x < b; x += 60) ctx.fillRect(x, top + 28, 30, 3);
+    }
+  }
+  function drawGate(gx, si) {
+    const label = GAME.sections[si].gate, modern = si === 5, G = GROUND;
+    const post = modern ? "#9aa3ad" : "#cbbfa6", beam = modern ? "#2b3b5c" : "#1c2a44";
+    softShadow(gx, 200);
+    box(gx - 90, G - 170, 22, 170, post); box(gx + 68, G - 170, 22, 170, post);
+    if (!modern) { box(gx - 94, G - 176, 30, 10, "#b3a68b"); box(gx + 64, G - 176, 30, 10, "#b3a68b"); }
+    rr(gx - 100, G - 214, 200, 50, modern ? 8 : 12); ctx.fillStyle = beam; ctx.fill();
+    ctx.strokeStyle = "#c9921f"; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = modern ? "#ffffff" : "#f5d48a"; ctx.font = "700 30px Georgia, serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(label, gx, G - 188);
+  }
+
+  /* ================= Game loop ================= */
+  function update(dt) {
+    if (S.mode !== "run") return;
+    const sp = TUNING.speed * (hurrying ? TUNING.hurry : 1);
+    S.x += sp * dt; S.walk += dt;
+    const sec = sectionAt(S.x);
+    if (sec !== S.section) { S.section = sec; showBanner(sec); setEra(sec, true); S.shiftAt = performance.now(); }
+    if (S.next < ENC.length && S.x >= encX(S.next) - TUNING.triggerAhead) {
+      S.x = encX(S.next) - TUNING.triggerAhead;
+      openCard(S.next);
+    } else if (S.next >= ENC.length && S.x >= END_X) {
+      S.x = END_X; finish();
+    }
+  }
+  let last = performance.now();
+  function frame(t) {
+    const dt = Math.min(0.1, (t - last) / 1000); last = t;
+    update(dt); render(t); updateTimeline();
+    requestAnimationFrame(frame);
+  }
+
+  /* ================= Banner ================= */
+  function showBanner(sec) {
+    worldEl.querySelectorAll(".banner").forEach(b => b.remove());
+    const s = GAME.sections[sec];
+    const b = h("div", "banner", "<small>" + UI.arrived + '</small><span class="big">' + (sec === 5 ? s.gate : s.year) + "</span><b>" + (sec === 5 ? s.year : s.name) + "</b><em>" + UI.clothes + " " + s.outfit + "</em>");
+    worldEl.appendChild(b);
+    setTimeout(() => { b.style.opacity = "0"; setTimeout(() => b.remove(), 500); }, TUNING.banner);
+  }
+
+  /* ================= Era badge and timeline ================= */
+  function buildTimeline() {
+    const tl = $("timeline");
+    tl.innerHTML = '<div class="track"></div><div class="fill" id="tlFill"></div>';
+    GAME.sections.forEach((sec, i) => {
+      const n = h("div", "node", "<i></i><span>" + sec.gate + "</span>");
+      n.style.left = (i === 0 ? 0 : SECTION_START[i] / END_X * 100) + "%";
+      tl.appendChild(n);
+    });
+    const you = h("div", "you", null); you.id = "tlYou"; tl.appendChild(you);
+  }
+  function updateTimeline() {
+    const pct = clamp(S.x / END_X, 0, 1) * 100;
+    $("tlFill").style.width = pct + "%";
+    $("tlYou").style.left = pct + "%";
+    const cur = sectionAt(S.x);
+    $("timeline").querySelectorAll(".node").forEach((n, i) => { n.classList.toggle("past", i < cur); n.classList.toggle("now", i === cur); });
+  }
+  function setEra(sec, animate) {
+    const s = GAME.sections[sec], el = $("era");
+    el.innerHTML = "<small>" + UI.youAreIn + "</small><b>" + (sec === 5 ? s.gate : s.year) + "</b><span>" + (sec === 5 ? s.year : s.name) + "</span>";
+    if (animate) { el.classList.remove("shift"); void el.offsetWidth; el.classList.add("shift"); }
+  }
+
+  /* ================= Encounter card ================= */
+  let resultTimer = null;
+  function openCard(i) {
+    S.mode = "card"; hurrying = false;
+    const d = ENC[i];
+    worldEl.classList.add("dim");
+    worldEl.querySelectorAll(".banner").forEach(b => b.remove());
+    S.cardAt = performance.now(); S.sel = 0; S.locked = false;
+    const card = h("div", "card");
+    card.setAttribute("role", "dialog"); card.setAttribute("aria-label", d.place);
+    const head = h("div", "card-head");
+    head.appendChild(h("div", "place", d.place)); head.appendChild(h("div", "year", d.year));
+    card.appendChild(head);
+    const st = h("div", "stakes"); UI.stakes.forEach((s, j) => st.appendChild(h("span", j === d.stake ? "on" : "", s))); card.appendChild(st);
+    card.appendChild(h("div", "contrast", '<span class="a">' + d.contrast[0] + "</span><i>" + UI.versus + '</i><span class="b">' + d.contrast[1] + "</span>"));
+    if (d.showDefinition) card.appendChild(h("div", "def", "<b>" + GAME.definition.label + "</b>" + GAME.definition.text));
+    card.appendChild(h("p", "q-text", d.text));
+    card.appendChild(h("p", "q-ask" + (d.ask ? " rq" : ""), d.ask || UI.whatNow));
+    const answers = h("div", "answers");
+    d.choices.forEach((c, j) => {
+      const b = h("button", "answer" + (j === 0 ? " sel" : ""), "<kbd>" + (j + 1) + "</kbd><span>" + c.label + "</span>");
+      b.type = "button";
+      b.addEventListener("click", () => choose(i, j));
+      b.addEventListener("mouseenter", () => select(j));
+      answers.appendChild(b);
+    });
+    card.appendChild(answers);
+    const meta = h("div", "meta");
+    const src = h("div"); src.appendChild(h("b", null, UI.sourceLabel));
+    d.sources.forEach(s => {
+      const row = h("div", "src"); row.appendChild(document.createTextNode(s.cite + " "));
+      const a = h("a", null, UI.viewSource); a.href = s.url; a.target = "_blank"; a.rel = "noopener"; row.appendChild(a);
+      const q = h("q"); q.textContent = s.quote; row.appendChild(q);
+      src.appendChild(row);
+    });
+    meta.appendChild(src);
+    const lang = h("div"); lang.appendChild(h("b", null, UI.langLabel)); lang.appendChild(document.createTextNode(d.lang)); meta.appendChild(lang);
+    card.appendChild(meta);
+    layer.appendChild(card);
+  }
+  function select(j) {
+    const bs = layer.querySelectorAll(".answer"); if (!bs.length) return;
+    S.sel = (j + bs.length) % bs.length;
+    bs.forEach((b, n) => b.classList.toggle("sel", n === S.sel));
+  }
+  function choose(i, j) {
+    if (S.mode !== "card" || S.locked || S.next !== i) return;
+    if (performance.now() - S.cardAt < 250) return;
+    S.locked = true;
+    const d = ENC[i], c = d.choices[j];
+    applyFx(c.fx);
+    S.picks.push({ place: d.place, label: c.label, kind: c.kind, i, j });
+    if (c.id) S.jury = c.id;
+    S.next = i + 1;
+    setTracker(true);
+    const card = layer.querySelector(".card");
+    card.innerHTML = "";
+    const con = h("div", "consequence");
+    con.appendChild(h("small", null, UI.yourChoice));
+    const pk = h("div", "picked"); pk.textContent = c.label; con.appendChild(pk);
+    const p = h("p"); p.textContent = c.result; con.appendChild(p);
+    const chips = h("div", "chips");
+    RES.forEach(key => { const v = c.fx[key] || 0; if (v) chips.appendChild(h("span", "chip " + (v > 0 ? "up" : "down"), fxText(key, v))); });
+    con.appendChild(chips);
+    con.appendChild(h("div", "timer", '<i style="animation-duration:' + TUNING.resultHold + 'ms"></i>'));
+    card.appendChild(con);
+    clearTimeout(resultTimer);
+    resultTimer = setTimeout(() => {
+      card.classList.add("out");
+      worldEl.classList.remove("dim");
+      setTimeout(() => card.remove(), 250);
+      S.mode = "run";
+    }, TUNING.resultHold);
+  }
+
+  /* ================= Input ================= */
+  window.addEventListener("keydown", e => {
+    if (e.target && e.target.tagName === "INPUT") return;
+    if (S.mode === "card" && !S.locked) {
+      if (e.code === "ArrowDown" || e.code === "KeyS") { e.preventDefault(); select(S.sel + 1); }
+      else if (e.code === "ArrowUp" || e.code === "KeyW") { e.preventDefault(); select(S.sel - 1); }
+      else if ((e.code === "Enter" || e.code === "NumpadEnter") && !e.repeat) { e.preventDefault(); choose(S.next, S.sel); }
+      else if (/^Digit[1-4]$/.test(e.code)) { const j = +e.code.slice(5) - 1; if (j < ENC[S.next].choices.length) { select(j); choose(S.next, j); } }
+      return;
+    }
+    if (e.code === "ArrowRight" || e.code === "Space" || e.code === "KeyD") { e.preventDefault(); hurrying = S.mode === "run"; }
+  });
+  window.addEventListener("keyup", e => { if (e.code === "ArrowRight" || e.code === "Space" || e.code === "KeyD") hurrying = false; });
+  window.addEventListener("blur", () => { hurrying = false; });
+  const tg = $("touchgo");
+  if (window.matchMedia("(pointer: coarse)").matches) tg.classList.add("on");
+  tg.addEventListener("pointerdown", e => { e.preventDefault(); hurrying = S.mode === "run"; });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(ev => tg.addEventListener(ev, () => { hurrying = false; }));
+
+  /* ================= HUD ================= */
   function buildHud() {
-    document.getElementById("hudBrand").textContent = UI.brand;
-    const res = document.getElementById("res");
-    KEYS.forEach(k => {
-      const r = h("div", "r");
-      r.dataset.k = k;
-      r.innerHTML = '<div class="r-top"><span><span class="long">' + UI.resources[k] + '</span><span class="short">' + UI.resourcesShort[k] +
+    $("hudBrand").textContent = UI.brand;
+    $("trackLabel").textContent = UI.decisions;
+    $("hurry").textContent = UI.hurry;
+    const res = $("res");
+    RES.forEach(key => {
+      const r = h("div", "r"); r.dataset.k = key;
+      r.innerHTML = '<div class="r-top"><span><span class="long">' + UI.resources[key] + '</span><span class="short">' + UI.resourcesShort[key] +
         '</span></span><span class="r-val"></span></div><div class="r-bar"><div class="r-fill"></div></div>';
       res.appendChild(r);
     });
   }
-  function updateHud() {
-    document.getElementById("hudName").textContent = S.name;
-    const p = document.getElementById("hudPortrait");
-    p.innerHTML = S.char ? ART[S.char] : "";
-  }
-  function paintRes(k, v) {
-    const r = document.querySelector('.r[data-k="' + k + '"]');
+  function paintRes(key, v) {
+    const r = document.querySelector('.hud .r[data-k="' + key + '"]');
     r.querySelector(".r-fill").style.width = v + "%";
     r.querySelector(".r-val").textContent = v;
-    r.setAttribute("aria-label", UI.resources[k] + " " + v + " of 100");
+    r.setAttribute("aria-label", UI.resources[key] + " " + v + " of 100");
   }
-  function animateTo(target, showFloats) {
-    KEYS.forEach(k => {
-      const from = S.res[k], to = clamp(target[k]), d = to - from;
-      S.res[k] = to;
-      const r = document.querySelector('.r[data-k="' + k + '"]');
+  function applyFx(fx) {
+    RES.forEach(key => {
+      const d = fx[key] || 0; if (!d) return;
+      const from = S.res[key], to = clamp(from + d, 0, 100); S.res[key] = to;
+      const r = document.querySelector('.hud .r[data-k="' + key + '"]');
       r.querySelector(".r-fill").style.width = to + "%";
-      if (showFloats && d !== 0) {
-        const f = h("span", "float " + (d > 0 ? "up" : "down"), (d > 0 ? UI.plus : UI.minus) + " " + Math.abs(d));
-        r.appendChild(f);
-        setTimeout(() => f.remove(), 1200);
-      }
-      const t0 = performance.now(), val = r.querySelector(".r-val");
+      r.classList.remove("up", "down"); void r.offsetWidth; r.classList.add(d > 0 ? "up" : "down");
+      setTimeout(() => r.classList.remove("up", "down"), 650);
+      const f = h("span", "float " + (d > 0 ? "up" : "down"), (d > 0 ? "+" : "−") + Math.abs(d)); r.appendChild(f); setTimeout(() => f.remove(), 1200);
+      const val = r.querySelector(".r-val"), t0 = performance.now();
       (function tick(now) {
-        const p = Math.max(0, Math.min(1, (now - t0) / Math.max(1, TIMING.count)));
-        val.textContent = Math.round(from + d * (1 - Math.pow(1 - p, 3)));
-        if (p < 1) requestAnimationFrame(tick); else paintRes(k, to);
+        const p = clamp((now - t0) / 500, 0, 1);
+        val.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - p, 3)));
+        if (p < 1) requestAnimationFrame(tick); else paintRes(key, to);
       })(t0);
     });
   }
-
-  /* ---------- Screen flow ---------- */
-  function go(id) {
-    clearTimeout(advanceTimer);
-    const idx = ORDER.indexOf(id);
-    document.getElementById("progress").textContent = (idx + 1) + " / " + ORDER.length;
-    const token = ++navToken;
-    const draw = () => {
-      if (token !== navToken) return;
-      stage.innerHTML = "";
-      stage.classList.remove("out", "in");
-      if (id === "start") renderStart();
-      else if (id === "final") renderFinal();
-      else renderScene(id);
-      void stage.offsetWidth;
-      stage.classList.add("in");
-      stageWrap.scrollTop = 0;
-      const h1 = stage.querySelector("h1");
-      if (h1) h1.focus({ preventScroll: true });
-      busy = false;
-    };
-    busy = true;
-    if (!stage.childElementCount) return draw();
-    stage.classList.remove("in");
-    stage.classList.add("out");
-    setTimeout(() => {
-      if (id === "now") return splash(draw);
-      draw();
-    }, TIMING.sceneOut);
+  function setTracker(bump) {
+    $("trackVal").textContent = S.next + " / " + ENC.length;
+    const tr = $("tracker"); if (bump) { tr.classList.remove("bump"); void tr.offsetWidth; tr.classList.add("bump"); }
   }
-  function splash(then) {
-    const s = h("div", "splash", "<span>" + UI.nowSplash + "</span>");
-    s.style.animationDuration = TIMING.splash + "ms";
-    s.firstChild.style.animationDuration = TIMING.splash + "ms";
-    document.body.appendChild(s);
-    setTimeout(then, TIMING.splash * 0.55);
-    setTimeout(() => s.remove(), TIMING.splash);
+  function updateHud() {
+    $("hudName").textContent = S.name;
+    $("hudPortrait").innerHTML = S.char ? PORTRAIT[S.char] : "";
+    RES.forEach(key => paintRes(key, S.res[key]));
+    setTracker(false);
   }
 
-  /* ---------- Screen 1 ---------- */
-  function renderStart() {
-    const sc = GAME.screens.start;
-    const panel = h("section", "panel");
-    const h1 = h("h1", null, sc.heading); h1.tabIndex = -1; panel.appendChild(h1);
-
-    const nameRow = h("div", "name-row");
-    const input = h("input", "name-input");
-    input.type = "text"; input.maxLength = 18; input.placeholder = UI.namePlaceholder; input.autocomplete = "off";
+  /* ================= Start screen ================= */
+  function showStart() {
+    layer.innerHTML = "";
+    const scr = h("div", "screen"), panel = h("div", "panel");
+    panel.appendChild(h("h1", null, UI.chooseTitle));
+    const input = h("input", "name-input"); input.type = "text"; input.maxLength = 18; input.placeholder = UI.namePlaceholder; input.autocomplete = "off";
     input.setAttribute("aria-label", UI.namePlaceholder);
-    input.addEventListener("input", () => {
-      const v = input.value.trim();
-      S.name = v ? v.toUpperCase() : UI.defaultName;
-      updateHud();
-    });
-    nameRow.appendChild(input);
-    panel.appendChild(nameRow);
-
-    const chars = h("div", "chars");
-    chars.style.marginTop = "12px";
-    chars.setAttribute("role", "radiogroup");
+    input.addEventListener("input", () => { const v = input.value.trim(); S.name = v ? v.toUpperCase() : UI.defaultName; updateHud(); });
+    input.addEventListener("keydown", e => { if (e.key === "Enter" && S.char) { e.preventDefault(); begin(); } });
+    panel.appendChild(input);
+    const chars = h("div", "chars"); chars.setAttribute("role", "radiogroup");
+    const go = h("button", "primary", UI.pickPrompt); go.type = "button"; go.disabled = true;
     GAME.characters.forEach(c => {
-      const b = h("button", "char");
-      b.type = "button";
-      b.setAttribute("role", "radio");
-      b.setAttribute("aria-checked", "false");
-      b.innerHTML = '<div class="pic">' + ART[c.id] + '</div><div class="char-body"><div class="cn">' + c.name + '</div><div class="cl">' + c.line +
-        '</div><div class="perks">' + c.perks.map(p => '<span class="perk">' + p + '</span>').join("") + '</div></div>';
+      const b = h("button", "char"); b.type = "button"; b.setAttribute("role", "radio"); b.setAttribute("aria-checked", "false");
+      b.innerHTML = '<div class="pic">' + PORTRAIT[c.id] + '</div><div class="char-body"><div class="cn">' + c.name + '</div><div class="cl">' + c.line +
+        '</div><div class="perks">' + c.perks.map(p => '<span class="perk">' + p + "</span>").join("") + "</div></div>";
       b.addEventListener("click", () => {
-        S.char = c.id;
+        S.char = c.id; S.res.time = c.start.time; S.res.money = c.start.money;
         chars.querySelectorAll(".char").forEach(x => { x.classList.toggle("sel", x === b); x.setAttribute("aria-checked", x === b ? "true" : "false"); });
-        animateTo(c.start, false);
-        updateHud();
-        begin.disabled = false;
-        begin.textContent = UI.begin;
+        updateHud(); go.disabled = false; go.textContent = UI.start;
       });
       chars.appendChild(b);
     });
     panel.appendChild(chars);
-    stage.appendChild(panel);
-
-    const def = h("div", "definition", '<div class="dl">' + GAME.definition.label + '</div><div class="dt">' + GAME.definition.text + '</div>');
-    stage.appendChild(def);
-    const ctx = h("p", "context", sc.context);
-    stage.appendChild(ctx);
-    stage.appendChild(h("p", "source", '<span>FOUNDING SOURCE</span>' + sc.source));
-
-    const begin = h("button", "primary", UI.pickPrompt);
-    begin.type = "button";
-    begin.disabled = true;
-    begin.addEventListener("click", () => { if (S.char && !busy) go("april"); });
-    stage.appendChild(begin);
+    panel.appendChild(h("div", "definition", '<div class="dl">' + GAME.definition.label + '</div><div class="dt">' + GAME.definition.text + "</div>"));
+    const ctl = h("ul", "controls"); UI.controls.forEach(t => ctl.appendChild(h("li", null, t))); panel.appendChild(ctl);
+    go.addEventListener("click", () => { if (S.char) begin(); });
+    panel.appendChild(go);
+    scr.appendChild(panel); layer.appendChild(scr);
+  }
+  function begin() {
+    if (S.mode !== "start") return;
+    layer.innerHTML = "";
+    S.mode = "run"; S.startedAt = performance.now();
+    showBanner(0);
   }
 
-  /* ---------- Decision screens ---------- */
-  function renderScene(id) {
-    const sc = GAME.screens[id];
-    const panel = h("section", "panel" + (sc.variant === "dark" ? " dark" : ""));
-    const stakes = h("ol", "stakes");
-    UI.stakes.forEach((s, i) => stakes.appendChild(h("li", sc.stakes.includes(i) ? "on" : "", s)));
-    stakes.setAttribute("aria-label", "Rising stakes");
-    panel.appendChild(stakes);
-    if (ART[id]) panel.appendChild(h("div", "art", ART[id]));
-    panel.appendChild(h("p", "stage-tag", sc.stage));
-    const h1 = h("h1", null, sc.heading); h1.tabIndex = -1; panel.appendChild(h1);
-    panel.appendChild(h("p", "text", fill(sc.text)));
-    if (sc.source) panel.appendChild(h("p", "source", '<span>FOUNDING SOURCE</span>' + sc.source));
-    if (sc.question) panel.appendChild(h("p", "question", sc.question));
-    if (sc.steps) {
-      const ol = h("ol", "steps");
-      sc.steps.forEach((t, i) => ol.appendChild(h("li", null, '<div class="num">' + (i + 1) + '</div>' + ART.stepIcons[i] + '<div>' + t + '</div>')));
-      panel.appendChild(ol);
-    }
-    stage.appendChild(panel);
-
-    const actions = h("div", "actions" + (sc.variant === "dark" ? " dark-actions" : ""));
-    sc.choices.forEach(c => {
-      const b = h("button", "choice", c.label);
-      b.type = "button";
-      b.addEventListener("click", () => choose(id, sc, c, b, actions));
-      actions.appendChild(b);
+  /* ================= Ending ================= */
+  function score() { return Math.round(clamp(S.res.duty * 0.65 + S.res.trust * 0.35, 0, 100)); }
+  function counts(picks) { return picks.reduce((a, p) => (a[p.kind]++, a), { duty: 0, balance: 0, self: 0 }); }
+  function personalityFor(picks) {
+    const c = counts(picks), chose = (i, j) => picks.some(p => p.i === i && p.j === j);
+    if (c.self >= 6) return "bystander";
+    if (c.duty >= 8) return "minuteman";
+    if (c.balance >= 5 && c.self <= 2) return "compromiser";
+    if (chose(3, 0) && c.duty >= 5) return "reformer";
+    if (chose(8, 1) && c.self <= 3) return "watchdog";
+    if (c.balance >= 4 && c.self <= 2) return "compromiser";
+    return "pragmatist";
+  }
+  const BADGE = {
+    minuteman: '<path d="M14 40h36M18 40c0-10 6-16 14-16s14 6 14 16" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><path d="M12 26l20-10 20 10" fill="none" stroke="#fff" stroke-width="3.5" stroke-linejoin="round"/><path d="M44 48l8-30" stroke="#f5d48a" stroke-width="3" stroke-linecap="round"/>',
+    reformer: '<path d="M16 28v10l22 8V20z" fill="#fff"/><path d="M38 20v26M44 26c4 2 4 12 0 14" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M20 38l3 9h6l-3-8" fill="#f5d48a"/>',
+    watchdog: '<path d="M10 32c6-10 14-15 22-15s16 5 22 15c-6 10-14 15-22 15S16 42 10 32z" fill="none" stroke="#fff" stroke-width="3.5"/><circle cx="32" cy="32" r="7" fill="#f5d48a"/>',
+    compromiser: '<path d="M32 14v34M18 48h28" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><path d="M14 22h36" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M14 22l-6 12h12zM50 22l-6 12h12z" fill="#f5d48a"/>',
+    pragmatist: '<circle cx="32" cy="32" r="17" fill="none" stroke="#fff" stroke-width="3.5"/><path d="M32 18l5 14-5 14-5-14z" fill="#f5d48a"/>',
+    bystander: '<circle cx="32" cy="20" r="6" fill="#fff"/><path d="M26 30h12l-2 12h-8z" fill="#fff"/><path d="M14 44h36M18 44v8M46 44v8" stroke="#f5d48a" stroke-width="3.5" stroke-linecap="round"/>'
+  };
+  function personalityBlock() {
+    const P = GAME.personality, key = personalityFor(S.picks), t = P.types[key], c = counts(S.picks);
+    const box = h("section", "persona " + key);
+    const head = h("div", "persona-head");
+    head.appendChild(h("div", "badge", '<svg viewBox="0 0 64 64" aria-hidden="true">' + BADGE[key] + "</svg>"));
+    const titles = h("div");
+    titles.appendChild(h("div", "persona-label", P.label));
+    titles.appendChild(h("div", "persona-name", t.name));
+    titles.appendChild(h("div", "persona-tag", t.tagline));
+    head.appendChild(titles);
+    box.appendChild(head);
+    box.appendChild(h("p", "persona-text", t.text));
+    const traits = h("div", "traits");
+    ["duty", "balance", "self"].forEach(k => {
+      const pct = Math.round(c[k] / Math.max(1, S.picks.length) * 100);
+      traits.appendChild(h("div", "trait " + k, '<div class="trait-top"><span>' + P.traits[k] + "</span><span>" + c[k] + '</span></div><div class="trait-bar"><i style="width:' + pct + '%"></i></div>'));
     });
-    stage.appendChild(actions);
+    box.appendChild(traits);
+    const facts = h("div", "persona-facts");
+    [[P.strengthLabel, t.strength], [P.blindLabel, t.blind], [P.historyLabel, t.history]].forEach(([l, v]) => {
+      const f = h("div"); f.appendChild(h("b", null, l)); f.appendChild(document.createTextNode(v)); facts.appendChild(f);
+    });
+    box.appendChild(facts);
+    box.appendChild(h("p", "persona-basis", P.basedOn.replace("{duty}", c.duty).replace("{balance}", c.balance).replace("{self}", c.self)));
+    return box;
   }
+  function finish() {
+    S.mode = "end"; hurrying = false; S.finishedAt = performance.now();
+    const Eg = GAME.ending, total = score();
+    const scr = h("div", "screen"), panel = h("div", "panel");
+    panel.appendChild(h("h1", null, UI.journeyTitle));
+    panel.appendChild(personalityBlock());
+    const row = h("div", "score-row");
+    const C = 2 * Math.PI * 60;
+    const ring = h("div", "ring", '<svg viewBox="0 0 140 140" aria-hidden="true"><circle class="track" cx="70" cy="70" r="60" fill="none" stroke-width="12"/><circle class="arc" cx="70" cy="70" r="60" fill="none" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + C.toFixed(1) + '"/></svg><div class="num"><div><b data-score>0</b><small>' + UI.scoreOutOf + '</small></div></div><div class="lbl">' + UI.scoreLabel + "</div>");
+    ring.setAttribute("aria-label", UI.scoreLabel + " " + total + " " + UI.scoreOutOf);
+    row.appendChild(ring);
+    const finals = h("div", "finals");
+    ["duty", "time", "money", "trust"].forEach(key => {
+      const f = h("div", "r"); f.dataset.k = key;
+      f.innerHTML = '<div class="r-top"><span>' + UI.resources[key] + '</span><span class="r-val">' + S.res[key] + '</span></div><div class="r-bar"><div class="r-fill" style="width:' + S.res[key] + '%"></div></div>';
+      finals.appendChild(f);
+    });
+    row.appendChild(finals);
+    panel.appendChild(row);
 
-  function choose(id, sc, c, btn, actions) {
-    if (actions.dataset.locked) return;
-    actions.dataset.locked = "1";
-    actions.querySelectorAll(".choice").forEach(b => { b.disabled = true; b.classList.add(b === btn ? "picked" : "dim"); });
-
-    const target = {};
-    KEYS.forEach(k => target[k] = S.res[k] + (c.effects[k] || 0));
-    animateTo(target, true);
-    S.points += c.points;
-    if (c.points >= 10) KEYS.forEach(k => { if ((c.effects[k] || 0) < 0 && k !== "trust") S.cost += -c.effects[k]; });
-    S.picks[id] = c;
-    S.path.push(c.title);
-
-    setTimeout(() => {
-      actions.innerHTML = "";
-      const card = h("button", "conseq");
-      card.type = "button";
-      card.appendChild(h("span", "c-title", c.title));
-      card.appendChild(h("span", "c-text", fill(c.text)));
-      if (sc.after) card.appendChild(h("span", "c-after", sc.after));
-      if (sc.echo && S.picks.april) {
-        card.appendChild(h("span", "c-echo", sc.echo.replace("{then}", S.picks.april.echo).replace("{now}", c.echo)));
-      }
-      const chips = h("span", "deltas");
-      KEYS.forEach(k => {
-        const d = c.effects[k] || 0;
-        if (d) chips.appendChild(h("span", "chip " + (d > 0 ? "up" : "down"), deltaText(k, d)));
-      });
-      card.appendChild(chips);
-      const hold = sc.long ? TIMING.holdLong : TIMING.hold;
-      const foot = h("span", "c-foot", '<span class="timer"><i style="animation-duration:' + hold + 'ms"></i></span><span>' + UI.tapToContinue + '</span>');
-      card.appendChild(foot);
-      actions.appendChild(card);
-      card.focus({ preventScroll: true });
-      card.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      const next = ORDER[ORDER.indexOf(id) + 1];
-      let done = false;
-      const advance = () => { if (done) return; done = true; busy = false; go(next); };
-      card.addEventListener("click", advance);
-      advanceTimer = setTimeout(advance, hold);
-    }, TIMING.feedback);
-  }
-
-  /* ---------- Final screen ---------- */
-  function score() {
-    const costPts = Math.min(15, Math.round(S.cost * 15 / 50));
-    return Math.max(0, Math.min(100, S.points + costPts));
-  }
-  function renderFinal() {
-    const E = GAME.ending, total = score();
-    const panel = h("section", "panel");
-    const wrap = h("div", "score-wrap");
-    const C2 = 2 * Math.PI * 64;
-    const ring = h("div", "ring",
-      '<svg viewBox="0 0 150 150" aria-hidden="true"><circle class="track" cx="75" cy="75" r="64" fill="none" stroke-width="12"/>' +
-      '<circle class="arc" cx="75" cy="75" r="64" fill="none" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + C2.toFixed(1) + '" stroke-dashoffset="' + C2.toFixed(1) + '"/></svg>' +
-      '<div class="num"><div><b>0</b><small>/ 100</small></div></div>');
-    wrap.appendChild(ring);
-    const lab = h("div");
-    lab.appendChild(h("div", "score-label", E.scoreLabel));
-    const nm = h("div", "score-name"); nm.textContent = S.name; lab.appendChild(nm);
-    const h1 = h("h1", null, total + " / 100");
-    h1.tabIndex = -1;
-    h1.style.cssText = "position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)";
-    lab.appendChild(h1);
-    wrap.appendChild(lab);
-    panel.appendChild(wrap);
-    stage.appendChild(panel);
-
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      ring.querySelector(".arc").style.strokeDashoffset = (C2 * (1 - total / 100)).toFixed(1);
-    }));
-    const numEl = ring.querySelector("b"), t0 = performance.now();
-    (function tick(now) {
-      const p = Math.max(0, Math.min(1, (now - t0) / 900));
-      numEl.textContent = Math.round(total * (1 - Math.pow(1 - p, 3)));
-      if (p < 1) requestAnimationFrame(tick);
-    })(t0);
-
-    stage.appendChild(h("div", "definition", '<div class="dl">' + GAME.definition.label + '</div><div class="dt">' + GAME.definition.text + '</div>'));
-    const jury = S.picks.now ? S.picks.now.id : "excused";
-    stage.appendChild(h("p", "judgment", E.judgment.concat(E.juryLine[jury]).join(" ")));
-
+    const kinds = S.picks.reduce((a, p) => (a[p.kind] = (a[p.kind] || 0) + 1, a), {});
+    const parts = [S.res.duty >= 70 ? Eg.duty.high : S.res.duty >= 40 ? Eg.duty.mid : Eg.duty.low];
+    if ((kinds.balance || 0) >= 2 && S.res.duty >= 40) parts.push(Eg.balanceNote);
+    parts.push(S.res.trust >= 65 ? Eg.trust.high : S.res.trust >= 35 ? Eg.trust.mid : Eg.trust.low, Eg.jury[S.jury] || "");
+    panel.appendChild(h("p", "pattern", parts.filter(Boolean).join(" ")));
+    panel.appendChild(h("p", "conclusion", Eg.conclusion));
+    panel.appendChild(h("p", "section-label", UI.actionsLabel));
+    const acts = h("ol", "actions"); Eg.actions.forEach(a => acts.appendChild(h("li", null, a))); panel.appendChild(acts);
+    panel.appendChild(h("p", "section-label", UI.decisionsLabel));
     const path = h("ul", "path");
-    S.path.forEach(t => path.appendChild(h("li", null, t)));
-    stage.appendChild(path);
-    stage.appendChild(h("p", "note", E.scoreNote));
-    stage.appendChild(sourcesBlock());
-
-    const again = h("button", "primary", UI.playAgain);
-    again.type = "button";
-    again.addEventListener("click", () => { if (!busy) start(); });
-    stage.appendChild(again);
+    S.picks.forEach(p => { const li = h("li", p.kind); li.textContent = p.place + ": " + p.label; path.appendChild(li); });
+    panel.appendChild(path);
+    panel.appendChild(h("div", "definition", '<div class="dl">' + GAME.definition.label + '</div><div class="dt">' + GAME.definition.text + "</div>"));
+    panel.appendChild(h("p", "note", Eg.scoreNote));
+    panel.appendChild(sourcesBlock());
+    const again = h("button", "primary", UI.playAgain); again.type = "button";
+    again.addEventListener("click", reset);
+    panel.appendChild(again);
+    scr.appendChild(panel); layer.appendChild(scr);
+    requestAnimationFrame(() => requestAnimationFrame(() => { ring.querySelector(".arc").style.strokeDashoffset = (C * (1 - total / 100)).toFixed(1); }));
+    const num = ring.querySelector("[data-score]"), t0 = performance.now();
+    (function tick(now) { const p = clamp((now - t0) / 900, 0, 1); num.textContent = Math.round(total * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(tick); })(t0);
   }
-
   function sourcesBlock() {
-    const SRC = GAME.sources;
-    const d = h("details", "sources");
-    d.appendChild(h("summary", null, SRC.label));
-    [[SRC.citedLabel, SRC.cited], [SRC.consultedLabel, SRC.consulted]].forEach(([label, list]) => {
-      d.appendChild(h("h2", null, label));
+    const SRC = GAME.sources, d = h("details", "sources");
+    d.appendChild(h("summary", null, UI.sourcesLabel));
+    [[UI.citedLabel, SRC.cited], [UI.consultedLabel, SRC.consulted]].forEach(([lab, list]) => {
+      d.appendChild(h("h2", null, lab));
       const ul = h("ul");
-      list.forEach(s => {
-        const li = h("li", null, s.text + " ");
-        const a = h("a", null, SRC.linkText);
-        a.href = s.url; a.target = "_blank"; a.rel = "noopener";
-        li.appendChild(a);
-        ul.appendChild(li);
-      });
+      list.forEach(s => { const li = h("li", null, s.text + " "); const a = h("a", null, SRC.linkText); a.href = s.url; a.target = "_blank"; a.rel = "noopener"; li.appendChild(a); ul.appendChild(li); });
       d.appendChild(ul);
     });
     return d;
   }
 
-  /* ---------- Boot ---------- */
-  function start() {
+  /* ================= Boot ================= */
+  function reset() {
+    clearTimeout(resultTimer); hurrying = false;
+    worldEl.classList.remove("dim");
+    worldEl.querySelectorAll(".banner").forEach(n => n.remove());
     S = fresh();
-    KEYS.forEach(k => paintRes(k, S.res[k]));
     updateHud();
-    go("start");
+    setEra(0, false);
+    showStart();
   }
-  document.title = "Personal Duty";
   buildHud();
-  start();
+  buildTimeline();
+  resize();
+  window.addEventListener("resize", resize);
+  reset();
+  requestAnimationFrame(frame);
+
+  /* Read only view of the game state for automated testing. */
+  window.__duty = { get state() { return S; }, encX, endX: END_X, tuning: TUNING,
+    step(seconds) { for (let s = 0; s < seconds; s += 0.02) update(0.02); } };
 })();
 </script>
 </body>
