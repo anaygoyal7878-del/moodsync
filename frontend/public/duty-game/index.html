@@ -17,12 +17,34 @@
 const GAME = {
   ui: {
     brand: "PERSONAL DUTY",
+    title: "Personal Duty",
+    subtitle: "A journey through American civic life, 1774 to today",
+    nameQuestion: "What is your name?",
+    occupationQuestion: "Choose your occupation.",
+    startsWith: "Starting supplies",
+    choicePrompt: "What is your choice?",
+    arrivedAt: "You have arrived at",
+    dateLabel: "Date",
+    nextStop: "Next stop",
+    miles: "miles",
+    trailEnd: "journey's end",
+    supplies: "Supplies",
+    landmarks: "Landmarks",
+    of: "of",
+    sourceShort: "Source",
+    langShort: "Rhetoric",
+    stakesShort: "Stakes",
+    orWord: "or",
+    resultLabel: "What happened",
+    hereLies: "Here lies",
+    endTitle: "Journey's End",
     defaultName: "CITIZEN",
     namePlaceholder: "Your name (optional)",
     chooseTitle: "Who are you?",
-    controls: ["The journey moves on its own", "Answer with ↑ ↓ and ENTER, or click", "Hold → or SPACE to hurry"],
+    controls: ["Walking is automatic", "↑ ↓ and ENTER to choose", "Hold → or SPACE to hurry", "If any supply hits 0, you start over"],
+    low: "LOW",
     start: "START THE JOURNEY",
-    pickPrompt: "Pick a character to start",
+    pickPrompt: "Choose an occupation to begin",
     decisions: "DECISIONS",
     whatNow: "WHAT DO YOU DO?",
     versus: "VS",
@@ -31,7 +53,7 @@ const GAME = {
     langLabel: "AP LANG CONNECTION",
     yourChoice: "YOUR CHOICE",
     hurry: "Hold → or SPACE to hurry",
-    arrived: "YOU HAVE ARRIVED IN",
+    arrived: "You have arrived in",
     youAreIn: "YOU ARE IN",
     clothes: "Your clothes:",
     resources: { time: "TIME", money: "MONEY", trust: "COMMUNITY TRUST", duty: "CIVIC DUTY" },
@@ -55,14 +77,14 @@ const GAME = {
 
   characters: [
     { id: "farmer", name: "FARMER", line: "You work the land from dawn to dusk.",
-      perks: ["More Money", "Less Time"], start: { time: 35, money: 65 } },
+      perks: ["More Money", "Less Time"], start: { time: 65, money: 75 } },
     { id: "shopkeeper", name: "SHOPKEEPER", line: "You sell goods to the whole town.",
-      perks: ["More Money", "Balanced Time"], start: { time: 50, money: 65 } },
+      perks: ["More Money", "Balanced Time"], start: { time: 75, money: 70 } },
     { id: "apprentice", name: "APPRENTICE", line: "You are learning a trade, coin by coin.",
-      perks: ["More Time", "Less Money"], start: { time: 65, money: 35 } }
+      perks: ["More Time", "Less Money"], start: { time: 85, money: 50 } }
   ],
-  startTrust: 30,
-  startDuty: 10,
+  startTrust: 45,
+  startDuty: 35,
 
   /* The six parts of the journey. The world changes as you pass through them. */
   sections: [
@@ -77,136 +99,136 @@ const GAME = {
   /* The 10 encounters, in the order you pass them. "sign" is the label above the object. */
   encounters: [
     {
-      place: "FARM", sign: "FARM", stake: 0, year: "1774", contrast: ["TIME", "DUTY"], showDefinition: true,
-      text: "Your town needs every family to repair the bridge. Your own field is waiting.",
-      ask: "What do you owe your community?",
+      place: "FARM", sign: "FARM", landmark: "a farm in Massachusetts", stake: 0, year: "Summer 1774", contrast: ["YOUR HARVEST", "BOSTON'S NEED"], showDefinition: true,
+      text: "Parliament closed Boston's harbor to punish the city. Towns are sending food. Your harvest is small.",
+      ask: "What do you owe strangers?",
       choices: [
-        { label: "Fix the bridge all day", kind: "duty", fx: { time: -12, money: -5, trust: 8, duty: 8 },
-          result: "Your field waits. The town can reach market." },
-        { label: "Help for half a day", kind: "balance", fx: { time: -5, money: -2, trust: 2, duty: 2 },
-          result: "A fair split between town and field." },
-        { label: "Tend your own field", kind: "self", fx: { time: 8, money: 5, trust: -15, duty: -15 },
-          result: "Your neighbors did your share." }
+        { label: "Send a full share of grain", kind: "duty", fx: { time: -4, money: -10, trust: 8, duty: 8 },
+          result: "Your family eats less this winter. Boston eats." },
+        { label: "Send what you can spare", kind: "balance", fx: { time: -2, money: -5, trust: 2, duty: 2 },
+          result: "A smaller gift, but your family stays fed." },
+        { label: "Sell your grain at high prices", kind: "self", fx: { money: 10, trust: -15, duty: -15 },
+          result: "You profit while Boston goes hungry." }
       ],
       sources: [{ cite: "Thomas Paine, Common Sense, 1776", quote: "Society in every state is a blessing.", url: "https://billofrightsinstitute.org/primary-sources/common-sense/" }],
-      lang: "Rhetorical question: it makes you answer for yourself before you choose."
+      lang: "Rhetorical question: it asks what you owe strangers, not just your neighbors."
     },
     {
-      place: "MILITIA", sign: "MILITIA MUSTER", stake: 1, year: "Spring 1775", contrast: ["LIBERTY", "SAFETY"],
-      text: "Patrick Henry urged Virginia to arm. Your militia needs volunteers. Your family needs you.",
+      place: "MILITIA", sign: "MILITIA MUSTER", landmark: "the county militia muster", stake: 1, year: "Spring 1775", contrast: ["LIBERTY", "SAFETY"],
+      text: "Patrick Henry says peace is a false hope. Your county forms a militia during planting season.",
       ask: "Is your safety worth more than liberty?",
       choices: [
-        { label: "Join the militia", kind: "duty", fx: { time: -15, money: -5, trust: 10, duty: 10 },
-          result: "You risk your safety. Your town notices." },
-        { label: "Drill on weekends", kind: "balance", fx: { time: -6, trust: 2, duty: 2 },
-          result: "Family and town each get part of you." },
-        { label: "Stay home", kind: "self", fx: { time: 8, money: 3, trust: -15, duty: -15 },
-          result: "Safe at home. Others march for you." }
+        { label: "Enlist and drill now", kind: "duty", fx: { time: -12, money: -6, trust: 10, duty: 10 },
+          result: "Your crops go in late. Your company is ready." },
+        { label: "Enlist, but after planting", kind: "balance", fx: { time: -6, trust: 2, duty: 2 },
+          result: "You will serve later. The company drills without you." },
+        { label: "Hire a substitute", kind: "self", fx: { time: 8, money: -8, trust: -10, duty: -15 },
+          result: "It is legal. Your neighbors notice who actually marched." }
       ],
       sources: [{ cite: "Patrick Henry, “Give Me Liberty or Give Me Death,” 1775", quote: "Is life so dear, or peace so sweet, as to be purchased at the price of chains and slavery?", url: "https://www.gilderlehrman.org/sites/default/files/2024-01/Speeches.pdf" }],
       lang: "Henry pairs a rhetorical question with the antithesis of liberty and death, so comfort starts to sound like surrender."
     },
     {
-      place: "PRINT SHOP", sign: "PRINT SHOP", stake: 1, year: "1776", contrast: ["FREEDOM", "RESPONSIBILITY"],
-      text: "You run the press. Printing Common Sense could anger officials.",
-      ask: null,
+      place: "PRINT SHOP", sign: "PRINT SHOP", landmark: "the print shop", stake: 1, year: "January 1776", contrast: ["YOUR CUSTOMERS", "FREE DEBATE"],
+      text: "Common Sense argues for independence. Many of your best customers are loyal to the king.",
+      ask: "Is free debate worth losing customers?",
       choices: [
-        { label: "Print it and sign it", kind: "duty", fx: { time: -5, money: -8, trust: 8, duty: 8 },
-          result: "Risky and public. Some customers stop coming." },
-        { label: "Print it unsigned", kind: "balance", fx: { time: -4, money: 4, trust: 2, duty: 2 },
-          result: "Like Paine's first edition, it spreads unsigned." },
-        { label: "Refuse the job", kind: "self", fx: { time: 5, money: -5, trust: -15, duty: -15 },
-          result: "No trouble. Another printer takes it." }
+        { label: "Print it with your name", kind: "duty", fx: { time: -5, money: -8, trust: 8, duty: 8 },
+          result: "Loyalist customers leave. Patriots line up to buy." },
+        { label: "Print it without your name", kind: "balance", fx: { time: -4, money: 4, trust: 2, duty: 2 },
+          result: "Like Paine's first edition, the argument spreads unsigned." },
+        { label: "Print only what officials approve", kind: "self", fx: { time: 5, money: 5, trust: -15, duty: -15 },
+          result: "Your shop stays safe. The debate goes on without you." }
       ],
       sources: [{ cite: "Thomas Paine, Common Sense, 1776", quote: "government even in its best state is but a necessary evil", url: "https://billofrightsinstitute.org/primary-sources/common-sense/" }],
-      lang: "Antithesis: society as a blessing set against government as a necessary evil."
+      lang: "Antithesis: Paine calls society a blessing and government a necessary evil, and you weigh profit against a public argument."
     },
     {
-      place: "DECLARATION", sign: "DECLARATION OF INDEPENDENCE", stake: 1, year: "July 1776", contrast: ["RIGHTS", "RESPONSIBILITY"],
-      text: "The Declaration says all men are created equal. Enslaved people and women lack those rights.",
+      place: "DECLARATION", sign: "DECLARATION OF INDEPENDENCE", landmark: "the town square", stake: 1, year: "July 1776", contrast: ["THE PROMISE", "THE PRACTICE"],
+      text: "The Declaration is read aloud: all men are created equal. Enslaved people and women listen, without those rights.",
       ask: "Does that promise create a duty?",
       choices: [
-        { label: "Speak up for them", kind: "duty", fx: { time: -8, trust: -6, duty: 10 },
-          result: "Some neighbors turn cold. You kept faith." },
-        { label: "Raise it later", kind: "balance", fx: { time: -2, trust: 2, duty: -4 },
-          result: "The crowd stays calm. The contradiction waits." },
-        { label: "Say nothing", kind: "self", fx: { time: 2, trust: -5, duty: -15 },
+        { label: "Petition your town to end slavery", kind: "duty", fx: { time: -8, trust: -6, duty: 10 },
+          result: "Neighbors turn cold. Enslaved people filed petitions like this too." },
+        { label: "Celebrate now, raise it later", kind: "balance", fx: { time: -2, trust: 2, duty: -4 },
+          result: "The crowd stays united. The promise waits." },
+        { label: "Celebrate and stay quiet", kind: "self", fx: { time: 2, trust: -5, duty: -15 },
           result: "Those left out notice your silence." }
       ],
       sources: [{ cite: "Declaration of Independence, 1776", quote: "all men are created equal", url: "https://www.archives.gov/founding-docs/declaration-transcript" }],
       lang: "Juxtaposition: the words of equality set beside the people they left out."
     },
     {
-      place: "CONVENTION", sign: "CONSTITUTIONAL CONVENTION", stake: 2, year: "1787", contrast: ["YOUR STATE", "GENERAL WELFARE"],
-      text: "You are a delegate in Philadelphia. The nation needs a compromise. Your state wants more.",
+      place: "CONVENTION", sign: "CONSTITUTIONAL CONVENTION", landmark: "the Constitutional Convention", stake: 2, year: "1787", contrast: ["YOUR STATE", "GENERAL WELFARE"],
+      text: "You represent a small state. Large states want Congress based on population, shrinking your voice.",
       ask: null,
       choices: [
-        { label: "Compromise for the nation", kind: "duty", fx: { time: -10, trust: 6, duty: 8 },
-          result: "Your state grumbles. The Union holds." },
-        { label: "Push, then compromise", kind: "balance", fx: { time: -8, trust: 2, duty: 2 },
-          result: "You defend your voters and the nation." },
-        { label: "Walk out", kind: "self", fx: { time: 8, trust: -15, duty: -15 },
-          result: "The nation loses your voice." }
+        { label: "Accept the Great Compromise", kind: "duty", fx: { time: -8, trust: 6, duty: 8 },
+          result: "Two senators per state, House by population. The Union holds." },
+        { label: "Hold out longer, then compromise", kind: "balance", fx: { time: -8, trust: 2, duty: 2 },
+          result: "You win small concessions but slow the whole convention." },
+        { label: "Walk out of the convention", kind: "self", fx: { time: 8, trust: -15, duty: -15 },
+          result: "Two New York delegates did this. New York lost its vote." }
       ],
       sources: [{ cite: "Constitution of the United States, Preamble, 1787", quote: "promote the general Welfare", url: "https://constitutioncenter.org/the-constitution/full-text" }],
-      lang: "Concession: representing your state is a real duty, so the best answer weighs both."
+      lang: "Concession: defending your state is a real duty, so the best answer weighs it against the nation."
     },
     {
-      place: "TOWN MEETING", sign: "TOWN MEETING", stake: 2, year: "1787", contrast: ["PRIVATE INTEREST", "PUBLIC GOOD"],
-      text: "Debtors and lenders want laws for their own side. You are on one side.",
-      ask: null,
+      place: "TOWN MEETING", sign: "TOWN MEETING", landmark: "the town meeting", stake: 2, year: "1787", contrast: ["YOUR WALLET", "YOUR TOWN"],
+      text: "Debtors want all debt payments delayed. Lenders call it theft. You owe money too.",
+      ask: "Your wallet or your town?",
       choices: [
-        { label: "Seek a fair law", kind: "duty", fx: { time: -10, money: -4, trust: 8, duty: 8 },
-          result: "You give up an edge. Both sides respect you." },
-        { label: "Vote with your side", kind: "self", fx: { time: -2, money: 8, trust: -15, duty: -15 },
-          result: "You win. The town splits." },
-        { label: "Skip the meeting", kind: "self", fx: { time: 8, trust: -15, duty: -15 },
-          result: "Others decide for you." }
+        { label: "Push for a fair payment plan", kind: "duty", fx: { time: -8, money: -4, trust: 8, duty: 8 },
+          result: "You pay more than you hoped. The town stays together." },
+        { label: "Vote to delay every debt", kind: "self", fx: { time: -2, money: 8, trust: -15, duty: -15 },
+          result: "You save money today. Lenders stop trusting the town." },
+        { label: "Abstain because you owe money", kind: "balance", fx: { time: 2, trust: 2, duty: 2 },
+          result: "Honest, but the loudest side wins." }
       ],
       sources: [{ cite: "James Madison, Federalist No. 10, 1787", quote: "Liberty is to faction what air is to fire.", url: "https://avalon.law.yale.edu/18th_century/fed10.asp" }],
-      lang: "Antithesis: your side against the whole community, the way Madison framed faction."
+      lang: "Antithesis: your wallet against your town, the way Madison framed faction."
     },
     {
-      place: "FEDERALIST NEWSPAPER", sign: "THE FEDERALIST", stake: 2, year: "1788", contrast: ["POWER", "LIMITS"],
-      text: "You hold office. Federalist 51 says power needs checks. An ally offers a way around yours.",
-      ask: null,
+      place: "FEDERALIST NEWSPAPER", sign: "THE FEDERALIST", landmark: "the newspaper office", stake: 2, year: "1788", contrast: ["LOYALTY", "THE LAW"],
+      text: "You are a judge. The governor, an old friend, asks you to rule for him.",
+      ask: "Who checks power if not you?",
       choices: [
-        { label: "Respect the limit", kind: "duty", fx: { time: -6, trust: 8, duty: 8 },
-          result: "Slower for you. Safer for all." },
-        { label: "Ask for a review", kind: "balance", fx: { time: -8, trust: 2, duty: 2 },
-          result: "You let others check you." },
-        { label: "Bend it once", kind: "self", fx: { time: 6, money: 5, trust: -15, duty: -15 },
-          result: "It works today. It sets a precedent." }
+        { label: "Rule by the law", kind: "duty", fx: { time: -6, money: -5, trust: 8, duty: 8 },
+          result: "You lose a powerful friend. The court stays independent." },
+        { label: "Step aside for another judge", kind: "balance", fx: { time: -4, trust: 2, duty: 2 },
+          result: "Fair to both sides, though you avoid the hard call." },
+        { label: "Rule for your friend", kind: "self", fx: { time: 6, money: 5, trust: -15, duty: -15 },
+          result: "You gain an ally. People stop trusting the court." }
       ],
-      sources: [{ cite: "James Madison, Federalist No. 51, 1788", quote: "If men were angels, no government would be necessary.", url: "https://constitutioncenter.org/the-constitution/historic-document-library/detail/james-madison-federalist-no-51-1788" }],
-      lang: "Antithesis: angels against ordinary people, and power against the limits that check it."
+      sources: [{ cite: "James Madison, Federalist No. 51, 1788", quote: "Ambition must be made to counteract ambition.", url: "https://constitutioncenter.org/the-constitution/historic-document-library/detail/james-madison-federalist-no-51-1788" }],
+      lang: "Repetition and antithesis: ambition must check ambition, so in this case you are the check."
     },
     {
-      place: "FIRST FEDERAL ELECTION", sign: "FIRST FEDERAL ELECTION", stake: 2, year: "1788", contrast: ["YOUR TIME", "REPRESENTATION"],
-      text: "Neighbors ask you to run for Congress. It pays little and takes you from home.",
-      ask: "Who speaks for you otherwise?",
+      place: "FIRST FEDERAL ELECTION", sign: "FIRST FEDERAL ELECTION", landmark: "the first federal election", stake: 2, year: "1788", contrast: ["YOUR TIME", "REPRESENTATION"],
+      text: "Neighbors ask you to run for Congress. It means months in New York, far from home.",
+      ask: "If good people refuse, who governs?",
       choices: [
-        { label: "Run for the seat", kind: "duty", fx: { time: -15, money: -8, trust: 10, duty: 10 },
-          result: "Months away. Your district has a voice." },
-        { label: "Back a better candidate", kind: "balance", fx: { time: -6, trust: 2, duty: 2 },
-          result: "You help choose good leaders." },
-        { label: "Stay out of it", kind: "self", fx: { time: 8, trust: -15, duty: -15 },
-          result: "Someone else speaks for you." }
+        { label: "Run for the seat", kind: "duty", fx: { time: -12, money: -8, trust: 10, duty: 10 },
+          result: "Months away from home. Your district has a real voice." },
+        { label: "Back a trusted neighbor instead", kind: "balance", fx: { time: -6, trust: 2, duty: 2 },
+          result: "You stay home and still help choose someone good." },
+        { label: "Say politics isn't your job", kind: "self", fx: { time: 8, trust: -15, duty: -15 },
+          result: "Someone else will speak for your district." }
       ],
       sources: [{ cite: "James Madison, Federalist No. 55, 1788", quote: "Republican government presupposes the existence of these qualities in a higher degree than any other form.", url: "https://constitutioncenter.org/the-constitution/historic-document-library/detail/james-madison-federalist-no-55-1788" }],
-      lang: "Second person: you, not a famous founder, decide whether to serve."
+      lang: "Rhetorical question: if good people refuse, the answer is uncomfortable."
     },
     {
-      place: "BILL OF RIGHTS", sign: "BILL OF RIGHTS", stake: 2, year: "1789", contrast: ["EFFECTIVE GOVERNMENT", "INDIVIDUAL LIBERTY"],
-      text: "Brutus warned of too much federal power. Congress proposes a Bill of Rights.",
+      place: "BILL OF RIGHTS", sign: "BILL OF RIGHTS", landmark: "the state legislature", stake: 2, year: "1789", contrast: ["EFFECTIVE GOVERNMENT", "INDIVIDUAL LIBERTY"],
+      text: "Brutus warned of a government too powerful. Congress proposes amendments, and your state must vote.",
       ask: "How much power is too much?",
       choices: [
-        { label: "Ratify it", kind: "duty", fx: { time: -6, trust: 8, duty: 8 },
-          result: "Strong government, rights in writing." },
-        { label: "Demand stricter limits", kind: "balance", fx: { time: -8, trust: 2, duty: 2 },
-          result: "Liberty guarded. Government slowed." },
-        { label: "Leave it to others", kind: "self", fx: { time: 6, trust: -15, duty: -15 },
-          result: "Others decide your rights." }
+        { label: "Ratify them now", kind: "duty", fx: { time: -6, trust: 8, duty: 8 },
+          result: "Your rights go into writing, and the new government keeps working." },
+        { label: "Hold out for stricter limits", kind: "balance", fx: { time: -8, trust: 2, duty: 2 },
+          result: "Liberty guarded, but your protections are delayed." },
+        { label: "Skip the debate", kind: "self", fx: { time: 6, trust: -15, duty: -15 },
+          result: "Others decide which rights you keep." }
       ],
       sources: [
         { cite: "Brutus No. 1, 1787", quote: "In every free government, the people must give their assent to the laws by which they are governed.", url: "https://minio.la.utexas.edu/webeditor-files/coretexts/pdf/178720brutus201.pdf" },
@@ -215,21 +237,40 @@ const GAME = {
       lang: "Antithesis: effective government set against individual liberty."
     },
     {
-      place: "COURTHOUSE", sign: "COURTHOUSE", stake: 3, year: "Today", contrast: ["YOUR OBLIGATION", "JURY DUTY"],
-      text: "It is now. A jury summons falls on the day of a shift you promised to work.",
+      place: "COURTHOUSE", sign: "COURTHOUSE", landmark: "the courthouse", stake: 3, year: "Today", contrast: ["YOUR OBLIGATION", "JURY DUTY"],
+      text: "It is now. A jury summons arrives for a weeklong trial during shifts you promised to cover.",
       ask: "If everyone skips, who decides?",
       choices: [
         { id: "serve", label: "SERVE", kind: "duty", fx: { time: -12, money: -10, trust: 12, duty: 12 },
-          result: "You lose the shift but fulfill your duty." },
+          result: "You lose the pay but give a stranger a fair trial." },
         { id: "skip", label: "SKIP", kind: "self", fx: { time: 8, money: 10, trust: -15, duty: -15 },
-          result: "You keep the pay, but ignoring a summons can bring legal trouble." },
+          result: "You keep the pay. Ignoring a summons can bring legal trouble." },
         { id: "excuse", label: "REQUEST AN EXCUSE THROUGH THE OFFICIAL PROCESS", kind: "balance", fx: { time: 2, trust: 4, duty: 5 },
-          result: "You respect both the court and your job." }
+          result: "Courts often allow a new date. You serve later." }
       ],
       sources: [{ cite: "Bill of Rights, Sixth Amendment, 1791", quote: "an impartial jury", url: "https://www.archives.gov/founding-docs/bill-of-rights-transcript" }],
       lang: "Juxtaposition: the founding era's question arrives in your own mailbox."
     }
   ],
+
+  /* Shown when Time, Money, Community Trust, or Civic Duty reaches 0. */
+  gameOver: {
+    label: "JOURNEY OVER",
+    reached: "You made it through {n} of 10 decisions.",
+    endedAt: "It ended at the {place}, {year}.",
+    lastChoice: "Your last choice:",
+    tryAgain: "TRY AGAIN",
+    reasons: {
+      time: { epitaph: "Gave every hour away.", title: "You ran out of time", text: "You gave away every hour you had. Burned out, you cannot help anyone now.",
+        lesson: "Personal duty asks you to accept costs, not to destroy yourself. Some middle paths protect what keeps you going." },
+      money: { epitaph: "Spent every last coin.", title: "You ran out of money", text: "Your sacrifices emptied your purse. Your family cannot keep going, and neither can you.",
+        lesson: "Personal duty asks you to accept costs, not to destroy yourself. Some middle paths protect what keeps you going." },
+      trust: { epitaph: "Lost the town's trust.", title: "Your community stopped trusting you", text: "Your neighbors no longer count on you, so your part in the story ends here.",
+        lesson: "A republic only works when citizens are willing to give something up for each other." },
+      duty: { epitaph: "Stopped doing their part.", title: "You stopped doing your part", text: "You protected yourself so often that your community moved on without you.",
+        lesson: "A republic only works when citizens are willing to give something up for each other." }
+    }
+  },
 
   ending: {
     duty: {
@@ -248,7 +289,7 @@ const GAME = {
       excuse: "Today, you used the court's official process instead of ignoring your summons.",
       skip: "Today, you skipped your summons and left the duty to others."
     },
-    conclusion: "American society has practiced personal duty in meaningful ways, from militias and boycotts to citizens who still serve on juries. Yet the same founding era demanded service from enslaved people and women while denying them full political rights. Civic responsibility can require sacrifice, but it also depends on who is asked to serve and who is allowed to share the rights.",
+    conclusion: "American society has practiced personal duty in meaningful ways, from sending food to Boston and marching with militias to citizens who still serve on juries. Yet the same founding era demanded service from enslaved people and women while denying them full political rights. Civic responsibility can require sacrifice, but it also depends on who is asked to serve and who is allowed to share the rights.",
     actions: [
       "Check if you can be a paid student poll worker through your county election office.",
       "If a jury summons comes, answer it by the deadline instead of ignoring it.",
@@ -344,236 +385,258 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
 </script>
 <style>
   :root {
-    --cream: #f5ecd6; --cream-2: #fbf6ea; --edge: #e8d9b6;
-    --navy: #1c2a44; --navy-2: #2b3b5c; --navy-soft: #4a5673;
-    --red: #b5402c; --red-dark: #8e3221; --brown: #8a6a44; --brown-light: #cbb086;
-    --green: #3d7a4d; --gold: #c9921f;
+    --paper: #f1e7cf;
+    --paper-2: #f8f2e2;
+    --paper-3: #e8dab8;
+    --ink: #2a2017;
+    --ink-2: #5a4833;
+    --ink-3: #8a7456;
+    --rule: #b09a70;
+    --red: #9a2f1f;
+    --red-2: #7c2416;
+    --green: #4c6a38;
+    --blue: #2f4b6e;
+    --gold: #a97d25;
     --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
-    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --ease: cubic-bezier(.2,.75,.25,1);
-    --shadow: 0 1px 2px rgba(28,42,68,.08), 0 12px 32px rgba(28,42,68,.22);
+    --ease: cubic-bezier(.22,.7,.22,1);
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
-  body { background: var(--cream); color: var(--navy); font-family: var(--sans); overflow: hidden; -webkit-font-smoothing: antialiased; touch-action: manipulation; }
-  button { font: inherit; }
+  body { background: var(--paper); color: var(--ink); font-family: var(--serif); overflow: hidden; -webkit-font-smoothing: antialiased; touch-action: manipulation; }
+  button, input { font: inherit; color: inherit; }
   .app { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr; }
+  .sc { font-variant-caps: all-small-caps; letter-spacing: .09em; }
+  .num { font-variant-numeric: lining-nums tabular-nums; }
 
-  /* ---------- HUD ---------- */
-  .hud { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 14px; padding: 8px 18px; z-index: 10;
-    background: rgba(251,246,234,.97); border-bottom: 1px solid var(--brown-light); box-shadow: 0 2px 14px rgba(28,42,68,.1); }
-  .who { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .portrait { width: 40px; height: 40px; flex: none; border-radius: 50%; overflow: hidden; border: 2px solid var(--navy); background: var(--edge); }
+  /* ---------- Ledger (top) ---------- */
+  .ledger { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(210px, 1.3fr) minmax(360px, 2fr); z-index: 10;
+    background: var(--paper-2); border-bottom: 3px double var(--ink); }
+  .ledger > div { padding: 7px 16px 8px; min-width: 0; }
+  .ledger > div + div { border-left: 1px solid var(--rule); }
+  .who { display: flex; align-items: center; gap: 10px; }
+  .portrait { width: 40px; height: 40px; flex: none; border: 1px solid var(--ink); background: var(--paper-3); }
   .portrait svg { display: block; width: 100%; height: 100%; }
-  .brand { font-size: .66rem; font-weight: 800; letter-spacing: .14em; color: var(--red); }
-  .pname { font-family: var(--serif); font-weight: 700; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tracker { text-align: center; padding: 4px 14px; border-radius: 12px; background: var(--navy); color: var(--cream-2); }
-  .tracker .tl { font-size: .58rem; font-weight: 800; letter-spacing: .16em; opacity: .8; }
-  .tracker .tv { font-weight: 800; font-size: 1.1rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
-  .tracker.bump { animation: bump .5s var(--ease); }
-  @keyframes bump { 40% { transform: scale(1.12); background: var(--red); } }
-  .res { display: grid; grid-template-columns: repeat(4, minmax(64px, 104px)); gap: 12px; justify-content: end; }
+  .kicker { font-size: .78rem; color: var(--ink-3); font-variant-caps: all-small-caps; letter-spacing: .1em; line-height: 1.1; }
+  .pname { font-weight: 700; font-size: 1.02rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+  .trip .row { display: flex; justify-content: space-between; gap: 10px; font-size: .9rem; line-height: 1.35; white-space: nowrap; }
+  .trip .row span:first-child { color: var(--ink-3); font-variant-caps: all-small-caps; letter-spacing: .1em; }
+  .trip .row b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+  .trip.bump b { animation: ink .6s var(--ease); }
+  @keyframes ink { 30% { color: var(--red); } }
+  .supplies { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; align-items: end; }
   .r { position: relative; }
-  .r-top { display: flex; justify-content: space-between; gap: 6px; font-size: .6rem; font-weight: 800; letter-spacing: .06em; }
-  .r-top .short { display: none; }
-  .r-val { font-variant-numeric: tabular-nums; font-size: .8rem; transition: transform .25s var(--ease), color .25s; }
-  .r-bar { height: 7px; margin-top: 3px; border-radius: 99px; background: var(--edge); overflow: hidden; }
-  .r-fill { height: 100%; width: 50%; border-radius: 99px; transition: width .5s var(--ease); }
-  .r[data-k="time"] .r-fill { background: var(--navy-2); }
+  .r-top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+  .r-name .short { display: none; }
+  .r-name { font-size: .8rem; color: var(--ink-2); font-variant-caps: all-small-caps; letter-spacing: .08em; white-space: nowrap; }
+  .r-val { font-size: 1.12rem; font-weight: 700; font-variant-numeric: lining-nums tabular-nums; transition: color .3s; }
+  .r-bar { position: relative; height: 7px; margin-top: 3px; border: 1px solid var(--ink); background: var(--paper); }
+  .r-fill { height: 100%; width: 50%; transition: width .5s var(--ease); }
+  .r-bar::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), var(--paper-2) calc(10% - 1px) 10%); pointer-events: none; }
+  .r[data-k="time"] .r-fill { background: var(--blue); }
   .r[data-k="money"] .r-fill { background: var(--green); }
   .r[data-k="trust"] .r-fill { background: var(--red); }
   .r[data-k="duty"] .r-fill { background: var(--gold); }
-  .r.up .r-val { color: var(--green); transform: scale(1.35); }
-  .r.down .r-val { color: var(--red); transform: scale(1.35); }
-  .r.down { animation: shake .4s; }
-  @keyframes shake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
-  .float { position: absolute; right: 0; top: 100%; margin-top: 3px; font-size: .7rem; font-weight: 800; padding: 2px 7px; border-radius: 99px; color: #fff; white-space: nowrap; animation: floatUp 1.1s var(--ease) forwards; pointer-events: none; }
-  .float.up { background: var(--green); } .float.down { background: var(--red); }
-  @keyframes floatUp { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-4px); } }
+  .r.up .r-val { color: var(--green); }
+  .r.down .r-val { color: var(--red); }
+  .r.low .r-val { color: var(--red); }
+  .r.low .r-name::after { content: " low"; color: var(--red); font-weight: 700; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .delta { position: absolute; right: 0; top: 100%; margin-top: 4px; font-style: italic; font-weight: 700; font-size: .85rem; pointer-events: none; animation: rise 1.2s var(--ease) forwards; }
+  .delta.up { color: var(--green); } .delta.down { color: var(--red); }
+  @keyframes rise { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; transform: none; } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(-3px); } }
 
   /* ---------- World ---------- */
-  .world { position: relative; overflow: hidden; }
+  .world { position: relative; overflow: hidden; background: #cfe0e2; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-  .world::after { content: ""; position: absolute; inset: 0; background: rgba(28,42,68,.32); opacity: 0; transition: opacity .3s; pointer-events: none; }
+  .world::after { content: ""; position: absolute; inset: 0; background: rgba(42,32,23,.28); opacity: 0; transition: opacity .35s; pointer-events: none; }
   .world.dim::after { opacity: 1; }
-  .banner { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); text-align: center; padding: 8px 20px; border-radius: 14px;
-    background: rgba(251,246,234,.95); box-shadow: var(--shadow); animation: bannerIn .45s var(--ease); pointer-events: none; transition: opacity .5s; z-index: 2; white-space: nowrap; }
-  .banner small { display: block; font-size: .62rem; font-weight: 800; letter-spacing: .16em; color: var(--red); }
-  .banner b { font-family: var(--serif); font-size: 1.25rem; letter-spacing: .03em; }
-  .banner span { display: block; font-size: .78rem; color: var(--navy-soft); }
-  @keyframes bannerIn { from { opacity: 0; transform: translate(-50%, -10px); } }
-  .era { position: absolute; left: 14px; top: 14px; z-index: 2; padding: 8px 14px 9px; border-radius: 14px; background: rgba(28,42,68,.9); color: var(--cream-2);
-    box-shadow: var(--shadow); pointer-events: none; min-width: 150px; }
-  .era small { display: block; font-size: .56rem; font-weight: 800; letter-spacing: .16em; color: #f5d48a; }
-  .era b { display: block; font-family: var(--serif); font-size: 1.7rem; line-height: 1.05; }
-  .era span { display: block; font-size: .66rem; font-weight: 800; letter-spacing: .1em; opacity: .85; }
-  .era.shift { animation: eraShift .8s var(--ease); }
-  @keyframes eraShift { 0% { transform: scale(1); } 30% { transform: scale(1.12); background: var(--red); } 100% { transform: scale(1); } }
-  .timeline { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(620px, calc(100% - 28px)); height: 34px; z-index: 2; pointer-events: none; }
-  .timeline .track { position: absolute; left: 0; right: 0; top: 8px; height: 4px; border-radius: 99px; background: rgba(28,42,68,.25); }
-  .timeline .fill { position: absolute; left: 0; top: 8px; height: 4px; border-radius: 99px; background: var(--red); width: 0; }
-  .timeline .node { position: absolute; top: 3px; transform: translateX(-50%); text-align: center; }
-  .timeline .node i { display: block; width: 14px; height: 14px; margin: 0 auto; border-radius: 50%; background: #fbf6ea; border: 2px solid rgba(28,42,68,.45); }
-  .timeline .node span { display: block; margin-top: 2px; font-size: .6rem; font-weight: 800; letter-spacing: .06em; color: rgba(28,42,68,.75); }
-  .timeline .node.past i { background: var(--red); border-color: var(--red); }
-  .timeline .node.now i { background: #f5d48a; border-color: var(--navy); transform: scale(1.3); }
-  .timeline .node.now span { color: var(--navy); }
-  .timeline .you { position: absolute; top: 1px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; background: var(--navy); border: 3px solid #fbf6ea; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
-  .banner em { display: block; font-style: normal; font-size: .72rem; margin-top: 2px; color: var(--navy-soft); }
-  .banner .big { display: block; font-family: var(--serif); font-size: 2.3rem; line-height: 1; color: var(--red); }
-  .hurry { position: absolute; right: 14px; top: 14px; font-size: .72rem; font-weight: 700; letter-spacing: .04em; color: rgba(28,42,68,.6); pointer-events: none; }
-  .touchgo { display: none; position: absolute; right: 14px; bottom: 14px; width: 64px; height: 64px; border-radius: 50%; border: none; background: rgba(28,42,68,.8); color: #fff; font-size: 1.4rem; touch-action: none; user-select: none; -webkit-user-select: none; z-index: 2; }
+  .era { position: absolute; left: 16px; top: 14px; z-index: 2; pointer-events: none; padding: 6px 12px 7px; background: var(--paper-2); border: 1px solid var(--ink); box-shadow: 3px 3px 0 rgba(42,32,23,.18); }
+  .era b { display: block; font-size: 1.55rem; line-height: 1; font-variant-numeric: lining-nums; }
+  .era span { display: block; font-size: .78rem; color: var(--ink-2); font-variant-caps: all-small-caps; letter-spacing: .1em; }
+  .era.shift { animation: stamp .7s var(--ease); }
+  @keyframes stamp { 0% { transform: scale(1.25) rotate(-3deg); opacity: 0; } 60% { transform: scale(.97); opacity: 1; } 100% { transform: none; } }
+  .hurry { position: absolute; right: 16px; top: 16px; z-index: 2; font-size: .85rem; font-style: italic; color: rgba(42,32,23,.6); pointer-events: none; }
+
+  /* trail map */
+  .trail { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; height: 54px; pointer-events: none; background: linear-gradient(to top, rgba(248,242,226,.95), rgba(248,242,226,.82)); border-top: 1px solid var(--rule); }
+  .trail-inner { position: absolute; left: 28px; right: 28px; top: 8px; bottom: 6px; }
+  .trail .path { position: absolute; left: 0; right: 0; top: 22px; border-top: 2px dashed var(--ink-3); }
+  .trail .done { position: absolute; left: 0; top: 21px; height: 0; border-top: 4px solid var(--red); width: 0; }
+  .trail .era-tick { position: absolute; top: 0; transform: translateX(-50%); font-size: .72rem; color: var(--ink-2); font-variant-caps: all-small-caps; letter-spacing: .08em; white-space: nowrap; }
+  .trail .era-tick::after { content: ""; position: absolute; left: 50%; top: 15px; height: 14px; border-left: 1px solid var(--ink-3); }
+  .trail .era-tick.now { color: var(--ink); font-weight: 700; }
+  .trail .stop { position: absolute; top: 18px; width: 9px; height: 9px; margin-left: -4.5px; background: var(--paper-2); border: 1.5px solid var(--ink); transform: rotate(45deg); }
+  .trail .stop.past { background: var(--red); border-color: var(--red); }
+  .trail .you { position: absolute; top: 13px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; background: var(--ink); border: 3px solid var(--paper-2); box-shadow: 0 0 0 1px var(--ink); }
+
+  /* arrival notice */
+  .notice { position: absolute; left: 50%; top: 14px; z-index: 3; transform: translateX(-50%); min-width: 280px; text-align: center; padding: 8px 26px 10px;
+    background: var(--paper-2); border: 1px solid var(--ink); outline: 1px solid var(--ink); outline-offset: -5px; pointer-events: none;
+    animation: noticeIn .55s var(--ease); transition: opacity .5s, transform .5s; }
+  @keyframes noticeIn { from { opacity: 0; transform: translate(-50%, -14px); } }
+  .notice.out { opacity: 0; transform: translate(-50%, -8px); }
+  .notice small { display: block; font-size: .8rem; color: var(--ink-2); font-style: italic; }
+  .notice .big { display: block; font-size: 2.3rem; line-height: 1.05; color: var(--red); font-variant-numeric: lining-nums; }
+  .notice b { display: block; font-size: .95rem; font-variant-caps: all-small-caps; letter-spacing: .12em; }
+  .notice em { display: block; margin-top: 3px; font-size: .82rem; color: var(--ink-2); }
+  .touchgo { display: none; position: absolute; right: 14px; bottom: 66px; z-index: 3; width: 62px; height: 62px; border: 1px solid var(--ink); border-radius: 50%; background: var(--paper-2); color: var(--ink); font-size: 1.2rem; touch-action: none; user-select: none; -webkit-user-select: none; }
   .touchgo.on { display: block; }
 
-  /* ---------- Encounter card ---------- */
-  .card { position: absolute; z-index: 5; right: 22px; top: 50%; transform: translateY(-50%); width: min(520px, 48%); max-height: calc(100% - 24px); overflow-y: auto;
-    background: var(--cream-2); border-radius: 18px; box-shadow: var(--shadow); padding: 16px 18px 14px; animation: cardIn .3s var(--ease); }
-  @keyframes cardIn { from { opacity: 0; transform: translate(24px, -50%); } }
-  .card.out { animation: cardOut .25s var(--ease) forwards; }
-  @keyframes cardOut { to { opacity: 0; transform: translate(24px, -50%); } }
-  .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-  .place { font-family: var(--serif); font-weight: 700; font-size: 1.35rem; letter-spacing: .02em; line-height: 1.15; }
-  .year { font-size: .72rem; font-weight: 800; letter-spacing: .1em; color: var(--brown); white-space: nowrap; }
-  .stakes { display: flex; gap: 4px; margin: 6px 0 8px; flex-wrap: wrap; }
-  .stakes span { font-size: .56rem; font-weight: 800; letter-spacing: .08em; padding: 3px 8px; border-radius: 99px; background: var(--edge); color: var(--navy-soft); }
-  .stakes span.on { background: var(--red); color: #fff; }
-  .contrast { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin: 0 0 10px; }
-  .contrast span { text-align: center; font-size: .68rem; font-weight: 800; letter-spacing: .08em; padding: 6px 8px; border-radius: 10px; }
-  .contrast .a { background: var(--navy); color: var(--cream-2); }
-  .contrast .b { background: var(--red); color: #fff; }
-  .contrast i { font-style: normal; font-weight: 800; font-size: .7rem; color: var(--brown); }
-  .def { margin: 0 0 8px; padding: 8px 10px; border-radius: 10px; background: var(--cream); border: 1.5px solid var(--navy); font-size: .9rem; }
-  .def b { display: block; font-size: .6rem; letter-spacing: .14em; color: var(--red); }
-  .q-text { font-family: var(--serif); font-size: 1.05rem; line-height: 1.4; margin: 0; }
-  .q-ask { margin: 8px 0 10px; font-weight: 800; letter-spacing: .06em; font-size: .8rem; color: var(--red); }
-  .q-ask.rq { font-family: var(--serif); font-style: italic; font-weight: 700; letter-spacing: 0; font-size: 1.1rem; color: var(--navy); }
-  .answers { display: grid; gap: 8px; }
-  .answer { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 50px; padding: 11px 14px; text-align: left; cursor: pointer;
-    border: 2px solid transparent; border-radius: 12px; background: var(--navy); color: var(--cream-2); font-weight: 700; font-size: .98rem; line-height: 1.25;
-    transition: transform .12s, background .15s, border-color .15s; }
-  .answer kbd { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; background: rgba(255,255,255,.16); font-family: var(--sans); font-size: .78rem; }
-  .answer:hover, .answer.sel { background: var(--red); }
-  .answer.sel { border-color: var(--gold); transform: translateX(4px); }
-  .answer:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
-  .meta { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--edge); font-size: .74rem; line-height: 1.35; color: var(--navy-soft); }
-  .meta b { display: block; font-size: .58rem; letter-spacing: .14em; color: var(--red); margin-bottom: 2px; }
-  .meta .src + .src { margin-top: 6px; }
-  .meta q { display: block; font-family: var(--serif); font-style: italic; color: var(--navy); quotes: "\201C" "\201D"; }
-  .meta a { color: var(--red); font-weight: 800; font-size: .64rem; letter-spacing: .08em; text-decoration: none; white-space: nowrap; }
-  .meta a:hover { text-decoration: underline; }
-  .consequence { text-align: center; padding: 8px 4px 4px; animation: pop .3s var(--ease); }
-  @keyframes pop { from { opacity: 0; transform: scale(.96); } }
-  .consequence small { font-size: .62rem; font-weight: 800; letter-spacing: .16em; color: var(--red); }
-  .consequence .picked { font-weight: 800; font-size: 1rem; margin: 4px 0 6px; }
-  .consequence p { margin: 0; font-family: var(--serif); font-size: 1.08rem; line-height: 1.4; }
-  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px; }
-  .chip { font-size: .78rem; font-weight: 800; letter-spacing: .05em; padding: 4px 10px; border-radius: 99px; color: #fff; }
-  .chip.up { background: var(--green); } .chip.down { background: var(--red); }
-  .timer { height: 3px; margin-top: 10px; border-radius: 99px; background: var(--edge); overflow: hidden; }
-  .timer i { display: block; height: 100%; background: var(--navy); transform-origin: left; animation: drain linear forwards; }
+  /* ---------- Landmark card ---------- */
+  .card { position: absolute; z-index: 5; right: 22px; top: 50%; width: min(540px, 48%); max-height: calc(100% - 90px); overflow-y: auto;
+    transform: translateY(calc(-50% - 22px)); background: var(--paper-2); border: 1px solid var(--ink); outline: 1px solid var(--ink); outline-offset: -6px;
+    box-shadow: 6px 6px 0 rgba(42,32,23,.2); padding: 18px 22px 16px; animation: unfold .38s var(--ease); }
+  @keyframes unfold { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+  .card.out { animation: fold .25s var(--ease) forwards; }
+  @keyframes fold { to { clip-path: inset(0 0 100% 0); } }
+  .card > * { animation: lineIn .35s var(--ease) both; }
+  .card > *:nth-child(2) { animation-delay: .05s; } .card > *:nth-child(3) { animation-delay: .1s; } .card > *:nth-child(4) { animation-delay: .15s; }
+  .card > *:nth-child(5) { animation-delay: .2s; } .card > *:nth-child(6) { animation-delay: .25s; } .card > *:nth-child(n+7) { animation-delay: .3s; }
+  @keyframes lineIn { from { opacity: 0; transform: translateY(5px); } }
+  .meta-top { display: flex; justify-content: space-between; gap: 10px; font-size: .8rem; color: var(--ink-3); font-variant-caps: all-small-caps; letter-spacing: .1em; }
+  .meta-top b { color: var(--red); font-weight: 700; }
+  .arrive { margin: 2px 0 0; font-size: 1.32rem; font-weight: 700; line-height: 1.2; }
+  .rule2 { height: 0; border-top: 3px double var(--ink); margin: 9px 0 10px; }
+  .q-text { margin: 0; font-size: 1.04rem; line-height: 1.45; }
+  .contrast { margin: 8px 0 0; font-size: .9rem; font-variant-caps: all-small-caps; letter-spacing: .1em; color: var(--ink-2); }
+  .contrast b { color: var(--ink); } .contrast i { font-variant-caps: normal; letter-spacing: 0; color: var(--ink-3); padding: 0 4px; }
+  .q-ask { margin: 10px 0 8px; font-style: italic; font-weight: 700; font-size: 1.06rem; }
+  .choices { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+  .answer { display: grid; grid-template-columns: 22px 26px 1fr; align-items: baseline; width: 100%; padding: 8px 6px; text-align: left; cursor: pointer;
+    background: none; border: none; border-bottom: 1px solid var(--rule); font-size: 1.02rem; line-height: 1.3; transition: background .15s; }
+  .answer .mark { color: var(--red); opacity: 0; transition: opacity .15s, transform .15s; transform: translateX(-4px); }
+  .answer .n { font-weight: 700; font-variant-numeric: lining-nums; }
+  .answer:hover, .answer.sel { background: var(--paper-3); }
+  .answer.sel .mark, .answer:hover .mark { opacity: 1; transform: none; }
+  .answer:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
+  .prompt { margin: 10px 0 0; font-size: .98rem; }
+  .prompt .cur { display: inline-block; min-width: 1ch; font-weight: 700; color: var(--red); border-bottom: 2px solid var(--red); animation: blink 1s steps(2) infinite; font-variant-numeric: lining-nums; }
+  .foot { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--rule); font-size: .8rem; line-height: 1.4; color: var(--ink-2); display: grid; gap: 5px; }
+  .foot .lab { font-variant-caps: all-small-caps; letter-spacing: .1em; color: var(--red); font-weight: 700; margin-right: 4px; }
+  .foot q { font-style: italic; quotes: "\201C" "\201D"; }
+  .foot a { color: var(--red); font-variant-caps: all-small-caps; letter-spacing: .08em; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+  .defn { margin: 0 0 8px; padding: 6px 10px; border-left: 3px solid var(--gold); background: var(--paper-3); font-size: .9rem; }
+  .defn b { font-variant-caps: all-small-caps; letter-spacing: .1em; }
+
+  /* consequence */
+  .result { padding: 4px 2px; }
+  .result .lab { font-size: .8rem; color: var(--ink-3); font-variant-caps: all-small-caps; letter-spacing: .12em; }
+  .result .picked { margin: 2px 0 6px; font-weight: 700; font-size: 1.05rem; }
+  .result p { margin: 0 0 8px; font-style: italic; font-size: 1.08rem; line-height: 1.4; }
+  .ledger-rows { border-top: 1px solid var(--ink); }
+  .lrow { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; border-bottom: 1px dotted var(--ink-3); font-size: .98rem; animation: lineIn .3s var(--ease) both; }
+  .lrow:nth-child(2) { animation-delay: .08s; } .lrow:nth-child(3) { animation-delay: .16s; } .lrow:nth-child(4) { animation-delay: .24s; }
+  .lrow span { flex: 1; font-variant-caps: all-small-caps; letter-spacing: .1em; }
+  .lrow b { font-variant-numeric: lining-nums tabular-nums; }
+  .lrow.up b { color: var(--green); } .lrow.down b { color: var(--red); }
+  .timer { height: 2px; margin-top: 10px; background: var(--paper-3); overflow: hidden; }
+  .timer i { display: block; height: 100%; background: var(--ink); transform-origin: left; animation: drain linear forwards; }
   @keyframes drain { to { transform: scaleX(0); } }
 
-  /* ---------- Full screen panels ---------- */
-  .screen { position: absolute; inset: 0; z-index: 20; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; padding: 18px 14px 28px;
-    background: rgba(28,42,68,.35); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
-  .panel { width: min(760px, 100%); margin: auto 0; background: var(--cream-2); border-radius: 20px; box-shadow: var(--shadow); padding: 20px 22px 22px;
-    animation: pop .4s var(--ease); display: flex; flex-direction: column; gap: 12px; }
-  .panel h1 { margin: 0; text-align: center; font-family: var(--serif); font-size: clamp(1.6rem, 4.5vw, 2.3rem); }
-  .definition { text-align: center; padding: 10px 14px; border: 2px solid var(--navy); border-radius: 14px; background: var(--cream); }
-  .definition .dl { font-size: .66rem; font-weight: 800; letter-spacing: .16em; color: var(--red); }
-  .definition .dt { font-family: var(--serif); font-size: 1.1rem; line-height: 1.35; }
-  .name-input { display: block; width: 100%; max-width: 300px; margin: 0 auto; padding: 10px 14px; font-size: 1rem; text-align: center;
-    border: 2px solid var(--edge); border-radius: 12px; background: var(--cream); color: var(--navy); }
-  .name-input:focus { outline: none; border-color: var(--navy); }
-  .chars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .char { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 12px 10px; cursor: pointer; text-align: center;
-    background: var(--cream); color: var(--navy); border: 2px solid var(--edge); border-radius: 14px; transition: transform .2s var(--ease), border-color .2s; }
-  .char:hover { transform: translateY(-2px); border-color: var(--navy); }
-  .char:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
-  .char.sel { border-color: var(--red); box-shadow: 0 0 0 3px rgba(181,64,44,.2); }
-  .char .pic { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; border: 2px solid var(--navy); flex: none; }
+  /* ---------- Full screen pages ---------- */
+  .screen { position: absolute; inset: 0; z-index: 20; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; padding: 22px 14px 30px;
+    background: rgba(42,32,23,.42); }
+  .page { width: min(720px, 100%); margin: auto 0; background: var(--paper-2); border: 1px solid var(--ink); outline: 1px solid var(--ink); outline-offset: -7px;
+    box-shadow: 8px 8px 0 rgba(42,32,23,.25); padding: 22px 30px 22px; display: flex; flex-direction: column; gap: 11px; animation: pageIn .45s var(--ease); }
+  @keyframes pageIn { from { opacity: 0; transform: translateY(14px); } }
+  .page h1 { margin: 0; text-align: center; font-size: clamp(1.8rem, 5vw, 2.6rem); font-weight: 700; letter-spacing: .02em; line-height: 1.1; }
+  .page .sub { margin: -6px 0 0; text-align: center; font-style: italic; color: var(--ink-2); }
+  .orn { text-align: center; color: var(--ink-3); letter-spacing: .5em; margin: -4px 0; }
+  .definition { margin: 0; padding: 10px 16px; text-align: center; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
+  .definition .dl { font-size: .82rem; font-variant-caps: all-small-caps; letter-spacing: .14em; color: var(--red); font-weight: 700; }
+  .definition .dt { font-style: italic; font-size: 1.1rem; line-height: 1.4; }
+  .ask { margin: 0; font-weight: 700; font-size: 1.05rem; }
+  .name-input { display: block; width: 100%; max-width: 340px; padding: 6px 2px; font-size: 1.1rem; background: transparent; border: none; border-bottom: 2px solid var(--ink); }
+  .name-input:focus { outline: none; border-bottom-color: var(--red); }
+  .name-input::placeholder { color: var(--ink-3); font-style: italic; }
+  .occ { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+  .char { display: grid; grid-template-columns: 22px 54px 1fr; gap: 12px; align-items: center; width: 100%; padding: 7px 6px; text-align: left; cursor: pointer;
+    background: none; border: none; border-bottom: 1px solid var(--rule); transition: background .15s; }
+  .char:hover, .char.sel { background: var(--paper-3); }
+  .char .mark { color: var(--red); font-weight: 700; font-variant-numeric: lining-nums; }
+  .char .pic { width: 54px; height: 54px; border: 1px solid var(--ink); }
   .char .pic svg { display: block; width: 100%; height: 100%; }
-  .char .cn { font-weight: 800; letter-spacing: .1em; font-size: .88rem; }
-  .char .cl { font-family: var(--serif); font-size: .93rem; line-height: 1.3; }
-  .char-body { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-  .perks { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
-  .perk { font-size: .68rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--edge); }
-  .controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
-  .controls li { font-size: .76rem; font-weight: 700; padding: 6px 12px; border-radius: 99px; background: var(--edge); }
-  .primary { width: 100%; min-height: 56px; border: none; border-radius: 14px; cursor: pointer; font-weight: 800; font-size: 1.08rem; letter-spacing: .08em;
-    background: var(--red); color: #fff; transition: transform .12s, background .2s; }
-  .primary:hover:not(:disabled) { background: var(--red-dark); }
-  .primary:active:not(:disabled) { transform: scale(.99); }
-  .primary:disabled { background: var(--edge); color: var(--navy-soft); cursor: not-allowed; }
-  .primary:focus-visible { outline: 3px solid var(--navy); outline-offset: 3px; }
-  .score-row { display: flex; align-items: center; justify-content: center; gap: 22px; flex-wrap: wrap; }
-  .ring { width: 140px; height: 140px; position: relative; flex: none; }
-  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-  .ring .track { stroke: var(--edge); } .ring .arc { stroke: var(--red); transition: stroke-dashoffset 1s var(--ease); }
-  .ring .num { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
-  .ring .num b { font-family: var(--serif); font-size: 2.6rem; line-height: 1; display: block; }
-  .ring .num small { font-weight: 800; font-size: .66rem; letter-spacing: .08em; color: var(--navy-soft); }
-  .ring .lbl { position: absolute; left: 0; right: 0; bottom: -18px; text-align: center; font-size: .6rem; font-weight: 800; letter-spacing: .14em; color: var(--red); }
-  .finals { display: grid; grid-template-columns: repeat(2, minmax(140px, 1fr)); gap: 10px 18px; min-width: 260px; }
-  .finals .r-top { font-size: .68rem; }
-  .finals .r-bar { height: 9px; }
-  .persona { border-radius: 18px; padding: 16px 18px; background: var(--navy); color: var(--cream-2); display: flex; flex-direction: column; gap: 10px; animation: pop .5s var(--ease); }
-  .persona-head { display: flex; align-items: center; gap: 14px; }
-  .badge { width: 68px; height: 68px; flex: none; border-radius: 50%; background: var(--red); display: grid; place-items: center; box-shadow: 0 0 0 4px rgba(245,212,138,.35); }
-  .badge svg { width: 44px; height: 44px; }
-  .persona-label { font-size: .62rem; font-weight: 800; letter-spacing: .16em; color: #f5d48a; }
-  .persona-name { font-family: var(--serif); font-weight: 700; font-size: clamp(1.5rem, 4.5vw, 2rem); line-height: 1.1; }
-  .persona-tag { font-family: var(--serif); font-style: italic; opacity: .85; }
-  .persona-text { margin: 0; font-family: var(--serif); font-size: 1.04rem; line-height: 1.45; }
-  .traits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .trait-top { display: flex; justify-content: space-between; font-size: .66rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
-  .trait-bar { height: 8px; margin-top: 4px; border-radius: 99px; background: rgba(255,255,255,.15); overflow: hidden; }
-  .trait-bar i { display: block; height: 100%; border-radius: 99px; }
-  .trait.duty i { background: #f5d48a; } .trait.balance i { background: #9cc7e8; } .trait.self i { background: #e8836f; }
-  .persona-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: .86rem; line-height: 1.4; }
-  .persona-facts div { padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.08); }
-  .persona-facts b { display: block; font-size: .6rem; letter-spacing: .14em; text-transform: uppercase; color: #f5d48a; margin-bottom: 3px; }
-  .persona-basis { margin: 0; font-size: .74rem; opacity: .75; }
-  .pattern { margin: 0; font-family: var(--serif); font-size: 1.03rem; line-height: 1.5; padding: 12px 16px; border-left: 4px solid var(--red); background: var(--cream); border-radius: 0 12px 12px 0; }
-  .conclusion { margin: 0; font-family: var(--serif); font-size: 1rem; line-height: 1.5; }
-  .section-label { margin: 0; font-weight: 800; letter-spacing: .14em; font-size: .7rem; color: var(--red); }
-  .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0; padding: 0; list-style: none; counter-reset: a; }
-  .actions li { counter-increment: a; padding: 12px 12px 12px 48px; position: relative; border-radius: 12px; background: var(--cream); font-size: .9rem; font-weight: 600; line-height: 1.35; }
-  .actions li::before { content: counter(a); position: absolute; left: 12px; top: 12px; width: 26px; height: 26px; border-radius: 50%; background: var(--red); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: .85rem; }
-  .path { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
-  .path li { font-size: .7rem; font-weight: 700; padding: 4px 10px; border-radius: 99px; background: var(--edge); }
-  .path li.duty { background: #d9ead9; } .path li.self { background: #f4d8d0; }
-  .note { margin: 0; font-size: .8rem; color: var(--navy-soft); text-align: center; }
-  .sources { background: var(--cream); border-radius: 12px; padding: 10px 14px; }
-  .sources summary { cursor: pointer; font-weight: 800; letter-spacing: .14em; font-size: .74rem; color: var(--red); }
-  .sources h2 { font-family: var(--serif); font-size: 1rem; margin: 10px 0 6px; }
-  .sources ul { list-style: none; margin: 0; padding: 0; }
-  .sources li { font-family: var(--serif); font-size: .88rem; line-height: 1.45; padding-left: 2em; text-indent: -2em; margin-bottom: 7px; }
-  .sources a { font-family: var(--sans); font-size: .74rem; font-weight: 700; color: var(--red); white-space: nowrap; }
+  .char .cn { font-weight: 700; font-variant-caps: all-small-caps; letter-spacing: .12em; font-size: 1.08rem; }
+  .char .cl { font-size: .95rem; }
+  .char .cs { font-size: .82rem; color: var(--ink-2); font-style: italic; }
+  .char:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
+  .controls { margin: 0; text-align: center; font-size: .86rem; color: var(--ink-2); font-style: italic; }
+  .primary { display: block; width: 100%; min-height: 54px; cursor: pointer; background: var(--ink); color: var(--paper-2); border: 1px solid var(--ink);
+    font-size: 1.1rem; font-weight: 700; font-variant-caps: all-small-caps; letter-spacing: .16em; transition: background .15s, transform .1s; }
+  .primary:hover:not(:disabled) { background: var(--red-2); }
+  .primary:active:not(:disabled) { transform: translateY(1px); }
+  .primary:disabled { background: transparent; color: var(--ink-3); border-style: dashed; cursor: not-allowed; }
+  .primary:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; }
 
-  @media (max-width: 820px) {
-    .hud { grid-template-columns: 1fr auto; grid-template-areas: "who track" "res res"; gap: 6px 10px; padding: 6px 12px 8px; }
-    .who { grid-area: who; } .tracker { grid-area: track; } .res { grid-area: res; grid-template-columns: repeat(4, 1fr); }
-    .r-top .long { display: none; } .r-top .short { display: inline; }
-    .card { left: 10px; right: 10px; top: auto; bottom: 10px; transform: none; width: auto; max-height: calc(100% - 20px); padding: 12px 14px; }
-    @keyframes cardIn { from { opacity: 0; transform: translateY(20px); } }
-    @keyframes cardOut { to { opacity: 0; transform: translateY(20px); } }
-    .meta { grid-template-columns: 1fr; }
-    .chars { grid-template-columns: 1fr; gap: 8px; }
-    .char { flex-direction: row; text-align: left; padding: 8px 10px; gap: 12px; }
-    .char .pic { width: 52px; height: 52px; }
-    .char-body { align-items: flex-start; gap: 3px; }
-    .perks { justify-content: flex-start; }
-    .finals { grid-template-columns: 1fr 1fr; min-width: 0; width: 100%; }
-    .actions { grid-template-columns: 1fr; }
-    .persona-facts { grid-template-columns: 1fr; }
-    .traits { gap: 6px; }
+  /* ending */
+  .score-row { display: grid; grid-template-columns: auto 1fr; gap: 26px; align-items: center; }
+  .scorebox { text-align: center; padding: 6px 18px; border-right: 1px solid var(--rule); }
+  .scorebox .lab { font-size: .8rem; font-variant-caps: all-small-caps; letter-spacing: .14em; color: var(--ink-2); }
+  .scorebox b { display: block; font-size: 4.2rem; line-height: 1; color: var(--red); font-variant-numeric: lining-nums; }
+  .scorebox small { font-style: italic; color: var(--ink-2); }
+  .finals { border-top: 1px solid var(--ink); }
+  .frow { display: grid; grid-template-columns: 1fr 44px 120px; gap: 10px; align-items: center; padding: 5px 0; border-bottom: 1px dotted var(--ink-3); }
+  .frow span { font-variant-caps: all-small-caps; letter-spacing: .1em; }
+  .frow b { text-align: right; font-variant-numeric: lining-nums tabular-nums; }
+  .frow .r-bar { margin: 0; }
+  .persona { border: 1px solid var(--ink); padding: 16px 18px; display: grid; gap: 10px; background: var(--paper); }
+  .persona-head { display: flex; align-items: center; gap: 14px; }
+  .badge { width: 64px; height: 64px; flex: none; border: 2px solid var(--ink); border-radius: 50%; display: grid; place-items: center; background: var(--paper-2); }
+  .badge svg { width: 40px; height: 40px; }
+  .persona-label { font-size: .8rem; font-variant-caps: all-small-caps; letter-spacing: .14em; color: var(--red); font-weight: 700; }
+  .persona-name { font-weight: 700; font-size: clamp(1.4rem, 4vw, 1.9rem); line-height: 1.1; }
+  .persona-tag { font-style: italic; color: var(--ink-2); }
+  .persona-text { margin: 0; font-size: 1.02rem; line-height: 1.45; }
+  .traits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .trait-top { display: flex; justify-content: space-between; font-size: .82rem; font-variant-caps: all-small-caps; letter-spacing: .1em; }
+  .trait-bar { position: relative; height: 7px; margin-top: 3px; border: 1px solid var(--ink); background: var(--paper-2); }
+  .trait-bar i { display: block; height: 100%; }
+  .trait.duty i { background: var(--gold); } .trait.balance i { background: var(--blue); } .trait.self i { background: var(--red); }
+  .persona-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; font-size: .88rem; line-height: 1.4; }
+  .persona-facts div { border-top: 1px solid var(--rule); padding-top: 6px; }
+  .persona-facts b { display: block; font-size: .78rem; font-variant-caps: all-small-caps; letter-spacing: .12em; color: var(--red); }
+  .persona-basis { margin: 0; font-size: .82rem; font-style: italic; color: var(--ink-2); }
+  .pattern { margin: 0; font-size: 1.03rem; line-height: 1.5; padding-left: 14px; border-left: 3px solid var(--red); }
+  .conclusion { margin: 0; font-size: 1rem; line-height: 1.5; }
+  .section-label { margin: 6px 0 -4px; font-size: .86rem; font-variant-caps: all-small-caps; letter-spacing: .14em; color: var(--red); font-weight: 700; border-bottom: 1px solid var(--rule); padding-bottom: 3px; }
+  .actions { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+  .actions li { line-height: 1.4; }
+  .path { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 24px; font-size: .88rem; }
+  .path li { break-inside: avoid; padding: 3px 0; border-bottom: 1px dotted var(--ink-3); }
+  .path li::before { content: "\25C6"; font-size: .6rem; margin-right: 6px; vertical-align: 2px; color: var(--ink-3); }
+  .path li.duty::before { color: var(--gold); } .path li.self::before { color: var(--red); } .path li.balance::before { color: var(--blue); }
+  .note { margin: 0; font-size: .85rem; color: var(--ink-2); text-align: center; font-style: italic; }
+  .sources { border-top: 1px solid var(--rule); padding-top: 8px; }
+  .sources summary { cursor: pointer; font-variant-caps: all-small-caps; letter-spacing: .14em; color: var(--red); font-weight: 700; }
+  .sources h2 { font-size: 1rem; margin: 10px 0 6px; }
+  .sources ul { list-style: none; margin: 0; padding: 0; }
+  .sources li { font-size: .88rem; line-height: 1.45; padding-left: 2em; text-indent: -2em; margin-bottom: 7px; }
+  .sources a { color: var(--red); font-variant-caps: all-small-caps; letter-spacing: .08em; font-weight: 700; white-space: nowrap; }
+
+  /* game over */
+  .stone { display: block; width: 190px; height: auto; margin: 0 auto -4px; }
+  .over-label { text-align: center; font-size: .86rem; font-variant-caps: all-small-caps; letter-spacing: .18em; color: var(--red); font-weight: 700; }
+  .over-text { margin: 0; text-align: center; font-size: 1.08rem; line-height: 1.45; }
+  .over-facts { margin: 0; text-align: center; font-size: .9rem; color: var(--ink-2); line-height: 1.5; font-style: italic; }
+  .over-lesson { margin: 0; padding-left: 14px; border-left: 3px solid var(--red); }
+
+  @media (max-width: 860px) {
+    .ledger { grid-template-columns: 1fr 1fr; }
+    .ledger > .supplies-wrap { grid-column: 1 / -1; border-left: none; border-top: 1px solid var(--rule); }
+    .ledger > div { padding: 6px 12px; }
+    .supplies { gap: 10px; }
+    .r-name { font-size: .78rem; } .r-name .long { display: none; } .r-name .short { display: inline; }
+    .supplies-wrap { padding-bottom: 8px !important; }
+    .card { left: 10px; right: 10px; top: auto; bottom: 60px; transform: none; width: auto; max-height: calc(100% - 76px); padding: 14px 16px 12px; }
+    .era b { font-size: 1.2rem; }
     .hurry { display: none; }
-    .era { padding: 6px 10px; min-width: 0; } .era b { font-size: 1.3rem; }
-    .timeline { bottom: 10px; }
-    .timeline .node span { font-size: .52rem; }
-    .touchgo { bottom: 58px; }
-    .banner b { font-size: 1.05rem; }
+    .trail .era-tick { font-size: .6rem; }
+    .score-row { grid-template-columns: 1fr; gap: 12px; }
+    .scorebox { border-right: none; border-bottom: 1px solid var(--rule); padding-bottom: 10px; }
+    .persona-facts, .traits { grid-template-columns: 1fr; gap: 8px; }
+    .path { columns: 1; }
+    .page { padding: 20px 18px; }
+    .notice { min-width: 0; padding: 6px 16px 8px; } .notice .big { font-size: 1.7rem; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
@@ -582,19 +645,23 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
 </head>
 <body>
 <div class="app">
-  <header class="hud">
+  <header class="ledger">
     <div class="who">
       <div class="portrait" id="hudPortrait" aria-hidden="true"></div>
-      <div style="min-width:0"><div class="brand" id="hudBrand"></div><div class="pname" id="hudName"></div></div>
+      <div style="min-width:0"><div class="kicker" id="hudBrand"></div><div class="pname" id="hudName"></div></div>
     </div>
-    <div class="tracker" id="tracker" aria-live="polite"><div class="tl" id="trackLabel"></div><div class="tv" id="trackVal"></div></div>
-    <div class="res" id="res"></div>
+    <div class="trip" id="trip" aria-live="polite">
+      <div class="row"><span id="dateLabel"></span><b id="dateVal"></b></div>
+      <div class="row"><span id="nextLabel"></span><b id="nextVal"></b></div>
+      <div class="row"><span id="trackLabel"></span><b id="trackVal"></b></div>
+    </div>
+    <div class="supplies-wrap"><div class="supplies" id="res"></div></div>
   </header>
   <div class="world" id="world">
     <canvas id="canvas" aria-label="Your journey through American civic history"></canvas>
     <div class="era" id="era" aria-live="polite"></div>
-    <div class="timeline" id="timeline" aria-hidden="true"></div>
     <div class="hurry" id="hurry"></div>
+    <div class="trail" id="timeline" aria-hidden="true"><div class="trail-inner" id="trailInner"></div></div>
     <button class="touchgo" id="touchgo" aria-label="Hurry">&#9654;&#9654;</button>
     <div id="layer"></div>
   </div>
@@ -623,7 +690,7 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
   function fresh() {
     return { mode: "start", char: null, name: UI.defaultName,
       res: { time: 50, money: 50, trust: GAME.startTrust, duty: GAME.startDuty },
-      x: 0, next: 0, picks: [], jury: null, section: 0, shiftAt: -1e9, walk: 0, cardAt: 0, sel: 0, locked: false };
+      x: 0, next: 0, picks: [], jury: null, section: 0, shiftAt: -1e9, mul: 1, dustAcc: 0, walk: 0, cardAt: 0, sel: 0, locked: false };
   }
 
   /* ================= Helpers ================= */
@@ -725,9 +792,10 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
     const hgt = 110 + v * 50;
     softShadow(x, 50);
     box(x - 5, GROUND - hgt * .45, 10, hgt * .45, "#7a5a3a");
-    circ(x, GROUND - hgt * .62, 30 + v * 10, modern ? "#4f9a5a" : "#6d9449");
-    circ(x - 20, GROUND - hgt * .5, 22 + v * 6, modern ? "#5aa865" : "#7ba355");
-    circ(x + 18, GROUND - hgt * .72, 22 + v * 6, modern ? "#63b06d" : "#86ad5e");
+    const sw = Math.sin(NOW / 1100 + x * .013) * 2.2;
+    circ(x + sw, GROUND - hgt * .62, 30 + v * 10, modern ? "#4f9a5a" : "#6d9449");
+    circ(x - 20 + sw * .8, GROUND - hgt * .5, 22 + v * 6, modern ? "#5aa865" : "#7ba355");
+    circ(x + 18 + sw * 1.2, GROUND - hgt * .72, 22 + v * 6, modern ? "#63b06d" : "#86ad5e");
   }
   function colonialHouse(x, v, brick) {
     const w = 110 + v * 40, hh = 80 + v * 20, c = brick ? "#b86b4f" : ["#e7dcc4", "#dfe6ea", "#e9d6b8"][Math.floor(v * 3)];
@@ -735,6 +803,7 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
     box(x - w / 2, GROUND - hh, w, hh, c);
     poly([[x - w / 2 - 8, GROUND - hh], [x, GROUND - hh - 46], [x + w / 2 + 8, GROUND - hh]], brick ? "#6d3d30" : "#5b6679");
     box(x + w / 4 - 6, GROUND - hh - 40, 12, 26, brick ? "#6d3d30" : "#8a5a44");
+    for (let s = 0; s < 3; s++) { const ph = (NOW / 1600 + s / 3 + v) % 1; circ(x + w / 4 + ph * 16, GROUND - hh - 44 - ph * 46, 5 + ph * 8, "rgba(236,232,224," + (0.5 * (1 - ph)).toFixed(3) + ")"); }
     box(x - 10, GROUND - 38, 20, 38, "#5a3d2a");
     [x - w / 2 + 14, x + w / 2 - 32].forEach(wx => { box(wx, GROUND - hh + 16, 18, 22, "#a9c7d6"); box(wx + 8, GROUND - hh + 16, 2, 22, "#fbf6ea"); });
   }
@@ -895,6 +964,8 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
     const bob = moving ? Math.abs(Math.sin(ph)) * 4 : Math.sin(t / 500) * 1;
     const O = outfitFor(sectionAt(S.x), S.char || "farmer");
     ctx.save(); ctx.translate(px, 0);
+    const lean = moving ? (hurrying ? .08 : .035) * S.mul : 0;
+    ctx.translate(0, y); ctx.rotate(lean); ctx.translate(0, -y);
     ctx.fillStyle = "rgba(20,25,15,.22)"; ctx.beginPath(); ctx.ellipse(0, y + 3, 20, 6, 0, 0, Math.PI * 2); ctx.fill();
     const swing = moving ? Math.sin(ph) * 0.7 : 0;
     ctx.lineCap = "round";
@@ -932,6 +1003,8 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
   function shade(hex) { return mix(hex, "#000000", .25); }
 
   /* ================= Frame render ================= */
+  let NOW = 0, FRAME_DT = 0;
+  const dust = [];
   function resize() {
     const r = worldEl.getBoundingClientRect();
     dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -939,28 +1012,65 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
     canvas.width = Math.round(viewW * dpr); canvas.height = Math.round(viewH * dpr);
     k = viewH / 600;
   }
+  const SIGN_FONT = "700 14px 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif";
+  function signpost(x, topY, text, state, t) {
+    ctx.font = SIGN_FONT;
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "1.5px";
+    const w = ctx.measureText(text).width + 30, hgt = 28, y = topY - 36;
+    ctx.strokeStyle = "#4a3824"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x - w / 2 + 12, y); ctx.lineTo(x - w / 2 + 12, y - 10); ctx.moveTo(x + w / 2 - 12, y); ctx.lineTo(x + w / 2 - 12, y - 10); ctx.stroke();
+    box(x - w / 2 - 4, y - 13, w + 8, 4, "#4a3824");
+    box(x - w / 2, y, w, hgt, "#8b6a44");
+    box(x - w / 2, y + hgt - 5, w, 5, "rgba(0,0,0,.13)");
+    ctx.strokeStyle = "rgba(50,32,15,.28)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x - w / 2 + 5, y + 8); ctx.lineTo(x + w / 2 - 30, y + 8); ctx.moveTo(x - w / 2 + 24, y + 20); ctx.lineTo(x + w / 2 - 6, y + 20); ctx.stroke();
+    ctx.strokeStyle = "#3a2a18"; ctx.lineWidth = 1.5; ctx.strokeRect(x - w / 2, y, w, hgt);
+    circ(x - w / 2 + 5, y + 5, 1.4, "#3a2a18"); circ(x + w / 2 - 5, y + 5, 1.4, "#3a2a18");
+    ctx.fillStyle = "#f6ecd2"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(text, x, y + hgt / 2 + 1);
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
+    if (state === "next") {
+      const px = x + w / 2 + 4, py = y - 13;
+      box(px - 1, py - 30, 2.5, 30, "#3a2a18");
+      const wv = Math.sin(t / 180) * 3;
+      poly([[px + 1, py - 30], [px + 24, py - 25 + wv], [px + 1, py - 19]], "#9a2f1f");
+    } else if (state === "done") {
+      const cx = x + w / 2 + 14, cy = y + hgt / 2;
+      circ(cx, cy, 10, "#4c6a38");
+      ctx.strokeStyle = "#f6ecd2"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(cx - 4.5, cy); ctx.lineTo(cx - 1, cy + 3.5); ctx.lineTo(cx + 5, cy - 3.5); ctx.stroke();
+    }
+  }
   function render(t) {
+    NOW = t;
     const unitsW = viewW / k;
     const playerScreen = unitsW * (viewW < 700 ? .24 : .3);
     const cam = S.x - playerScreen;
     const pal = paletteAt(S.x);
+    const sec = sectionAt(S.x);
     ctx.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
 
-    /* sky */
+    /* sky and sun */
     const g = ctx.createLinearGradient(0, 0, 0, GROUND);
     g.addColorStop(0, pal.skyA); g.addColorStop(1, pal.skyB);
     ctx.fillStyle = g; ctx.fillRect(0, 0, unitsW, 600);
-    const sec = sectionAt(S.x);
-    circ(unitsW * .82, 90, 34, sec === 2 ? "rgba(255,210,140,.9)" : "rgba(255,245,210,.9)");
+    const sunX = unitsW * .8 - S.x * .004, sunY = 92 + Math.sin(S.x / 2600) * 10;
+    circ(sunX, sunY, 44, sec === 2 ? "rgba(255,214,150,.35)" : "rgba(255,248,215,.4)");
+    circ(sunX, sunY, 32, sec === 2 ? "rgba(255,210,140,.95)" : "rgba(255,246,212,.95)");
 
-    /* clouds (slow parallax) */
-    for (let i = 0; i < 7; i++) {
-      const cx = ((i * 420 - cam * .12) % (unitsW + 400) + unitsW + 400) % (unitsW + 400) - 200, cy = 60 + (i * 53) % 110;
-      ctx.fillStyle = "rgba(255,255,255,.8)"; rr(cx, cy, 120, 28, 14); ctx.fill(); circ(cx + 40, cy + 2, 20, "rgba(255,255,255,.8)"); circ(cx + 70, cy - 4, 24, "rgba(255,255,255,.8)");
+    /* clouds */
+    for (let i = 0; i < 6; i++) {
+      const span = unitsW + 400, cx = ((i * 430 - cam * .1 - t * .006) % span + span) % span - 200, cy = 58 + (i * 53) % 110;
+      ctx.fillStyle = "rgba(255,255,255,.82)"; rr(cx, cy, 130, 26, 13); ctx.fill();
+      circ(cx + 42, cy + 2, 20, "rgba(255,255,255,.82)"); circ(cx + 74, cy - 4, 25, "rgba(255,255,255,.82)");
     }
-    /* far hills */
+    /* birds */
+    if (sec < 5) for (let b = 0; b < 3; b++) {
+      const span = unitsW + 300, bx = ((t * .035 + b * 34 + cam * .03) % span) - 150, by = 130 + b * 14 + Math.sin(t / 900 + b) * 6, f = Math.sin(t / 110 + b * 2) * 4;
+      ctx.strokeStyle = "rgba(42,32,23,.5)"; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(bx - 7, by - f); ctx.quadraticCurveTo(bx - 3, by - 3, bx, by); ctx.quadraticCurveTo(bx + 3, by - 3, bx + 7, by - f); ctx.stroke();
+    }
+    /* far hills, near hills */
     ctx.fillStyle = pal.hill2; ctx.beginPath(); ctx.moveTo(0, GROUND);
-    for (let x = 0; x <= unitsW + 40; x += 40) ctx.lineTo(x, GROUND - 120 - Math.sin((x + cam * .25) / 190) * 40 - Math.sin((x + cam * .25) / 70) * 10);
+    for (let x = 0; x <= unitsW + 40; x += 40) ctx.lineTo(x, GROUND - 120 - Math.sin((x + cam * .2) / 190) * 40 - Math.sin((x + cam * .2) / 70) * 10);
     ctx.lineTo(unitsW, GROUND); ctx.closePath(); ctx.fill();
     ctx.fillStyle = pal.hill; ctx.beginPath(); ctx.moveTo(0, GROUND);
     for (let x = 0; x <= unitsW + 40; x += 40) ctx.lineTo(x, GROUND - 60 - Math.sin((x + cam * .45) / 150) * 26);
@@ -970,17 +1080,14 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
     box(0, GROUND, unitsW, 600 - GROUND, pal.ground);
 
     ctx.save(); ctx.translate(-cam, 0);
-    /* road surface changes with each time period */
     for (let si = 0; si < SECTION_START.length; si++) {
       const a = Math.max(si === 0 ? -1e9 : SECTION_START[si], cam - 60), b = Math.min(SECTION_START[si + 1] || 1e9, cam + unitsW + 60);
       if (a < b) drawRoad(si, a, b);
     }
-    /* time gates between periods */
     for (let si = 1; si < SECTION_START.length; si++) {
       const gx = SECTION_START[si];
       if (gx > cam - 200 && gx < cam + unitsW + 200) drawGate(gx, si);
     }
-    /* scenery behind */
     DECOR.forEach(d => {
       if (d.x < cam - 250 || d.x > cam + unitsW + 250) return;
       switch (d.type) {
@@ -988,78 +1095,118 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
         case "house": colonialHouse(d.x, d.v, false); break;
         case "row": rowHouses(d.x, d.v); break;
         case "tower": tower(d.x, d.v); break;
-        case "fence": ctx.fillStyle = "#8a6a44"; for (let j = 0; j < 5; j++) ctx.fillRect(d.x - 60 + j * 30, GROUND - 34, 5, 34); ctx.fillRect(d.x - 62, GROUND - 28, 130, 4); ctx.fillRect(d.x - 62, GROUND - 14, 130, 4); break;
-        case "hay": circ(d.x, GROUND - 20, 22, "#d8b25a"); box(d.x - 22, GROUND - 20, 44, 20, "#d8b25a"); break;
-        case "cow": rr(d.x - 30, GROUND - 42, 60, 28, 10); ctx.fillStyle = "#f4efe6"; ctx.fill(); circ(d.x - 8, GROUND - 32, 7, "#3b3024"); rr(d.x + 24, GROUND - 50, 18, 16, 6); ctx.fillStyle = "#f4efe6"; ctx.fill(); box(d.x - 24, GROUND - 16, 5, 16, "#e8dfd0"); box(d.x + 18, GROUND - 16, 5, 16, "#e8dfd0"); break;
+        case "fence": ctx.fillStyle = "#7d5f3d"; for (let j = 0; j < 5; j++) ctx.fillRect(d.x - 60 + j * 30, GROUND - 34, 5, 34); ctx.fillRect(d.x - 62, GROUND - 28, 130, 4); ctx.fillRect(d.x - 62, GROUND - 14, 130, 4); break;
+        case "hay": circ(d.x, GROUND - 20, 22, "#d2ab55"); box(d.x - 22, GROUND - 20, 44, 20, "#d2ab55"); ctx.strokeStyle = "rgba(120,80,20,.35)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(d.x - 16, GROUND - 26); ctx.lineTo(d.x + 16, GROUND - 26); ctx.moveTo(d.x - 18, GROUND - 12); ctx.lineTo(d.x + 18, GROUND - 12); ctx.stroke(); break;
+        case "cow": { const nod = Math.sin(t / 700 + d.x) * 2; rr(d.x - 30, GROUND - 42, 60, 28, 10); ctx.fillStyle = "#f4efe6"; ctx.fill(); circ(d.x - 8, GROUND - 32, 7, "#3b3024"); rr(d.x + 24, GROUND - 50 + nod, 18, 16, 6); ctx.fillStyle = "#f4efe6"; ctx.fill(); box(d.x - 24, GROUND - 16, 5, 16, "#e8dfd0"); box(d.x + 18, GROUND - 16, 5, 16, "#e8dfd0"); break; }
         case "lamp": box(d.x - 2, GROUND - 120, 4, 120, "#4b5057"); rr(d.x - 12, GROUND - 124, 24, 6, 3); ctx.fillStyle = "#4b5057"; ctx.fill(); circ(d.x, GROUND - 116, 5, "#fff4c2"); break;
-        case "lampOld": box(d.x - 2, GROUND - 100, 4, 100, "#2b2419"); rr(d.x - 8, GROUND - 118, 16, 20, 3); ctx.fillStyle = "#f3d27a"; ctx.fill(); break;
+        case "lampOld": box(d.x - 2, GROUND - 100, 4, 100, "#2b2419"); rr(d.x - 8, GROUND - 118, 16, 20, 3); ctx.fillStyle = "#f3d27a"; ctx.fill(); ctx.strokeStyle = "#2b2419"; ctx.lineWidth = 1.5; ctx.strokeRect(d.x - 8, GROUND - 118, 16, 20); break;
         case "person": person(d.x, PEOPLE[d.s][d.v > .5 ? 0 : 1], t, d.h > .5); break;
-        case "car": rr(d.x - 44, GROUND + 6, 88, 26, 10); ctx.fillStyle = ["#3f6ea8", "#c24b3a", "#e0b43b"][Math.floor(d.v * 3)]; ctx.fill(); rr(d.x - 26, GROUND - 8, 50, 18, 8); ctx.fill(); box(d.x - 20, GROUND - 4, 18, 10, "#cfe6f2"); box(d.x + 2, GROUND - 4, 18, 10, "#cfe6f2"); circ(d.x - 26, GROUND + 32, 8, "#222"); circ(d.x + 26, GROUND + 32, 8, "#222"); break;
+        case "car": rr(d.x - 44, GROUND + 6, 88, 26, 10); ctx.fillStyle = ["#3f6ea8", "#b04a3a", "#d9a83b"][Math.floor(d.v * 3)]; ctx.fill(); rr(d.x - 26, GROUND - 8, 50, 18, 8); ctx.fill(); box(d.x - 20, GROUND - 4, 18, 10, "#cfe6f2"); box(d.x + 2, GROUND - 4, 18, 10, "#cfe6f2"); circ(d.x - 26, GROUND + 32, 8, "#222"); circ(d.x + 26, GROUND + 32, 8, "#222"); break;
       }
     });
-    /* encounters */
     ENC.forEach((e, i) => {
       const x = encX(i);
       if (x < cam - 400 || x > cam + unitsW + 400) return;
       const topY = drawEncounter(i, x, t);
-      label(x, topY - 20, e.sign);
-      if (i < S.next) { circ(x + 0, topY - 50, 12, "#3d7a4d"); ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 5, topY - 50); ctx.lineTo(x - 1, topY - 46); ctx.lineTo(x + 6, topY - 55); ctx.stroke(); }
-      else if (i === S.next) { const b = Math.sin(t / 250) * 4; circ(x, topY - 52 + b, 14, "#c9921f"); ctx.fillStyle = "#fff"; ctx.font = "800 16px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("?", x, topY - 51 + b); }
+      signpost(x, topY, e.sign, i < S.next ? "done" : i === S.next ? "next" : "", t);
     });
-    /* finish line */
     const fx = END_X - 120;
-    if (fx < cam + unitsW + 100) { box(fx, GROUND - 130, 6, 130, "#1c2a44"); box(fx + 6, GROUND - 128, 70, 40, "#b5402c"); ctx.fillStyle = "#fff"; ctx.font = "800 13px system-ui"; ctx.textAlign = "center"; ctx.fillText("YOUR JOURNEY", fx + 41, GROUND - 107); }
+    if (fx < cam + unitsW + 150) {
+      box(fx - 3, GROUND - 120, 6, 120, "#4a3824");
+      signpost(fx, GROUND - 92, UI.endTitle.toUpperCase(), "", t);
+    }
     ctx.restore();
 
+    /* dust from your footsteps on dirt and cobblestone */
+    if (S.mode === "run" && sec <= 2) {
+      S.dustAcc = (S.dustAcc || 0) + FRAME_DT * (hurrying ? 16 : 9) * S.mul;
+      while (S.dustAcc >= 1) { S.dustAcc--; dust.push({ x: playerScreen - 6 + Math.random() * 10, y: GROUND + 2, vx: -(30 + Math.random() * 40), vy: -(8 + Math.random() * 14), life: 0 }); }
+    }
+    for (let i = dust.length - 1; i >= 0; i--) {
+      const p = dust[i]; p.life += FRAME_DT; p.x += p.vx * FRAME_DT; p.y += p.vy * FRAME_DT; p.vy += 12 * FRAME_DT;
+      if (p.life > .7) { dust.splice(i, 1); continue; }
+      circ(p.x, p.y, 3 + p.life * 7, "rgba(170,140,95," + (0.35 * (1 - p.life / .7)).toFixed(3) + ")");
+    }
+
     drawPlayer(playerScreen, t);
+
+    /* foreground grass and posts move faster than the road, for depth */
+    const fg = cam * 1.35;
+    for (let x = -((fg % 90) + 90); x < unitsW + 90; x += 90) {
+      const wx = Math.floor((x + fg) / 90), v = ((wx * 37) % 11 + 11) % 11;
+      const bx = x + v * 3, sway = Math.sin(t / 800 + wx) * 2;
+      ctx.fillStyle = shade(pal.ground);
+      for (let b = 0; b < 5; b++) poly([[bx + b * 7, 600], [bx + b * 7 + 4 + sway, 528 - (b % 2) * 14 - v * 2], [bx + b * 7 + 8, 600]], ctx.fillStyle);
+      if (v === 3 && sec < 5) { box(x + 44, 500, 10, 100, "#6b5033"); box(x + 40, 496, 18, 6, "#5a4229"); }
+    }
 
     /* flash of light when you cross into a new time period */
     const sp = (performance.now() - S.shiftAt) / 900;
     if (sp >= 0 && sp < 1) {
-      ctx.fillStyle = "rgba(255,244,214," + (0.55 * (1 - sp)).toFixed(3) + ")"; ctx.fillRect(0, 0, unitsW, 600);
+      ctx.fillStyle = "rgba(255,244,214," + (0.5 * (1 - sp)).toFixed(3) + ")"; ctx.fillRect(0, 0, unitsW, 600);
       for (let q = 0; q < 12; q++) {
         const ang = q / 12 * Math.PI * 2 + sp * 2, rad = 20 + sp * 90;
-        circ(playerScreen + Math.cos(ang) * rad, GROUND - 50 + Math.sin(ang) * rad * .7, 4 * (1 - sp) + 1, "rgba(201,146,31," + (1 - sp).toFixed(2) + ")");
+        circ(playerScreen + Math.cos(ang) * rad, GROUND - 50 + Math.sin(ang) * rad * .7, 4 * (1 - sp) + 1, "rgba(169,125,37," + (1 - sp).toFixed(2) + ")");
       }
     }
   }
   function drawRoad(si, a, b) {
     const top = GROUND, hgt = 46;
     if (si === 0) {
-      box(a, top, b - a, hgt, "#dcc493"); box(a, top, b - a, 5, "#c6ab76");
-      ctx.fillStyle = "rgba(90,60,30,.12)";
+      box(a, top, b - a, hgt, "#d8bf8c"); box(a, top, b - a, 4, "#bfa06b");
+      ctx.fillStyle = "rgba(90,60,30,.13)";
       for (let x = Math.floor(a / 23) * 23; x < b; x += 23) ctx.fillRect(x, top + 12 + (Math.abs(x) % 3) * 9, 8, 3);
+      ctx.fillStyle = "rgba(90,60,30,.18)"; ctx.fillRect(a, top + 17, b - a, 2); ctx.fillRect(a, top + 31, b - a, 2);
     } else if (si <= 2) {
-      box(a, top, b - a, hgt, "#bfae8e"); box(a, top, b - a, 5, "#a8966f");
-      ctx.fillStyle = "rgba(255,255,255,.28)";
-      for (let row = 0; row < 3; row++) for (let x = Math.floor(a / 26) * 26 + (row % 2) * 13; x < b; x += 26) { rr(x + 2, top + 8 + row * 12, 20, 9, 4); ctx.fill(); }
+      box(a, top, b - a, hgt, "#b9a785"); box(a, top, b - a, 4, "#9e8b66");
+      for (let row = 0; row < 3; row++) for (let x = Math.floor(a / 26) * 26 + (row % 2) * 13; x < b; x += 26) {
+        rr(x + 2, top + 8 + row * 12, 20, 9, 4); ctx.fillStyle = "rgba(255,255,255,.26)"; ctx.fill(); ctx.strokeStyle = "rgba(60,45,25,.2)"; ctx.lineWidth = 1; ctx.stroke();
+      }
     } else if (si <= 4) {
-      box(a, top, b - a, hgt, "#b27c60"); box(a, top, b - a, 5, "#8f5f47");
-      ctx.fillStyle = "rgba(90,40,25,.35)";
+      box(a, top, b - a, hgt, "#ad785c"); box(a, top, b - a, 4, "#8a5a43");
+      ctx.fillStyle = "rgba(80,35,20,.35)";
       for (let row = 0; row < 4; row++) { ctx.fillRect(a, top + 8 + row * 10, b - a, 1.5); for (let x = Math.floor(a / 30) * 30 + (row % 2) * 15; x < b; x += 30) ctx.fillRect(x, top + 8 + row * 10, 1.5, 10); }
     } else {
-      box(a, top, b - a, 12, "#d9d9d4"); box(a, top + 12, b - a, hgt - 12, "#5d636b");
-      ctx.fillStyle = "rgba(255,255,255,.6)";
-      for (let x = Math.floor(a / 60) * 60; x < b; x += 60) ctx.fillRect(x, top + 28, 30, 3);
+      box(a, top, b - a, 12, "#d9d7cf"); box(a, top + 12, b - a, hgt - 12, "#5b6068");
+      ctx.fillStyle = "rgba(0,0,0,.12)"; for (let x = Math.floor(a / 48) * 48; x < b; x += 48) ctx.fillRect(x, top, 1.5, 12);
+      ctx.fillStyle = "rgba(255,255,255,.62)"; for (let x = Math.floor(a / 60) * 60; x < b; x += 60) ctx.fillRect(x, top + 28, 30, 3);
     }
   }
   function drawGate(gx, si) {
     const label = GAME.sections[si].gate, modern = si === 5, G = GROUND;
-    const post = modern ? "#9aa3ad" : "#cbbfa6", beam = modern ? "#2b3b5c" : "#1c2a44";
     softShadow(gx, 200);
-    box(gx - 90, G - 170, 22, 170, post); box(gx + 68, G - 170, 22, 170, post);
-    if (!modern) { box(gx - 94, G - 176, 30, 10, "#b3a68b"); box(gx + 64, G - 176, 30, 10, "#b3a68b"); }
-    rr(gx - 100, G - 214, 200, 50, modern ? 8 : 12); ctx.fillStyle = beam; ctx.fill();
-    ctx.strokeStyle = "#c9921f"; ctx.lineWidth = 3; ctx.stroke();
-    ctx.fillStyle = modern ? "#ffffff" : "#f5d48a"; ctx.font = "700 30px Georgia, serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(label, gx, G - 188);
+    if (modern) {
+      box(gx - 86, G - 180, 8, 180, "#8c949c"); box(gx + 78, G - 180, 8, 180, "#8c949c");
+      rr(gx - 96, G - 226, 192, 52, 6); ctx.fillStyle = "#2f6b4a"; ctx.fill();
+      ctx.strokeStyle = "#f2f2ee"; ctx.lineWidth = 2.5; rr(gx - 91, G - 221, 182, 42, 4); ctx.stroke();
+      ctx.fillStyle = "#f2f2ee"; ctx.font = "700 26px system-ui, -apple-system, Segoe UI, sans-serif";
+    } else {
+      [gx - 90, gx + 68].forEach(px => {
+        box(px, G - 170, 22, 170, "#c9bda3");
+        ctx.strokeStyle = "rgba(80,65,45,.35)"; ctx.lineWidth = 1;
+        for (let yy = G - 150; yy < G; yy += 20) { ctx.beginPath(); ctx.moveTo(px, yy); ctx.lineTo(px + 22, yy); ctx.stroke(); }
+        box(px - 4, G - 176, 30, 9, "#b1a486");
+      });
+      box(gx - 102, G - 214, 204, 44, "#8b6a44");
+      ctx.strokeStyle = "#3a2a18"; ctx.lineWidth = 2; ctx.strokeRect(gx - 102, G - 214, 204, 44);
+      ctx.strokeStyle = "rgba(50,32,15,.3)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(gx - 96, G - 200); ctx.lineTo(gx + 60, G - 200); ctx.moveTo(gx - 60, G - 182); ctx.lineTo(gx + 96, G - 182); ctx.stroke();
+      ctx.fillStyle = "#f6ecd2"; ctx.font = "700 30px 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif";
+    }
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(label, gx, modern ? G - 199 : G - 191);
   }
 
   /* ================= Game loop ================= */
   function update(dt) {
     if (S.mode !== "run") return;
-    const sp = TUNING.speed * (hurrying ? TUNING.hurry : 1);
-    S.x += sp * dt; S.walk += dt;
+    let target = 1;
+    if (S.next < ENC.length) {
+      const dist = encX(S.next) - TUNING.triggerAhead - S.x;
+      if (dist < 170) target = clamp(dist / 170, .3, 1);
+    }
+    S.mul += (target - S.mul) * Math.min(1, dt * 5);
+    const sp = TUNING.speed * (hurrying ? TUNING.hurry : 1) * S.mul;
+    S.x += sp * dt; S.walk += dt * S.mul;
     const sec = sectionAt(S.x);
     if (sec !== S.section) { S.section = sec; showBanner(sec); setEra(sec, true); S.shiftAt = performance.now(); }
     if (S.next < ENC.length && S.x >= encX(S.next) - TUNING.triggerAhead) {
@@ -1071,88 +1218,109 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
   }
   let last = performance.now();
   function frame(t) {
-    const dt = Math.min(0.1, (t - last) / 1000); last = t;
-    update(dt); render(t); updateTimeline();
+    FRAME_DT = Math.min(0.1, (t - last) / 1000); last = t;
+    update(FRAME_DT); render(t); updateTrail(); updateTrip();
     requestAnimationFrame(frame);
   }
 
-  /* ================= Banner ================= */
+  /* ================= Arrival notice ================= */
   function showBanner(sec) {
-    worldEl.querySelectorAll(".banner").forEach(b => b.remove());
+    worldEl.querySelectorAll(".notice").forEach(b => b.remove());
     const s = GAME.sections[sec];
-    const b = h("div", "banner", "<small>" + UI.arrived + '</small><span class="big">' + (sec === 5 ? s.gate : s.year) + "</span><b>" + (sec === 5 ? s.year : s.name) + "</b><em>" + UI.clothes + " " + s.outfit + "</em>");
+    const b = h("div", "notice", "<small>" + UI.arrived + '</small><span class="big">' + (sec === 5 ? s.gate : s.year) + "</span><b>" + (sec === 5 ? s.year : s.name) + "</b><em>" + UI.clothes + " " + s.outfit + "</em>");
     worldEl.appendChild(b);
-    setTimeout(() => { b.style.opacity = "0"; setTimeout(() => b.remove(), 500); }, TUNING.banner);
+    setTimeout(() => { b.classList.add("out"); setTimeout(() => b.remove(), 500); }, TUNING.banner);
   }
 
-  /* ================= Era badge and timeline ================= */
+  /* ================= Era tag and trail map ================= */
   function buildTimeline() {
-    const tl = $("timeline");
-    tl.innerHTML = '<div class="track"></div><div class="fill" id="tlFill"></div>';
+    const tl = $("trailInner");
+    tl.innerHTML = '<div class="path"></div><div class="done" id="tlFill"></div>';
     GAME.sections.forEach((sec, i) => {
-      const n = h("div", "node", "<i></i><span>" + sec.gate + "</span>");
+      const n = h("div", "era-tick", sec.gate);
       n.style.left = (i === 0 ? 0 : SECTION_START[i] / END_X * 100) + "%";
       tl.appendChild(n);
     });
+    ENC.forEach((e, i) => { const s = h("div", "stop", null); s.style.left = (encX(i) / END_X * 100) + "%"; tl.appendChild(s); });
     const you = h("div", "you", null); you.id = "tlYou"; tl.appendChild(you);
   }
-  function updateTimeline() {
+  function updateTrail() {
     const pct = clamp(S.x / END_X, 0, 1) * 100;
     $("tlFill").style.width = pct + "%";
     $("tlYou").style.left = pct + "%";
     const cur = sectionAt(S.x);
-    $("timeline").querySelectorAll(".node").forEach((n, i) => { n.classList.toggle("past", i < cur); n.classList.toggle("now", i === cur); });
+    $("trailInner").querySelectorAll(".era-tick").forEach((n, i) => n.classList.toggle("now", i === cur));
+    $("trailInner").querySelectorAll(".stop").forEach((n, i) => n.classList.toggle("past", i < S.next));
   }
   function setEra(sec, animate) {
     const s = GAME.sections[sec], el = $("era");
-    el.innerHTML = "<small>" + UI.youAreIn + "</small><b>" + (sec === 5 ? s.gate : s.year) + "</b><span>" + (sec === 5 ? s.year : s.name) + "</span>";
+    el.innerHTML = "<b>" + (sec === 5 ? s.gate : s.year) + "</b><span>" + (sec === 5 ? s.year : s.name) + "</span>";
     if (animate) { el.classList.remove("shift"); void el.offsetWidth; el.classList.add("shift"); }
   }
+  let tripCache = "";
+  function updateTrip() {
+    const s = GAME.sections[sectionAt(S.x)];
+    const here = S.mode === "card" ? (S.locked ? S.next - 1 : S.next) : -1;
+    const date = here >= 0 && ENC[here] ? ENC[here].year : (sectionAt(S.x) === 5 ? s.gate : s.year);
+    let next;
+    if (S.next < ENC.length) {
+      const miles = Math.max(0, encX(S.next) - TUNING.triggerAhead - S.x) / 140;
+      next = S.mode === "card" && !S.locked ? ENC[S.next].sign.toLowerCase() : ENC[S.next].sign.toLowerCase() + ", " + miles.toFixed(1) + " " + UI.miles;
+    } else next = UI.trailEnd;
+    const val = S.next + " " + UI.of + " " + ENC.length;
+    const key = date + "|" + next + "|" + val;
+    if (key === tripCache) return;
+    const bump = tripCache && tripCache.split("|")[2] !== val;
+    tripCache = key;
+    $("dateVal").textContent = date; $("nextVal").textContent = next; $("trackVal").textContent = val;
+    if (bump) { const tr = $("trip"); tr.classList.remove("bump"); void tr.offsetWidth; tr.classList.add("bump"); }
+  }
 
-  /* ================= Encounter card ================= */
+  /* ================= Landmark card ================= */
   let resultTimer = null;
   function openCard(i) {
     S.mode = "card"; hurrying = false;
     const d = ENC[i];
     worldEl.classList.add("dim");
-    worldEl.querySelectorAll(".banner").forEach(b => b.remove());
+    worldEl.querySelectorAll(".notice").forEach(b => b.remove());
     S.cardAt = performance.now(); S.sel = 0; S.locked = false;
     const card = h("div", "card");
     card.setAttribute("role", "dialog"); card.setAttribute("aria-label", d.place);
-    const head = h("div", "card-head");
-    head.appendChild(h("div", "place", d.place)); head.appendChild(h("div", "year", d.year));
-    card.appendChild(head);
-    const st = h("div", "stakes"); UI.stakes.forEach((s, j) => st.appendChild(h("span", j === d.stake ? "on" : "", s))); card.appendChild(st);
-    card.appendChild(h("div", "contrast", '<span class="a">' + d.contrast[0] + "</span><i>" + UI.versus + '</i><span class="b">' + d.contrast[1] + "</span>"));
-    if (d.showDefinition) card.appendChild(h("div", "def", "<b>" + GAME.definition.label + "</b>" + GAME.definition.text));
+    card.appendChild(h("div", "meta-top", "<span>" + d.year + "</span><span>" + UI.stakesShort + ": <b>" + UI.stakes[d.stake] + "</b></span>"));
+    card.appendChild(h("h2", "arrive", UI.arrivedAt + " " + d.landmark + "."));
+    card.appendChild(h("div", "rule2", null));
+    if (d.showDefinition) card.appendChild(h("p", "defn", "<b>" + GAME.definition.label + ".</b> " + GAME.definition.text));
     card.appendChild(h("p", "q-text", d.text));
-    card.appendChild(h("p", "q-ask" + (d.ask ? " rq" : ""), d.ask || UI.whatNow));
-    const answers = h("div", "answers");
+    card.appendChild(h("p", "contrast", "<b>" + d.contrast[0] + "</b><i>" + UI.orWord + "</i><b>" + d.contrast[1] + "</b>"));
+    card.appendChild(h("p", "q-ask", d.ask || UI.whatNow));
+    const list = h("ol", "choices");
     d.choices.forEach((c, j) => {
-      const b = h("button", "answer" + (j === 0 ? " sel" : ""), "<kbd>" + (j + 1) + "</kbd><span>" + c.label + "</span>");
+      const li = h("li");
+      const b = h("button", "answer" + (j === 0 ? " sel" : ""), '<span class="mark">▸</span><span class="n">' + (j + 1) + ".</span><span>" + c.label + "</span>");
       b.type = "button";
       b.addEventListener("click", () => choose(i, j));
       b.addEventListener("mouseenter", () => select(j));
-      answers.appendChild(b);
+      li.appendChild(b); list.appendChild(li);
     });
-    card.appendChild(answers);
-    const meta = h("div", "meta");
-    const src = h("div"); src.appendChild(h("b", null, UI.sourceLabel));
+    card.appendChild(list);
+    card.appendChild(h("p", "prompt", UI.choicePrompt + ' <span class="cur">1</span>'));
+    const foot = h("div", "foot");
     d.sources.forEach(s => {
-      const row = h("div", "src"); row.appendChild(document.createTextNode(s.cite + " "));
-      const a = h("a", null, UI.viewSource); a.href = s.url; a.target = "_blank"; a.rel = "noopener"; row.appendChild(a);
-      const q = h("q"); q.textContent = s.quote; row.appendChild(q);
-      src.appendChild(row);
+      const row = h("div"); row.appendChild(h("span", "lab", UI.sourceShort));
+      row.appendChild(document.createTextNode(s.cite + ". "));
+      const q = h("q"); q.textContent = s.quote; row.appendChild(q); row.appendChild(document.createTextNode(" "));
+      const a = h("a", null, UI.viewSource.toLowerCase()); a.href = s.url; a.target = "_blank"; a.rel = "noopener"; row.appendChild(a);
+      foot.appendChild(row);
     });
-    meta.appendChild(src);
-    const lang = h("div"); lang.appendChild(h("b", null, UI.langLabel)); lang.appendChild(document.createTextNode(d.lang)); meta.appendChild(lang);
-    card.appendChild(meta);
+    const lang = h("div"); lang.appendChild(h("span", "lab", UI.langShort)); lang.appendChild(document.createTextNode(d.lang)); foot.appendChild(lang);
+    card.appendChild(foot);
     layer.appendChild(card);
   }
   function select(j) {
     const bs = layer.querySelectorAll(".answer"); if (!bs.length) return;
     S.sel = (j + bs.length) % bs.length;
     bs.forEach((b, n) => b.classList.toggle("sel", n === S.sel));
+    const cur = layer.querySelector(".prompt .cur"); if (cur) cur.textContent = S.sel + 1;
   }
   function choose(i, j) {
     if (S.mode !== "card" || S.locked || S.next !== i) return;
@@ -1163,23 +1331,28 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
     S.picks.push({ place: d.place, label: c.label, kind: c.kind, i, j });
     if (c.id) S.jury = c.id;
     S.next = i + 1;
-    setTracker(true);
     const card = layer.querySelector(".card");
     card.innerHTML = "";
-    const con = h("div", "consequence");
-    con.appendChild(h("small", null, UI.yourChoice));
-    const pk = h("div", "picked"); pk.textContent = c.label; con.appendChild(pk);
-    const p = h("p"); p.textContent = c.result; con.appendChild(p);
-    const chips = h("div", "chips");
-    RES.forEach(key => { const v = c.fx[key] || 0; if (v) chips.appendChild(h("span", "chip " + (v > 0 ? "up" : "down"), fxText(key, v))); });
-    con.appendChild(chips);
-    con.appendChild(h("div", "timer", '<i style="animation-duration:' + TUNING.resultHold + 'ms"></i>'));
-    card.appendChild(con);
+    const res = h("div", "result");
+    res.appendChild(h("div", "lab", UI.resultLabel));
+    const pk = h("div", "picked"); pk.textContent = (j + 1) + ". " + c.label; res.appendChild(pk);
+    const p = h("p"); p.textContent = c.result; res.appendChild(p);
+    const rows = h("div", "ledger-rows");
+    RES.forEach(key => {
+      const v = c.fx[key] || 0; if (!v) return;
+      rows.appendChild(h("div", "lrow " + (v > 0 ? "up" : "down"), "<span>" + UI.resources[key] + "</span><b>" + (v > 0 ? "+" : "−") + Math.abs(v) + "</b>"));
+    });
+    res.appendChild(rows);
+    res.appendChild(h("div", "timer", '<i style="animation-duration:' + TUNING.resultHold + 'ms"></i>'));
+    card.appendChild(res);
+    const empty = ["duty", "trust", "time", "money"].find(key => S.res[key] <= 0);
     clearTimeout(resultTimer);
     resultTimer = setTimeout(() => {
       card.classList.add("out");
-      worldEl.classList.remove("dim");
       setTimeout(() => card.remove(), 250);
+      if (empty) return gameOver(empty, i, c);
+      worldEl.classList.remove("dim");
+      S.mul = .3;
       S.mode = "run";
     }, TUNING.resultHold);
   }
@@ -1187,6 +1360,11 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
   /* ================= Input ================= */
   window.addEventListener("keydown", e => {
     if (e.target && e.target.tagName === "INPUT") return;
+    if (S.mode === "start") {
+      if (/^Digit[1-3]$/.test(e.code)) { const b = layer.querySelectorAll(".char")[+e.code.slice(5) - 1]; if (b) b.click(); }
+      else if (e.code === "Enter" && S.char) { e.preventDefault(); begin(); }
+      return;
+    }
     if (S.mode === "card" && !S.locked) {
       if (e.code === "ArrowDown" || e.code === "KeyS") { e.preventDefault(); select(S.sel + 1); }
       else if (e.code === "ArrowUp" || e.code === "KeyW") { e.preventDefault(); select(S.sel - 1); }
@@ -1203,34 +1381,36 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
   tg.addEventListener("pointerdown", e => { e.preventDefault(); hurrying = S.mode === "run"; });
   ["pointerup", "pointerleave", "pointercancel"].forEach(ev => tg.addEventListener(ev, () => { hurrying = false; }));
 
-  /* ================= HUD ================= */
+  /* ================= Ledger (HUD) ================= */
   function buildHud() {
     $("hudBrand").textContent = UI.brand;
-    $("trackLabel").textContent = UI.decisions;
+    $("dateLabel").textContent = UI.dateLabel;
+    $("nextLabel").textContent = UI.nextStop;
+    $("trackLabel").textContent = UI.landmarks;
     $("hurry").textContent = UI.hurry;
     const res = $("res");
     RES.forEach(key => {
       const r = h("div", "r"); r.dataset.k = key;
-      r.innerHTML = '<div class="r-top"><span><span class="long">' + UI.resources[key] + '</span><span class="short">' + UI.resourcesShort[key] +
-        '</span></span><span class="r-val"></span></div><div class="r-bar"><div class="r-fill"></div></div>';
+      r.innerHTML = '<div class="r-top"><span class="r-name"><span class="long">' + UI.resources[key].toLowerCase() + '</span><span class="short">' + UI.resourcesShort[key].toLowerCase() + '</span></span><span class="r-val"></span></div><div class="r-bar"><div class="r-fill"></div></div>';
       res.appendChild(r);
     });
   }
   function paintRes(key, v) {
-    const r = document.querySelector('.hud .r[data-k="' + key + '"]');
+    const r = document.querySelector('.ledger .r[data-k="' + key + '"]');
     r.querySelector(".r-fill").style.width = v + "%";
     r.querySelector(".r-val").textContent = v;
+    r.classList.toggle("low", v > 0 && v <= 15);
     r.setAttribute("aria-label", UI.resources[key] + " " + v + " of 100");
   }
   function applyFx(fx) {
     RES.forEach(key => {
       const d = fx[key] || 0; if (!d) return;
       const from = S.res[key], to = clamp(from + d, 0, 100); S.res[key] = to;
-      const r = document.querySelector('.hud .r[data-k="' + key + '"]');
+      const r = document.querySelector('.ledger .r[data-k="' + key + '"]');
       r.querySelector(".r-fill").style.width = to + "%";
       r.classList.remove("up", "down"); void r.offsetWidth; r.classList.add(d > 0 ? "up" : "down");
-      setTimeout(() => r.classList.remove("up", "down"), 650);
-      const f = h("span", "float " + (d > 0 ? "up" : "down"), (d > 0 ? "+" : "−") + Math.abs(d)); r.appendChild(f); setTimeout(() => f.remove(), 1200);
+      setTimeout(() => r.classList.remove("up", "down"), 900);
+      const f = h("span", "delta " + (d > 0 ? "up" : "down"), (d > 0 ? "+" : "−") + Math.abs(d)); r.appendChild(f); setTimeout(() => f.remove(), 1300);
       const val = r.querySelector(".r-val"), t0 = performance.now();
       (function tick(now) {
         const p = clamp((now - t0) / 500, 0, 1);
@@ -1239,51 +1419,53 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
       })(t0);
     });
   }
-  function setTracker(bump) {
-    $("trackVal").textContent = S.next + " / " + ENC.length;
-    const tr = $("tracker"); if (bump) { tr.classList.remove("bump"); void tr.offsetWidth; tr.classList.add("bump"); }
-  }
   function updateHud() {
-    $("hudName").textContent = S.name;
+    const ch = GAME.characters.find(c => c.id === S.char);
+    $("hudName").textContent = S.name + (ch ? ", " + ch.name.charAt(0) + ch.name.slice(1).toLowerCase() : "");
     $("hudPortrait").innerHTML = S.char ? PORTRAIT[S.char] : "";
     RES.forEach(key => paintRes(key, S.res[key]));
-    setTracker(false);
+    tripCache = ""; updateTrip();
   }
 
-  /* ================= Start screen ================= */
+  /* ================= Title page ================= */
   function showStart() {
     layer.innerHTML = "";
-    const scr = h("div", "screen"), panel = h("div", "panel");
-    panel.appendChild(h("h1", null, UI.chooseTitle));
+    const scr = h("div", "screen"), page = h("div", "page");
+    page.appendChild(h("h1", null, UI.title));
+    page.appendChild(h("p", "sub", UI.subtitle));
+    page.appendChild(h("div", "orn", "❦"));
+    page.appendChild(h("div", "definition", '<div class="dl">' + GAME.definition.label + '</div><div class="dt">' + GAME.definition.text + "</div>"));
+    page.appendChild(h("p", "ask", UI.nameQuestion));
     const input = h("input", "name-input"); input.type = "text"; input.maxLength = 18; input.placeholder = UI.namePlaceholder; input.autocomplete = "off";
-    input.setAttribute("aria-label", UI.namePlaceholder);
+    input.setAttribute("aria-label", UI.nameQuestion);
     input.addEventListener("input", () => { const v = input.value.trim(); S.name = v ? v.toUpperCase() : UI.defaultName; updateHud(); });
     input.addEventListener("keydown", e => { if (e.key === "Enter" && S.char) { e.preventDefault(); begin(); } });
-    panel.appendChild(input);
-    const chars = h("div", "chars"); chars.setAttribute("role", "radiogroup");
+    page.appendChild(input);
+    page.appendChild(h("p", "ask", UI.occupationQuestion));
+    const list = h("ul", "occ"); list.setAttribute("role", "radiogroup");
     const go = h("button", "primary", UI.pickPrompt); go.type = "button"; go.disabled = true;
-    GAME.characters.forEach(c => {
+    GAME.characters.forEach((c, n) => {
+      const li = h("li");
       const b = h("button", "char"); b.type = "button"; b.setAttribute("role", "radio"); b.setAttribute("aria-checked", "false");
-      b.innerHTML = '<div class="pic">' + PORTRAIT[c.id] + '</div><div class="char-body"><div class="cn">' + c.name + '</div><div class="cl">' + c.line +
-        '</div><div class="perks">' + c.perks.map(p => '<span class="perk">' + p + "</span>").join("") + "</div></div>";
+      b.innerHTML = '<span class="mark">' + (n + 1) + '.</span><div class="pic">' + PORTRAIT[c.id] + '</div><div><div class="cn">' + c.name.toLowerCase() + '</div><div class="cl">' + c.line +
+        '</div><div class="cs">' + UI.startsWith + ": " + UI.resources.time.toLowerCase() + " " + c.start.time + ", " + UI.resources.money.toLowerCase() + " " + c.start.money + "</div></div>";
       b.addEventListener("click", () => {
         S.char = c.id; S.res.time = c.start.time; S.res.money = c.start.money;
-        chars.querySelectorAll(".char").forEach(x => { x.classList.toggle("sel", x === b); x.setAttribute("aria-checked", x === b ? "true" : "false"); });
+        list.querySelectorAll(".char").forEach((x, m) => { x.classList.toggle("sel", x === b); x.setAttribute("aria-checked", x === b ? "true" : "false"); x.querySelector(".mark").textContent = x === b ? "▸" : (m + 1) + "."; });
         updateHud(); go.disabled = false; go.textContent = UI.start;
       });
-      chars.appendChild(b);
+      li.appendChild(b); list.appendChild(li);
     });
-    panel.appendChild(chars);
-    panel.appendChild(h("div", "definition", '<div class="dl">' + GAME.definition.label + '</div><div class="dt">' + GAME.definition.text + "</div>"));
-    const ctl = h("ul", "controls"); UI.controls.forEach(t => ctl.appendChild(h("li", null, t))); panel.appendChild(ctl);
+    page.appendChild(list);
+    page.appendChild(h("p", "controls", UI.controls.join(" · ")));
     go.addEventListener("click", () => { if (S.char) begin(); });
-    panel.appendChild(go);
-    scr.appendChild(panel); layer.appendChild(scr);
+    page.appendChild(go);
+    scr.appendChild(page); layer.appendChild(scr);
   }
   function begin() {
     if (S.mode !== "start") return;
     layer.innerHTML = "";
-    S.mode = "run"; S.startedAt = performance.now();
+    S.mode = "run"; S.mul = .3; S.startedAt = performance.now();
     showBanner(0);
   }
 
@@ -1300,13 +1482,14 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
     if (c.balance >= 4 && c.self <= 2) return "compromiser";
     return "pragmatist";
   }
+  const I = "#2a2017", A = "#9a2f1f";
   const BADGE = {
-    minuteman: '<path d="M14 40h36M18 40c0-10 6-16 14-16s14 6 14 16" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><path d="M12 26l20-10 20 10" fill="none" stroke="#fff" stroke-width="3.5" stroke-linejoin="round"/><path d="M44 48l8-30" stroke="#f5d48a" stroke-width="3" stroke-linecap="round"/>',
-    reformer: '<path d="M16 28v10l22 8V20z" fill="#fff"/><path d="M38 20v26M44 26c4 2 4 12 0 14" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M20 38l3 9h6l-3-8" fill="#f5d48a"/>',
-    watchdog: '<path d="M10 32c6-10 14-15 22-15s16 5 22 15c-6 10-14 15-22 15S16 42 10 32z" fill="none" stroke="#fff" stroke-width="3.5"/><circle cx="32" cy="32" r="7" fill="#f5d48a"/>',
-    compromiser: '<path d="M32 14v34M18 48h28" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><path d="M14 22h36" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M14 22l-6 12h12zM50 22l-6 12h12z" fill="#f5d48a"/>',
-    pragmatist: '<circle cx="32" cy="32" r="17" fill="none" stroke="#fff" stroke-width="3.5"/><path d="M32 18l5 14-5 14-5-14z" fill="#f5d48a"/>',
-    bystander: '<circle cx="32" cy="20" r="6" fill="#fff"/><path d="M26 30h12l-2 12h-8z" fill="#fff"/><path d="M14 44h36M18 44v8M46 44v8" stroke="#f5d48a" stroke-width="3.5" stroke-linecap="round"/>'
+    minuteman: '<path d="M14 40h36M18 40c0-10 6-16 14-16s14 6 14 16" fill="none" stroke="' + I + '" stroke-width="3.5" stroke-linecap="round"/><path d="M12 26l20-10 20 10" fill="none" stroke="' + I + '" stroke-width="3.5" stroke-linejoin="round"/><path d="M44 48l8-30" stroke="' + A + '" stroke-width="3" stroke-linecap="round"/>',
+    reformer: '<path d="M16 28v10l22 8V20z" fill="' + I + '"/><path d="M38 20v26M44 26c4 2 4 12 0 14" fill="none" stroke="' + I + '" stroke-width="3" stroke-linecap="round"/><path d="M20 38l3 9h6l-3-8" fill="' + A + '"/>',
+    watchdog: '<path d="M10 32c6-10 14-15 22-15s16 5 22 15c-6 10-14 15-22 15S16 42 10 32z" fill="none" stroke="' + I + '" stroke-width="3.5"/><circle cx="32" cy="32" r="7" fill="' + A + '"/>',
+    compromiser: '<path d="M32 14v34M18 48h28" stroke="' + I + '" stroke-width="3.5" stroke-linecap="round"/><path d="M14 22h36" stroke="' + I + '" stroke-width="3" stroke-linecap="round"/><path d="M14 22l-6 12h12zM50 22l-6 12h12z" fill="' + A + '"/>',
+    pragmatist: '<circle cx="32" cy="32" r="17" fill="none" stroke="' + I + '" stroke-width="3.5"/><path d="M32 18l5 14-5 14-5-14z" fill="' + A + '"/>',
+    bystander: '<circle cx="32" cy="20" r="6" fill="' + I + '"/><path d="M26 30h12l-2 12h-8z" fill="' + I + '"/><path d="M14 44h36M18 44v8M46 44v8" stroke="' + A + '" stroke-width="3.5" stroke-linecap="round"/>'
   };
   function personalityBlock() {
     const P = GAME.personality, key = personalityFor(S.picks), t = P.types[key], c = counts(S.picks);
@@ -1321,9 +1504,9 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
     box.appendChild(head);
     box.appendChild(h("p", "persona-text", t.text));
     const traits = h("div", "traits");
-    ["duty", "balance", "self"].forEach(k => {
-      const pct = Math.round(c[k] / Math.max(1, S.picks.length) * 100);
-      traits.appendChild(h("div", "trait " + k, '<div class="trait-top"><span>' + P.traits[k] + "</span><span>" + c[k] + '</span></div><div class="trait-bar"><i style="width:' + pct + '%"></i></div>'));
+    ["duty", "balance", "self"].forEach(k2 => {
+      const pct = Math.round(c[k2] / Math.max(1, S.picks.length) * 100);
+      traits.appendChild(h("div", "trait " + k2, '<div class="trait-top"><span>' + P.traits[k2] + "</span><span>" + c[k2] + '</span></div><div class="trait-bar"><i style="width:' + pct + '%"></i></div>'));
     });
     box.appendChild(traits);
     const facts = h("div", "persona-facts");
@@ -1335,55 +1518,77 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
     return box;
   }
   function finish() {
-    S.mode = "end"; hurrying = false; S.finishedAt = performance.now();
+    S.mode = "end"; hurrying = false;
     const Eg = GAME.ending, total = score();
-    const scr = h("div", "screen"), panel = h("div", "panel");
-    panel.appendChild(h("h1", null, UI.journeyTitle));
-    panel.appendChild(personalityBlock());
+    const scr = h("div", "screen"), page = h("div", "page");
+    page.appendChild(h("h1", null, UI.endTitle));
+    page.appendChild(h("div", "orn", "❦"));
+    page.appendChild(personalityBlock());
     const row = h("div", "score-row");
-    const C = 2 * Math.PI * 60;
-    const ring = h("div", "ring", '<svg viewBox="0 0 140 140" aria-hidden="true"><circle class="track" cx="70" cy="70" r="60" fill="none" stroke-width="12"/><circle class="arc" cx="70" cy="70" r="60" fill="none" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + C.toFixed(1) + '"/></svg><div class="num"><div><b data-score>0</b><small>' + UI.scoreOutOf + '</small></div></div><div class="lbl">' + UI.scoreLabel + "</div>");
-    ring.setAttribute("aria-label", UI.scoreLabel + " " + total + " " + UI.scoreOutOf);
-    row.appendChild(ring);
+    const sb = h("div", "scorebox", '<div class="lab">' + UI.scoreLabel.toLowerCase() + '</div><b data-score>0</b><small>' + UI.scoreOutOf + "</small>");
+    sb.setAttribute("aria-label", UI.scoreLabel + " " + total + " " + UI.scoreOutOf);
+    row.appendChild(sb);
     const finals = h("div", "finals");
-    ["duty", "time", "money", "trust"].forEach(key => {
-      const f = h("div", "r"); f.dataset.k = key;
-      f.innerHTML = '<div class="r-top"><span>' + UI.resources[key] + '</span><span class="r-val">' + S.res[key] + '</span></div><div class="r-bar"><div class="r-fill" style="width:' + S.res[key] + '%"></div></div>';
-      finals.appendChild(f);
+    ["duty", "trust", "time", "money"].forEach(key => {
+      finals.appendChild(h("div", "frow r", '<span>' + UI.resources[key].toLowerCase() + '</span><b>' + S.res[key] + '</b><div class="r-bar"><div class="r-fill" style="width:' + S.res[key] + '%"></div></div>')).dataset.k = key;
     });
     row.appendChild(finals);
-    panel.appendChild(row);
-
-    const kinds = S.picks.reduce((a, p) => (a[p.kind] = (a[p.kind] || 0) + 1, a), {});
+    page.appendChild(row);
+    const kinds = counts(S.picks);
     const parts = [S.res.duty >= 70 ? Eg.duty.high : S.res.duty >= 40 ? Eg.duty.mid : Eg.duty.low];
-    if ((kinds.balance || 0) >= 2 && S.res.duty >= 40) parts.push(Eg.balanceNote);
+    if (kinds.balance >= 2 && S.res.duty >= 40) parts.push(Eg.balanceNote);
     parts.push(S.res.trust >= 65 ? Eg.trust.high : S.res.trust >= 35 ? Eg.trust.mid : Eg.trust.low, Eg.jury[S.jury] || "");
-    panel.appendChild(h("p", "pattern", parts.filter(Boolean).join(" ")));
-    panel.appendChild(h("p", "conclusion", Eg.conclusion));
-    panel.appendChild(h("p", "section-label", UI.actionsLabel));
-    const acts = h("ol", "actions"); Eg.actions.forEach(a => acts.appendChild(h("li", null, a))); panel.appendChild(acts);
-    panel.appendChild(h("p", "section-label", UI.decisionsLabel));
+    page.appendChild(h("p", "pattern", parts.filter(Boolean).join(" ")));
+    page.appendChild(h("p", "conclusion", Eg.conclusion));
+    page.appendChild(h("p", "section-label", UI.actionsLabel));
+    const acts = h("ol", "actions"); Eg.actions.forEach(a => acts.appendChild(h("li", null, a))); page.appendChild(acts);
+    page.appendChild(h("p", "section-label", UI.decisionsLabel));
     const path = h("ul", "path");
-    S.picks.forEach(p => { const li = h("li", p.kind); li.textContent = p.place + ": " + p.label; path.appendChild(li); });
-    panel.appendChild(path);
-    panel.appendChild(h("div", "definition", '<div class="dl">' + GAME.definition.label + '</div><div class="dt">' + GAME.definition.text + "</div>"));
-    panel.appendChild(h("p", "note", Eg.scoreNote));
-    panel.appendChild(sourcesBlock());
+    S.picks.forEach(p => { const li = h("li", p.kind); li.textContent = p.place.charAt(0) + p.place.slice(1).toLowerCase() + ": " + p.label; path.appendChild(li); });
+    page.appendChild(path);
+    page.appendChild(h("div", "definition", '<div class="dl">' + GAME.definition.label + '</div><div class="dt">' + GAME.definition.text + "</div>"));
+    page.appendChild(h("p", "note", Eg.scoreNote));
+    page.appendChild(sourcesBlock());
     const again = h("button", "primary", UI.playAgain); again.type = "button";
     again.addEventListener("click", reset);
-    panel.appendChild(again);
-    scr.appendChild(panel); layer.appendChild(scr);
-    requestAnimationFrame(() => requestAnimationFrame(() => { ring.querySelector(".arc").style.strokeDashoffset = (C * (1 - total / 100)).toFixed(1); }));
-    const num = ring.querySelector("[data-score]"), t0 = performance.now();
-    (function tick(now) { const p = clamp((now - t0) / 900, 0, 1); num.textContent = Math.round(total * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(tick); })(t0);
+    page.appendChild(again);
+    scr.appendChild(page); layer.appendChild(scr);
+    const num = sb.querySelector("[data-score]"), t0 = performance.now();
+    (function tick(now) { const p = clamp((now - t0) / 1000, 0, 1); num.textContent = Math.round(total * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(tick); })(t0);
+  }
+  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+  function gameOver(key, i, c) {
+    S.mode = "over"; hurrying = false;
+    const G = GAME.gameOver, why = G.reasons[key], d = ENC[i];
+    const scr = h("div", "screen"), page = h("div", "page");
+    page.appendChild(h("div", "over-label", G.label));
+    const nm = S.name, fit = nm.length > 11 ? ' textLength="104" lengthAdjust="spacingAndGlyphs"' : "";
+    page.appendChild(h("div", null,
+      '<svg class="stone" viewBox="0 0 200 172" aria-hidden="true"><path d="M44 160V74a56 56 0 0 1 112 0v86z" fill="#d8d0bd" stroke="#2a2017" stroke-width="2"/>' +
+      '<path d="M52 160V78a48 48 0 0 1 96 0v82" fill="none" stroke="rgba(42,32,23,.2)" stroke-width="1.5"/>' +
+      '<path d="M18 161h164" stroke="#2a2017" stroke-width="3"/><path d="M26 160c8-12 16-12 24 0M146 160c7-10 15-10 22 0M60 160c4-6 8-6 12 0" stroke="#4c6a38" stroke-width="3" fill="none"/>' +
+      '<text x="100" y="74" text-anchor="middle" font-family="Georgia,serif" font-size="11" letter-spacing="2" fill="#2a2017">' + esc(UI.hereLies.toUpperCase()) + "</text>" +
+      '<text x="100" y="98" text-anchor="middle" font-family="Georgia,serif" font-size="16" font-weight="700" fill="#2a2017"' + fit + ">" + esc(nm) + "</text>" +
+      '<text x="100" y="122" text-anchor="middle" font-family="Georgia,serif" font-size="10.5" font-style="italic" fill="#2a2017">' + esc(why.epitaph) + "</text></svg>"));
+    page.appendChild(h("h1", null, why.title));
+    page.appendChild(h("p", "over-text", why.text));
+    const facts = h("p", "over-facts");
+    facts.textContent = G.reached.replace("{n}", S.next) + " " + G.endedAt.replace("{place}", d.place.split(" ").map(w => w === "OF" ? "of" : w[0] + w.slice(1).toLowerCase()).join(" ")).replace("{year}", d.year) + " " + G.lastChoice + " " + c.label + ".";
+    page.appendChild(facts);
+    page.appendChild(h("p", "over-lesson", why.lesson));
+    const again = h("button", "primary", G.tryAgain); again.type = "button";
+    again.addEventListener("click", reset);
+    page.appendChild(again);
+    scr.appendChild(page); layer.appendChild(scr);
+    again.focus({ preventScroll: true });
   }
   function sourcesBlock() {
     const SRC = GAME.sources, d = h("details", "sources");
-    d.appendChild(h("summary", null, UI.sourcesLabel));
+    d.appendChild(h("summary", null, UI.sourcesLabel.toLowerCase()));
     [[UI.citedLabel, SRC.cited], [UI.consultedLabel, SRC.consulted]].forEach(([lab, list]) => {
       d.appendChild(h("h2", null, lab));
       const ul = h("ul");
-      list.forEach(s => { const li = h("li", null, s.text + " "); const a = h("a", null, SRC.linkText); a.href = s.url; a.target = "_blank"; a.rel = "noopener"; li.appendChild(a); ul.appendChild(li); });
+      list.forEach(s => { const li = h("li", null, s.text + " "); const a = h("a", null, SRC.linkText.toLowerCase()); a.href = s.url; a.target = "_blank"; a.rel = "noopener"; li.appendChild(a); ul.appendChild(li); });
       d.appendChild(ul);
     });
     return d;
@@ -1391,10 +1596,10 @@ const TUNING = { speed: 430, hurry: 1.8, spacing: 700, firstAt: 1000, triggerAhe
 
   /* ================= Boot ================= */
   function reset() {
-    clearTimeout(resultTimer); hurrying = false;
+    clearTimeout(resultTimer); hurrying = false; dust.length = 0;
     worldEl.classList.remove("dim");
-    worldEl.querySelectorAll(".banner").forEach(n => n.remove());
-    S = fresh();
+    worldEl.querySelectorAll(".notice").forEach(n => n.remove());
+    S = fresh(); S.mul = 1;
     updateHud();
     setEra(0, false);
     showStart();
