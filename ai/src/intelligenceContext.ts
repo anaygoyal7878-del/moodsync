@@ -5,12 +5,11 @@ import {
   musicSessionRepository,
   userTimezoneRepository,
 } from '@moodsync/database';
-import { hourInZone } from '@moodsync/shared';
 import { computeWellnessScores } from './wellness.js';
 import { computePersonalBaselines } from './personalBaselines.js';
 import { detectHealthScenarios } from './healthScenarios.js';
 import { correlateOccurrences, MEMORY_WINDOW_DAYS } from './wellnessMemory.js';
-import { rankPlaylistsByEffect, type CompletedMusicSession } from './musicMemory.js';
+import { rankPlaylistsByEffect, toCompletedMusicSessions } from './musicMemory.js';
 import { buildIntelligenceStack, type IntelligenceStackResult } from './intelligenceStack.js';
 
 /**
@@ -70,18 +69,7 @@ export async function loadIntelligenceStack(userId: string): Promise<Intelligenc
   // that silently reports every session as having happened at midnight
   // the moment anyone did call it. One extra cheap query is worth not
   // leaving that behind.
-  const completed: CompletedMusicSession[] = musicSessions
-    .filter((row) => row.endedAt !== null)
-    .map((row) => ({
-      mode: row.mode as CompletedMusicSession['mode'],
-      itemName: row.itemName,
-      genre: row.genre,
-      startedAt: row.startedAt,
-      endedAt: row.endedAt!,
-      heartRateDelta: row.outcomeHeartRateDelta,
-      endedEarly: row.endedEarly,
-      hourOfDay: hourInZone(row.startedAt, timezone),
-    }));
+  const completed = toCompletedMusicSessions(musicSessions, timezone);
 
   return buildIntelligenceStack({
     readingCount: readings.length,
