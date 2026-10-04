@@ -26,7 +26,7 @@ export function AppleMusicConnectButton({ isActive }: { isActive: boolean }) {
 
 function ConnectInner() {
   const router = useRouter();
-  const { status, authorize } = useMusicKit();
+  const { status, authorize, connectError } = useMusicKit();
   const [connecting, setConnecting] = useState(false);
 
   if (status.kind === "not_configured") {
@@ -36,20 +36,29 @@ function ConnectInner() {
   }
 
   return (
-    <Button
-      variant="primary"
-      disabled={connecting || status.kind === "loading"}
-      onClick={async () => {
-        setConnecting(true);
-        try {
-          await authorize();
-          router.refresh();
-        } finally {
-          setConnecting(false);
-        }
-      }}
-    >
-      {connecting || status.kind === "loading" ? "Connecting…" : "Connect Apple Music"}
-    </Button>
+    <div className="flex flex-col items-end gap-1">
+      <Button
+        variant="primary"
+        disabled={connecting || status.kind === "loading"}
+        onClick={async () => {
+          setConnecting(true);
+          try {
+            await authorize();
+            router.refresh();
+          } finally {
+            setConnecting(false);
+          }
+        }}
+      >
+        {connecting || status.kind === "loading"
+          ? "Connecting…"
+          : "Connect Apple Music"}
+      </Button>
+      {connectError && (
+        <p role="alert" className="text-xs text-ink-muted">
+          {connectError}
+        </p>
+      )}
+    </div>
   );
 }

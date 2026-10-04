@@ -74,10 +74,11 @@ const envSchema = z.object({
   // docs/APPLE_MUSIC_ARCHITECTURE.md.
   APPLE_MUSIC_TEAM_ID: z.string().optional(),
   APPLE_MUSIC_KEY_ID: z.string().optional(),
-  /** The .p8 file's contents verbatim (PEM, including the
-   * `-----BEGIN PRIVATE KEY-----`/`-----END PRIVATE KEY-----` lines) —
-   * store literal `\n` line breaks in the env var and this is used as-is
-   * by jose's `importPKCS8`, which expects real PEM text. */
+  /** The .p8 file's contents (PEM, including the
+   * `-----BEGIN PRIVATE KEY-----`/`-----END PRIVATE KEY-----` lines).
+   * Either real line breaks or literal `\n` sequences on one line work —
+   * appleMusicService.normalizePrivateKey converts the latter, since
+   * jose's `importPKCS8` needs real PEM line breaks. */
   APPLE_MUSIC_PRIVATE_KEY: z.string().optional(),
 
   // MoodSync is the OAuth 2.0 authorization SERVER for Alexa account

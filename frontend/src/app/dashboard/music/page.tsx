@@ -140,7 +140,7 @@ function RecentlyPlayed() {
  * whole page, which hid all of that behind a provider that wasn't even
  * configured. */
 function PlaybackSlot() {
-  const { status, authorize } = useMusicKit();
+  const { status, authorize, connectError } = useMusicKit();
   const [connecting, setConnecting] = useState(false);
 
   if (status.kind === "loading") {
@@ -184,6 +184,11 @@ function PlaybackSlot() {
         >
           {connecting ? "Connecting…" : "Connect Apple Music"}
         </Button>
+        {connectError && (
+          <p role="alert" className="text-sm text-ink-muted">
+            {connectError}
+          </p>
+        )}
       </Card>
     );
   }

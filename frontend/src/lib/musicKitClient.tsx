@@ -28,6 +28,11 @@ type MusicKitStatus =
 
 interface MusicKitContextValue {
   status: MusicKitStatus;
+  /** Why the last connect attempt didn't complete, in the user's terms.
+   * Cleared when a new attempt starts. */
+  connectError: string | null;
+  /** Never throws — a failure lands in `connectError` instead, so every
+   * caller shows the same message without its own catch. */
   authorize: () => Promise<void>;
   unauthorize: () => Promise<void>;
   instance: MusicKit.MusicKitInstance | null;
@@ -53,6 +58,7 @@ export function useMusicKit(): MusicKitContextValue {
 
 export function MusicKitProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<MusicKitStatus>({ kind: "loading" });
+  const [connectError, setConnectError] = useState<string | null>(null);
   const [nowPlayingItem, setNowPlayingItem] = useState<MusicKit.MediaItem | null>(null);
   const [playbackState, setPlaybackState] = useState<MusicKit.PlaybackStates | null>(null);
   // The ref is for internal use inside callbacks (authorize/play/etc,
@@ -85,7 +91,24 @@ export function MusicKitProvider({ children }: { children: ReactNode }) {
         const { developerToken } = (await res.json()) as { developerToken: string };
         if (cancelled) return;
 
-        const instance = musicKit.configure({ developerToken, app: { name: "MoodSync", build: "1.0.0" } });
+        // v3's configure() is async. It was called synchronously, so
+        // `instance` was a Promise, the addEventListener call below threw,
+        // and the catch reported "couldn't reach the server" — Apple Music
+        // could never finish setting up, with or without a valid key.
+        let instance: MusicKit.MusicKitInstance;
+        try {
+          instance = await musicKit.configure({ developerToken, app: { name: "MoodSync", build: "1.0.0" } });
+        } catch (error) {
+          console.error("MusicKit.configure failed", error);
+          if (!cancelled) {
+            setStatus({
+              kind: "not_configured",
+              message: "Apple Music rejected this server's MusicKit credentials. Check the Apple Music key settings.",
+            });
+          }
+          return;
+        }
+        if (cancelled) return;
         instanceRef.current = instance;
 
         const updateNowPlaying = () => setNowPlayingItem(instance.nowPlayingItem);
@@ -93,11 +116,32 @@ export function MusicKitProvider({ children }: { children: ReactNode }) {
         instance.addEventListener("nowPlayingItemDidChange", updateNowPlaying);
         instance.addEventListener("playbackStateDidChange", updatePlaybackState);
 
+        // MusicKit remembers its authorization in the browser, and that
+        // outlives a disconnect made on the Connections page (which only
+        // deletes MoodSync's stored token). Without this check the Music
+        // page kept playing as "connected" after the user disconnected.
+        // The server is the source of truth for whether MoodSync is
+        // connected; a failed check leaves the browser state alone.
+        let authorized = instance.isAuthorized;
+        if (authorized) {
+          const serverConnected = await fetch("/api/integrations/apple-music/status")
+            .then((r) => (r.ok ? (r.json() as Promise<{ connected: boolean }>) : null))
+            .then((body) => body?.connected ?? null)
+            .catch(() => null);
+          if (serverConnected === false) {
+            await instance.unauthorize().catch(() => undefined);
+            authorized = false;
+          }
+        }
+
         if (!cancelled) {
           setInstance(instance);
-          setStatus({ kind: "ready", authorized: instance.isAuthorized });
+          setStatus({ kind: "ready", authorized });
         }
-      } catch {
+      } catch (error) {
+        // Logged because this branch previously hid a TypeError behind a
+        // network-sounding message, which cost a real diagnosis.
+        console.error("Apple Music setup failed", error);
         if (!cancelled) setStatus({ kind: "not_configured", message: "Couldn't reach MoodSync's server to set up Apple Music." });
       }
     }
@@ -117,14 +161,38 @@ export function MusicKitProvider({ children }: { children: ReactNode }) {
   async function authorize() {
     const instance = instanceRef.current;
     if (!instance) return;
-    const musicUserToken = await instance.authorize();
+    setConnectError(null);
+
+    let musicUserToken: string;
+    try {
+      musicUserToken = await instance.authorize();
+    } catch {
+      // Closing Apple's sign-in window rejects here. Previously that was
+      // an unhandled rejection and the button silently reset.
+      setConnectError("Apple Music sign-in didn't finish. Try again when you're ready.");
+      return;
+    }
+
     // Persisted server-side so background sync / AI recommendations can
     // eventually use it too — see docs/APPLE_MUSIC_ARCHITECTURE.md §3.
-    await fetch("/api/integrations/apple-music/connect", {
+    // Only reported as connected once the server confirms it stored the
+    // token: before, a failed save still showed "connected" here while
+    // the Connections page said otherwise.
+    const saved = await fetch("/api/integrations/apple-music/connect", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ musicUserToken, storefront: instance.storefrontId }),
-    });
+    })
+      .then((r) => r.ok)
+      .catch(() => false);
+
+    if (!saved) {
+      // Don't leave the browser authorized against a connection MoodSync
+      // doesn't have — the next check on load would undo it anyway.
+      await instance.unauthorize().catch(() => undefined);
+      setConnectError("Apple approved access, but MoodSync couldn't save the connection. Please try again.");
+      return;
+    }
     setStatus({ kind: "ready", authorized: true });
   }
 
@@ -170,6 +238,7 @@ export function MusicKitProvider({ children }: { children: ReactNode }) {
       <MusicKitContext.Provider
         value={{
           status,
+          connectError,
           authorize,
           unauthorize,
           instance,
