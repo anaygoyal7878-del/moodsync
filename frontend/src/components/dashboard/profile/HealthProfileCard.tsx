@@ -238,7 +238,7 @@ export function HealthProfileCard() {
       )}
 
       {data && !editing && (
-        <div className="relative mt-4 flex flex-col gap-4">
+        <div className="lux-reveal relative mt-4 flex flex-col gap-4">
           {/* What you told MoodSync. */}
           <div className="grid grid-cols-3" style={{}}>
             {[
@@ -354,7 +354,7 @@ export function HealthProfileCard() {
       )}
 
       {data && editing && (
-        <div className="relative mt-4 flex flex-col gap-3">
+        <div className="lux-reveal relative mt-4 flex flex-col gap-3">
           <label className="flex flex-col gap-1.5">
             <span className="text-[11px] uppercase tracking-[0.08em]" style={{ color: "var(--lux-muted)" }}>
               Birthday

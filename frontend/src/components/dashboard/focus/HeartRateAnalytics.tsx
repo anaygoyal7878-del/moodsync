@@ -151,14 +151,14 @@ export function HeartRateAnalytics() {
       )}
 
       {analytics && analytics.latest === null && (
-        <p className="text-[12.5px] leading-relaxed" style={{ color: "var(--lux-muted)" }}>
+        <p className="lux-reveal text-[12.5px] leading-relaxed" style={{ color: "var(--lux-muted)" }}>
           No heart-rate readings have synced in the last week. Once your wearable syncs, you&apos;ll see today&apos;s curve
           and how your resting rate compares with your normal.
         </p>
       )}
 
       {analytics && analytics.latest !== null && (
-        <div className="flex flex-col gap-5">
+        <div className="lux-reveal flex flex-col gap-5">
           <MetricRow>
             <Metric value={analytics.latest.heartRate as number} unit="bpm" label="Latest" emphasis />
             <Metric
