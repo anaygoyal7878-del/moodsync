@@ -27,8 +27,12 @@ export interface RecommendationCandidate {
    * skip-rate heuristic below suggests swapping a specific playlist,
    * not adopting a new template, so it needs its own action shape
    * rather than stretching `templateId` to mean something it doesn't. */
-  kind: 'template' | 'edit-rule' | 'run-scene';
+  kind: 'template' | 'edit-rule' | 'run-scene' | 'open';
   templateId?: string;
+  /** Only for `kind === 'open'`: an in-app destination that acts on the
+   * suggestion directly (the breathing session, the music hub). Needs no
+   * device, so it is what a user with no smart home gets. */
+  href?: string;
   ruleId?: string;
   /** Only present when `kind === 'run-scene'` — points at a cached
    * `HomeSceneSnapshot.sceneId` (see docs/HOME_SCENES_ARCHITECTURE.md).
@@ -66,22 +70,18 @@ export interface PlaylistSkipStat {
   sampleSize: number;
 }
 
-function hasMatchingRule(rules: AutomationRuleDefinition[], fields: string[]): boolean {
-  return rules.some((rule) => rule.enabled && rule.conditions.some((c) => fields.includes(c.field)));
-}
-
-/** Thresholds are MoodSync's own engineering heuristic, not a clinical
- * cutoff — same "estimate, not measurement" framing as wellness.ts's
- * scores this reads from. Only suggests a rule the user doesn't already
- * have something like, so this never nags about a template they've
- * already adopted (under any condition targeting the same fields, not
- * just an exact match on this heuristic's own suggested condition). */
 /** A skip-rate this high is MoodSync's own engineering cutoff for "worth
  * flagging," not a validated behavioral threshold — same "estimate, not
  * measurement" framing as every other heuristic here. Requires a real
  * minimum sample size first so 1-of-1 "skipped" doesn't trigger a
  * suggestion off a single data point. */
 const SKIP_RATE_THRESHOLD = 0.6;
+
+/** Acute thresholds are deliberately stricter than the trend ones
+ * (65 / 40). A single reading is noisier than a week's average, so it has
+ * to be clearly elevated on its own before it triggers anything. */
+const ACUTE_STRESS_THRESHOLD = 75;
+const ACUTE_LOW_RECOVERY_THRESHOLD = 25;
 const MIN_SKIP_SAMPLE_SIZE = 5;
 
 export function generateRecommendations(params: {
@@ -94,12 +94,33 @@ export function generateRecommendations(params: {
    * every existing caller (and test) that has no Home snapshot yet
    * keeps working unchanged. */
   cachedScenes?: { sceneId: string; name: string }[];
+  /** Scores from the most recent reading. The trends above compare one
+   * week's average with the previous week's, which dilutes an acute
+   * stretch: two hard days inside a calm fortnight averaged to a stress
+   * of ~60 while the latest reading was 100, so the engine stayed
+   * silent exactly when a suggestion was most useful. Optional so
+   * existing callers keep working. */
+  currentScores?: { stress: number | null; recovery: number | null };
 }): RecommendationCandidate[] {
-  const { wellnessTrends, existingRules, playlistSkipStats = [], cachedScenes = [] } = params;
+  const {
+    wellnessTrends,
+    existingRules,
+    playlistSkipStats = [],
+    cachedScenes = [],
+    currentScores,
+  } = params;
   const candidates: RecommendationCandidate[] = [];
 
   const stress = wellnessTrends.find((t) => t.metric === 'stress');
-  if (stress && stress.direction === 'up' && stress.current >= 65) {
+  const stressTrending = !!stress && stress.direction === 'up' && stress.current >= 65;
+  const stressNow = currentScores?.stress ?? null;
+  const stressAcute = stressNow !== null && stressNow >= ACUTE_STRESS_THRESHOLD;
+  if (stressTrending || stressAcute) {
+    // Say which signal fired. A trend sentence quoting a weekly average
+    // of 60 next to a live reading of 100 would read as contradictory.
+    const why = stressTrending
+      ? `Your computed Stress score has trended up recently (${stress!.previous} → ${stress!.current}).`
+      : `Your latest Stress reading is ${stressNow}, well above your usual range.`;
     const relaxScene = findRelaxScene(cachedScenes);
     if (relaxScene) {
       candidates.push({
@@ -107,31 +128,36 @@ export function generateRecommendations(params: {
         sceneId: relaxScene.sceneId,
         sceneName: relaxScene.name,
         title: `Run your "${relaxScene.name}" scene?`,
-        description: `Your computed Stress score has trended up recently (${stress.previous} → ${stress.current}). You appear stressed — want to run your "${relaxScene.name}" Apple Home scene now?`,
+        description: `${why} Want to run your "${relaxScene.name}" Apple Home scene now?`,
       });
     }
-    if (!hasMatchingRule(existingRules, ['heartRate', 'wellness.stress'])) {
-      candidates.push({
-        kind: 'template',
-        templateId: 'elevated-stress',
-        title: 'Try the "Elevated Stress" automation',
-        description: `Your computed Stress score has trended up recently (${stress.previous} → ${stress.current}). The "Elevated Stress" template dims your Hue lights and shifts to a warmer color temperature when your heart rate spikes — you don't have a rule reacting to this yet.`,
-      });
-    }
+    // Previously this pointed at an "Elevated Stress" Hue template. Hue
+    // and its templates were removed from the UI, so every stress
+    // suggestion sent people to a template that no longer existed. The
+    // breathing session works for everyone, with or without a smart home.
+    candidates.push({
+      kind: 'open',
+      href: '/dashboard/meditation',
+      title: 'Take five minutes to breathe',
+      description: `${why} A few minutes of slow breathing, with a longer exhale than inhale, is a quick way to bring your heart rate down.`,
+    });
   }
 
   const recovery = wellnessTrends.find((t) => t.metric === 'recovery');
-  if (
-    recovery &&
-    recovery.direction === 'down' &&
-    recovery.current <= 40 &&
-    !hasMatchingRule(existingRules, ['activityLevel', 'wellness.recovery'])
-  ) {
+  const recoveryTrending = !!recovery && recovery.direction === 'down' && recovery.current <= 40;
+  const recoveryNow = currentScores?.recovery ?? null;
+  const recoveryAcute = recoveryNow !== null && recoveryNow <= ACUTE_LOW_RECOVERY_THRESHOLD;
+  if (recoveryTrending || recoveryAcute) {
+    const why = recoveryTrending
+      ? `Your computed Recovery score has trended down recently (${recovery!.previous} → ${recovery!.current}).`
+      : `Your latest Recovery reading is ${recoveryNow}, well below your usual range.`;
+    // Replaces a "Recovery" Hue template removed along with Hue — see the
+    // stress suggestion above.
     candidates.push({
-      kind: 'template',
-      templateId: 'recovery',
-      title: 'Try the "Recovery" automation',
-      description: `Your computed Recovery score has trended down recently (${recovery.previous} → ${recovery.current}). The "Recovery" template lowers your Hue lights' intensity after a period of high activity — you don't have a rule reacting to this yet.`,
+      kind: 'open',
+      href: '/dashboard/music',
+      title: 'Wind down with something calm',
+      description: `${why} Slow, familiar music is an easy way to make room for recovery. MoodSync will suggest what to put on.`,
     });
   }
 
