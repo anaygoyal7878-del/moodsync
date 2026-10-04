@@ -7,6 +7,7 @@ import {
   computeNextNightOutcome,
   computeWellnessScores,
   rankPlaylistsByEffect,
+  toCompletedMusicSessions,
   rankGenresByEffect,
   bestHoursForMode,
   buildMusicRecommendations,
@@ -389,14 +390,5 @@ export default async function musicSessionRoutes(app: FastifyInstance) {
  * included, since the AI layer never does timezone work itself). */
 async function loadCompletedSessions(userId: string, timezone: string): Promise<CompletedMusicSession[]> {
   const rows = await musicSessionRepository.listCompletedSince(userId, ANALYTICS_WINDOW_DAYS);
-  return rows.map((row) => ({
-    mode: row.mode as MusicMode,
-    itemName: row.itemName,
-    genre: row.genre,
-    startedAt: row.startedAt,
-    endedAt: row.endedAt!,
-    heartRateDelta: row.outcomeHeartRateDelta,
-    endedEarly: row.endedEarly,
-    hourOfDay: hourInZone(row.startedAt, timezone),
-  }));
+  return toCompletedMusicSessions(rows, timezone);
 }

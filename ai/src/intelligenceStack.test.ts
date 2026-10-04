@@ -55,7 +55,7 @@ describe('buildIntelligenceStack', () => {
     const stack = buildIntelligenceStack({
       ...empty,
       readingCount: 0,
-      musicEffects: [{ label: 'Calm', mode: 'RELAX' as const, sessions: 9, meanHeartRateDelta: -5, helped: true, earlyStopRate: 0 }],
+      musicEffects: [{ label: 'Calm', mode: 'RELAX' as const, sessions: 9, meanHeartRateDelta: -5, helped: true, earlyStopRate: 0, score: 6 }],
     });
     expect(stack.depth).toBeNull();
     expect(stack.layers.find((l) => l.id === 'preference')!.unlocked).toBe(true);
@@ -97,7 +97,7 @@ describe('buildIntelligenceStack', () => {
       baselines: baselines(200),
       scenarios: [],
       findings: [{ label: 'Meditation', meanDelta: 4, sampleSize: 20 }],
-      musicEffects: [{ label: 'Calm', mode: 'RELAX' as const, sessions: 20, meanHeartRateDelta: -6, helped: true, earlyStopRate: 0 }],
+      musicEffects: [{ label: 'Calm', mode: 'RELAX' as const, sessions: 20, meanHeartRateDelta: -6, helped: true, earlyStopRate: 0, score: 6 }],
     });
     expect(stack.depth).toBe('preference');
     expect(stack.cannotAnswer.join(' ')).toMatch(/diagnostic/i);

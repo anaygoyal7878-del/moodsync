@@ -6,6 +6,8 @@ import {
   buildMusicRecommendations,
   compareFocusDuration,
   describeFocusDuration,
+  rankingScore,
+  toCompletedMusicSessions,
   type CompletedMusicSession,
 } from './musicMemory.js';
 import type { MusicMode } from './musicFeedback.js';
@@ -209,5 +211,80 @@ describe('describeFocusDuration', () => {
       sessionsWithoutMusic: 5,
     });
     expect(line).toBeNull();
+  });
+});
+
+describe('evidence-weighted ranking', () => {
+  const NOW = new Date(Date.UTC(2026, 9, 1));
+  const daysAgo = (d: number) => new Date(NOW.getTime() - d * 86_400_000);
+  const at = (d: number, overrides: Partial<CompletedMusicSession> = {}) =>
+    session({ startedAt: daysAgo(d), endedAt: daysAgo(d), mode: 'RELAX', ...overrides });
+
+  it('ranks thirty consistent sessions above three lucky ones', () => {
+    // Raw means would put "Lucky" (−8) first. Thin evidence is shrunk
+    // toward "no effect" and has to be striking to rank high.
+    const lucky = [1, 2, 3].map((d) => at(d, { itemName: 'Lucky', heartRateDelta: -8 }));
+    const steady = Array.from({ length: 30 }, (_, i) => at(i % 10, { itemName: 'Steady', heartRateDelta: -6 }));
+    const ranked = rankPlaylistsByEffect([...lucky, ...steady], NOW);
+    expect(ranked.map((r) => r.label)).toEqual(['Steady', 'Lucky']);
+    // Display numbers stay the honest measured means.
+    expect(ranked.find((r) => r.label === 'Lucky')!.meanHeartRateDelta).toBe(-8);
+  });
+
+  it('ranks a playlist people abandon below one they finish', () => {
+    const abandoned = [1, 2, 3, 4].map((d) => at(d, { itemName: 'Skipped', heartRateDelta: -7, endedEarly: d % 2 === 0 }));
+    const finished = [1, 2, 3, 4].map((d) => at(d, { itemName: 'Finished', heartRateDelta: -6 }));
+    expect(rankPlaylistsByEffect([...abandoned, ...finished], NOW)[0]!.label).toBe('Finished');
+  });
+
+  it('does not let abandoning a harmful playlist improve its score', () => {
+    const kept = [1, 2, 3].map((d) => at(d, { heartRateDelta: 6 }));
+    const abandoned = [1, 2, 3].map((d) => at(d, { heartRateDelta: 6, endedEarly: true }));
+    expect(rankingScore('RELAX', abandoned, NOW)).toBe(rankingScore('RELAX', kept, NOW));
+    expect(rankingScore('RELAX', kept, NOW)).toBeLessThan(0);
+  });
+
+  it('weights recent sessions above old ones', () => {
+    // Same playlist, same count: worked recently vs. worked months ago.
+    const recent = [...[1, 2, 3].map((d) => at(d, { heartRateDelta: -8 })), ...[80, 81, 82].map((d) => at(d, { heartRateDelta: 0 }))];
+    const stale = [...[1, 2, 3].map((d) => at(d, { heartRateDelta: 0 })), ...[80, 81, 82].map((d) => at(d, { heartRateDelta: -8 }))];
+    expect(rankingScore('RELAX', recent, NOW)).toBeGreaterThan(rankingScore('RELAX', stale, NOW));
+  });
+
+  it('scores a rise as positive for activating modes', () => {
+    const lifted = [1, 2, 3].map((d) => at(d, { mode: 'WORKOUT', heartRateDelta: 12 }));
+    expect(rankingScore('WORKOUT', lifted, NOW)).toBeGreaterThan(0);
+  });
+});
+
+describe('toCompletedMusicSessions', () => {
+  const row = {
+    mode: 'RELAX',
+    itemName: 'Evening Calm',
+    genre: null,
+    startedAt: new Date(Date.UTC(2026, 6, 1, 3, 30)),
+    endedAt: new Date(Date.UTC(2026, 6, 1, 4, 0)),
+    outcomeHeartRateDelta: -7,
+    endedEarly: false,
+  };
+
+  it('reads the stored outcome column, not a field that does not exist on the row', () => {
+    // Regression: rows were cast straight to CompletedMusicSession, so
+    // heartRateDelta was undefined on every one and nothing ever ranked.
+    expect(toCompletedMusicSessions([row], 'UTC')[0]!.heartRateDelta).toBe(-7);
+  });
+
+  it('converts the hour into the user’s own timezone', () => {
+    expect(toCompletedMusicSessions([row], 'America/Chicago')[0]!.hourOfDay).toBe(22);
+  });
+
+  it('drops sessions still in progress', () => {
+    expect(toCompletedMusicSessions([{ ...row, endedAt: null }], 'UTC')).toEqual([]);
+  });
+
+  it('produces sessions the ranking can actually rank', () => {
+    const rows = [1, 2, 3].map((d) => ({ ...row, startedAt: new Date(Date.UTC(2026, 6, d)), endedAt: new Date(Date.UTC(2026, 6, d, 0, 30)) }));
+    const ranked = rankPlaylistsByEffect(toCompletedMusicSessions(rows, 'UTC'));
+    expect(ranked[0]).toMatchObject({ label: 'Evening Calm', helped: true, meanHeartRateDelta: -7 });
   });
 });

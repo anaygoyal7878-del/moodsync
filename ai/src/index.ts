@@ -101,6 +101,9 @@ export {
 export { describeActiveState, journeyLabel, type ActiveState, type ActiveStateInput } from './moodLanguage.js';
 export {
   rankPlaylistsByEffect,
+  toCompletedMusicSessions,
+  rankingScore,
+  type MusicSessionRowLike,
   rankGenresByEffect,
   bestHoursForMode,
   buildMusicRecommendations,

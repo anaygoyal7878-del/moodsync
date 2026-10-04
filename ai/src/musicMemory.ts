@@ -1,3 +1,4 @@
+import { hourInZone } from '@moodsync/shared';
 import { modeWantsLowerHeartRate, musicModeLabel, type MusicMode } from './musicFeedback.js';
 
 /**
@@ -24,6 +25,47 @@ export interface CompletedMusicSession {
   /** Hour of day in the user's own timezone — the caller converts,
    * matching the convention in proactiveNotifications.ts. */
   hourOfDay: number;
+}
+
+/** The stored columns the learning loop reads — structural, so this
+ * module stays free of a Prisma dependency while still being checked
+ * against the real row shape at every call site. */
+export interface MusicSessionRowLike {
+  mode: string;
+  itemName: string;
+  genre: string | null;
+  startedAt: Date;
+  endedAt: Date | null;
+  outcomeHeartRateDelta: number | null;
+  endedEarly: boolean;
+}
+
+/**
+ * The one place a stored music session becomes a `CompletedMusicSession`.
+ *
+ * Exists because of a bug: the playlist resolver cast database rows
+ * straight to this type, but the column is `outcomeHeartRateDelta`, not
+ * `heartRateDelta`. Every delta read as `undefined`, which passes a
+ * `!== null` check, so every mean was NaN, nothing ever counted as
+ * having helped, and "play what has worked for you" silently never
+ * fired. Two other callers mapped by hand and were fine. One mapper,
+ * typed against the row, makes that unrepresentable.
+ *
+ * Sessions still in progress are dropped — they have no outcome yet.
+ */
+export function toCompletedMusicSessions(rows: MusicSessionRowLike[], timezone: string): CompletedMusicSession[] {
+  return rows
+    .filter((row): row is MusicSessionRowLike & { endedAt: Date } => row.endedAt !== null)
+    .map((row) => ({
+      mode: row.mode as MusicMode,
+      itemName: row.itemName,
+      genre: row.genre,
+      startedAt: row.startedAt,
+      endedAt: row.endedAt,
+      heartRateDelta: row.outcomeHeartRateDelta,
+      endedEarly: row.endedEarly,
+      hourOfDay: hourInZone(row.startedAt, timezone),
+    }));
 }
 
 /** Below this many sessions, a "finding" is a coincidence. Matches
@@ -53,12 +95,75 @@ export interface MusicEffectiveness {
   helped: boolean;
   /** Share of sessions the user stopped early, 0-1. */
   earlyStopRate: number;
+  /** What the ranking sorts by: the effect in the mode's intended
+   * direction, discounted for thin evidence, age and abandonment. Not
+   * shown to users — `meanHeartRateDelta` is the honest measured number
+   * for display; this is only the order. See `rankingScore`. */
+  score: number;
+}
+
+/**
+ * Pseudo-sessions of "no effect" every playlist starts with.
+ *
+ * Ranking by raw mean lets three lucky sessions at −8 bpm beat thirty
+ * consistent ones at −6. Shrinking toward zero — a sceptical prior of
+ * "this playlist does nothing special" — means a small sample has to
+ * be striking to rank high, while a large one ranks on its merits.
+ * Three matches MIN_SESSIONS_FOR_FINDING: at the threshold a finding
+ * counts at half strength.
+ */
+const PRIOR_SESSIONS = 3;
+
+/** Half-life for a session's weight. Taste and context drift — what
+ * settled someone in spring may not in autumn — so recent sessions
+ * count more, without old ones ever counting for nothing. */
+const RECENCY_HALF_LIFE_DAYS = 30;
+
+const DAY_MS = 86_400_000;
+
+/**
+ * The ranking score for a group of sessions, in bpm-equivalent units.
+ *
+ *     directional effect × completion rate
+ *
+ * - Directional effect: recency-weighted mean delta, shrunk toward zero
+ *   by PRIOR_SESSIONS, and signed so moving the way the mode wants is
+ *   positive.
+ * - Completion rate: a playlist people stop halfway through is not
+ *   working for them, whatever their heart rate did in the minutes they
+ *   stayed. Only applied to a positive effect — multiplying a negative
+ *   one would make abandoning a bad playlist *improve* its score.
+ *
+ * Exported for tests; deterministic given `now`.
+ */
+export function rankingScore(mode: MusicMode, sessions: CompletedMusicSession[], now: Date): number {
+  const measured = sessions.filter((s) => s.heartRateDelta !== null);
+  if (measured.length === 0) return 0;
+
+  let weightedSum = 0;
+  let weightTotal = 0;
+  for (const s of measured) {
+    const ageDays = Math.max(0, (now.getTime() - s.endedAt.getTime()) / DAY_MS);
+    const weight = 0.5 ** (ageDays / RECENCY_HALF_LIFE_DAYS);
+    weightedSum += weight * s.heartRateDelta!;
+    weightTotal += weight;
+  }
+  // Prior weight scales with the data's own weighting, so a playlist
+  // whose sessions are all old is also held to a sceptical prior,
+  // rather than being shrunk less because its weights are small.
+  const meanWeight = weightTotal / measured.length;
+  const shrunk = weightedSum / (weightTotal + PRIOR_SESSIONS * meanWeight);
+
+  const directional = modeWantsLowerHeartRate(mode) ? -shrunk : shrunk;
+  const completion = 1 - sessions.filter((s) => s.endedEarly).length / sessions.length;
+  return directional > 0 ? directional * completion : directional;
 }
 
 function summarize(
   label: string,
   mode: MusicMode,
   sessions: CompletedMusicSession[],
+  now: Date,
 ): MusicEffectiveness | null {
   const measured = sessions.filter((s) => s.heartRateDelta !== null);
   if (measured.length < MIN_SESSIONS_FOR_FINDING) return null;
@@ -72,6 +177,7 @@ function summarize(
     meanHeartRateDelta: meanDelta,
     helped: wantsLower ? meanDelta < 0 : meanDelta > 0,
     earlyStopRate: sessions.filter((s) => s.endedEarly).length / sessions.length,
+    score: Math.round(rankingScore(mode, sessions, now) * 100) / 100,
   };
 }
 
@@ -93,37 +199,31 @@ function groupBy<T>(items: T[], key: (item: T) => string | null): Map<string, T[
  * a bad Sleep one — collapsing them would average away the thing the
  * user actually wants to know.
  *
- * Sorted by how strongly each moved in its mode's intended direction.
+ * Sorted by `score` — effect in the intended direction, weighed by how
+ * much recent evidence backs it and whether the person stays with it.
  */
-export function rankPlaylistsByEffect(sessions: CompletedMusicSession[]): MusicEffectiveness[] {
+export function rankPlaylistsByEffect(sessions: CompletedMusicSession[], now: Date = new Date()): MusicEffectiveness[] {
   const results: MusicEffectiveness[] = [];
   for (const [mode, modeSessions] of groupBy(sessions, (s) => s.mode)) {
     for (const [name, group] of groupBy(modeSessions, (s) => s.itemName)) {
-      const summary = summarize(name, mode as MusicMode, group);
+      const summary = summarize(name, mode as MusicMode, group, now);
       if (summary) results.push(summary);
     }
   }
-  return results.sort((a, b) => effectStrength(b) - effectStrength(a));
+  return results.sort((a, b) => b.score - a.score);
 }
 
 /** Same grouping by genre rather than by individual playlist — answers
  * "which *kind* of music works" rather than "which playlist". */
-export function rankGenresByEffect(sessions: CompletedMusicSession[]): MusicEffectiveness[] {
+export function rankGenresByEffect(sessions: CompletedMusicSession[], now: Date = new Date()): MusicEffectiveness[] {
   const results: MusicEffectiveness[] = [];
   for (const [mode, modeSessions] of groupBy(sessions, (s) => s.mode)) {
     for (const [genre, group] of groupBy(modeSessions, (s) => s.genre)) {
-      const summary = summarize(genre, mode as MusicMode, group);
+      const summary = summarize(genre, mode as MusicMode, group, now);
       if (summary) results.push(summary);
     }
   }
-  return results.sort((a, b) => effectStrength(b) - effectStrength(a));
-}
-
-/** How far the mean moved in the direction the mode wanted. Signed so
- * "helped a lot" sorts above "did nothing" above "went the wrong way". */
-function effectStrength(entry: MusicEffectiveness): number {
-  const magnitude = Math.abs(entry.meanHeartRateDelta);
-  return entry.helped ? magnitude : -magnitude;
+  return results.sort((a, b) => b.score - a.score);
 }
 
 export interface HourPattern {

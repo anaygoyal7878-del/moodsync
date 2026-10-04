@@ -1,4 +1,9 @@
-import { smartHomeConnectionRepository, oauthTokenRepository, musicSessionRepository } from '@moodsync/database';
+import {
+  smartHomeConnectionRepository,
+  oauthTokenRepository,
+  musicSessionRepository,
+  userTimezoneRepository,
+} from '@moodsync/database';
 import {
   SpotifyClient,
   matchPlaylistByKeywords,
@@ -6,7 +11,7 @@ import {
   type SpotifyOAuthConfig,
   type SpotifyPlaylistSummary,
 } from '@moodsync/integration-spotify';
-import { rankPlaylistsByEffect, type CompletedMusicSession } from './musicMemory.js';
+import { rankPlaylistsByEffect, toCompletedMusicSessions, type CompletedMusicSession } from './musicMemory.js';
 import type { MusicMode } from './musicFeedback.js';
 
 /**
@@ -142,10 +147,11 @@ export async function resolveMusicPlaylist(userId: string, category: string): Pr
   const mode = CATEGORY_TO_MODE[category];
   if (mode) {
     try {
-      const sessions = (await musicSessionRepository.listCompletedSince(
-        userId,
-        HISTORY_WINDOW_DAYS,
-      )) as unknown as CompletedMusicSession[];
+      const [rows, timezone] = await Promise.all([
+        musicSessionRepository.listCompletedSince(userId, HISTORY_WINDOW_DAYS),
+        userTimezoneRepository.getTimezone(userId),
+      ]);
+      const sessions = toCompletedMusicSessions(rows, timezone);
       const proven = pickProvenPlaylist(playlists, sessions, mode);
       if (proven) return { uri: proven.uri, name: proven.name, basis: 'proven_for_you' };
     } catch {
