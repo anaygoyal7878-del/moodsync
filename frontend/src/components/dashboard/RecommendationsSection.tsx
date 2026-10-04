@@ -16,21 +16,42 @@ const TEMPLATE_NAMES: Record<string, string> = {
   recovery: "Recovery",
 };
 
-function RecommendationCard({ recommendation, onResponded }: { recommendation: RecommendationEntry; onResponded: () => void }) {
-  const [submitting, setSubmitting] = useState<"accept" | "dismiss" | null>(null);
-
-  async function respond(action: "accept" | "dismiss") {
-    setSubmitting(action);
-    await fetch(`/api/recommendations/${recommendation.id}/${action}`, { method: "POST" });
-    setSubmitting(null);
-    onResponded();
-  }
+function RecommendationCard({
+  recommendation,
+  onResponded,
+}: {
+  recommendation: RecommendationEntry;
+  onResponded: () => void;
+}) {
+  const router = useRouter();
+  const [submitting, setSubmitting] = useState<"accept" | "dismiss" | null>(
+    null,
+  );
 
   const actions = recommendation.suggestedActions;
   const isEditRule = "kind" in actions && actions.kind === "edit-rule";
   const isRunScene = "kind" in actions && actions.kind === "run-scene";
+  const openHref =
+    "kind" in actions && actions.kind === "open" ? actions.href : null;
+
+  async function respond(action: "accept" | "dismiss") {
+    setSubmitting(action);
+    await fetch(`/api/recommendations/${recommendation.id}/${action}`, {
+      method: "POST",
+    });
+    setSubmitting(null);
+    // An "open" suggestion is acted on by going there — accepting records
+    // the answer, then takes the person straight to it.
+    if (action === "accept" && openHref) {
+      router.push(openHref);
+      return;
+    }
+    onResponded();
+  }
   const templateId = "templateId" in actions ? actions.templateId : undefined;
-  const templateName = templateId ? (TEMPLATE_NAMES[templateId] ?? templateId) : undefined;
+  const templateName = templateId
+    ? (TEMPLATE_NAMES[templateId] ?? templateId)
+    : undefined;
 
   return (
     <Card>
@@ -39,30 +60,55 @@ function RecommendationCard({ recommendation, onResponded }: { recommendation: R
           AI-generated
         </span>
         <p className="text-sm font-medium text-ink">{recommendation.title}</p>
-        <p className="text-sm text-ink-secondary">{recommendation.description}</p>
-        <p className="text-xs text-ink-muted">
-          {isRunScene ? (
-            <>
-              This only suggests running your Apple Home scene — accepting queues it for your iOS companion app to
-              run next time it&rsquo;s opened, MoodSync never runs a scene without you accepting first.
-            </>
-          ) : isEditRule ? (
-            <>
-              To use it: open this rule below and change its playlist — this only suggests it, MoodSync never edits
-              a rule for you.
-            </>
-          ) : (
-            <>
-              To use it: open &ldquo;New rule&rdquo; below and pick the &ldquo;{templateName}&rdquo; template — this
-              only suggests it, MoodSync never creates a rule without you confirming which device it controls.
-            </>
-          )}
+        <p className="text-sm text-ink-secondary">
+          {recommendation.description}
         </p>
+        {!openHref && (
+          <p className="text-xs text-ink-muted">
+            {isRunScene ? (
+              <>
+                This only suggests running your Apple Home scene — accepting
+                queues it for your iOS companion app to run next time it&rsquo;s
+                opened, MoodSync never runs a scene without you accepting first.
+              </>
+            ) : isEditRule ? (
+              <>
+                To use it: open this rule below and change its playlist — this
+                only suggests it, MoodSync never edits a rule for you.
+              </>
+            ) : (
+              <>
+                To use it: open &ldquo;New rule&rdquo; below and pick the
+                &ldquo;{templateName}&rdquo; template — this only suggests it,
+                MoodSync never creates a rule without you confirming which
+                device it controls.
+              </>
+            )}
+          </p>
+        )}
         <div className="flex items-center gap-2">
-          <Button variant="secondary" disabled={submitting !== null} onClick={() => respond("accept")}>
-            {submitting === "accept" ? (isRunScene ? "Running…" : "Accepting…") : isRunScene ? "Run scene" : "Got it, I'll set this up"}
+          <Button
+            variant="secondary"
+            disabled={submitting !== null}
+            onClick={() => respond("accept")}
+          >
+            {submitting === "accept"
+              ? isRunScene
+                ? "Running…"
+                : openHref
+                  ? "Opening…"
+                  : "Accepting…"
+              : isRunScene
+                ? "Run scene"
+                : openHref
+                  ? "Let's do it"
+                  : "Got it, I'll set this up"}
           </Button>
-          <Button variant="ghost" disabled={submitting !== null} onClick={() => respond("dismiss")}>
+          <Button
+            variant="ghost"
+            disabled={submitting !== null}
+            onClick={() => respond("dismiss")}
+          >
             {submitting === "dismiss" ? "Dismissing…" : "Dismiss"}
           </Button>
         </div>
@@ -71,25 +117,39 @@ function RecommendationCard({ recommendation, onResponded }: { recommendation: R
   );
 }
 
-export function RecommendationsSection({ recommendations }: { recommendations: RecommendationEntry[] }) {
+export function RecommendationsSection({
+  recommendations,
+}: {
+  recommendations: RecommendationEntry[];
+}) {
   const router = useRouter();
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Suggested for you</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
+        Suggested for you
+      </h2>
       {recommendations.length === 0 ? (
         <Card className="flex flex-col items-start gap-1.5 py-6">
-          <Sparkles size={18} className="mb-1 text-ink-muted" aria-hidden="true" />
+          <Sparkles
+            size={18}
+            className="mb-1 text-ink-muted"
+            aria-hidden="true"
+          />
           <p className="text-sm font-medium text-ink">No suggestions yet</p>
           <p className="text-sm text-ink-secondary">
-            MoodSync looks for patterns in your wellness trends and suggests automations that might help — check back
-            after your next sync.
+            MoodSync looks for patterns in your wellness trends and suggests
+            automations that might help — check back after your next sync.
           </p>
         </Card>
       ) : (
         <div className="flex flex-col gap-2">
           {recommendations.map((r) => (
-            <RecommendationCard key={r.id} recommendation={r} onResponded={() => router.refresh()} />
+            <RecommendationCard
+              key={r.id}
+              recommendation={r}
+              onResponded={() => router.refresh()}
+            />
           ))}
         </div>
       )}

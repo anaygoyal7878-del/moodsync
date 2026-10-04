@@ -57,9 +57,25 @@ export const recommendationRepository = {
    * dashboard load hits. All three non-terminal statuses count as
    * "seen", not just PENDING: a suggestion the user already accepted or
    * dismissed must not come back. */
-  async listSuggestedTitles(userId: string): Promise<Set<string>> {
+  /** Titles that should not be suggested again right now.
+   *
+   * Pending ones always count. Answered ones count all-time by default —
+   * right for one-off setup suggestions ("try this automation"). Pass
+   * `answeredSince` for in-the-moment suggestions ("take five minutes to
+   * breathe"): without it, a suggestion dismissed once could never come
+   * back on a later hard day. */
+  async listSuggestedTitles(userId: string, options: { answeredSince?: Date } = {}): Promise<Set<string>> {
     const rows = await prisma.recommendation.findMany({
-      where: { userId, status: { in: ['PENDING', 'ACCEPTED', 'DISMISSED'] } },
+      where: {
+        userId,
+        OR: [
+          { status: 'PENDING' },
+          {
+            status: { in: ['ACCEPTED', 'DISMISSED'] },
+            ...(options.answeredSince ? { createdAt: { gte: options.answeredSince } } : {}),
+          },
+        ],
+      },
       select: { title: true },
     });
     return new Set(rows.map((r) => r.title));

@@ -7,11 +7,16 @@ import {
   pendingDeviceCommandRepository,
   recommendationRepository,
 } from '@moodsync/database';
-import { computeWellnessTrends, generateRecommendations, type PlaylistSkipStat } from '@moodsync/ai';
+import { computeWellnessScores, computeWellnessTrends, generateRecommendations, type PlaylistSkipStat } from '@moodsync/ai';
 
 /** How far back to look for wellness trend data when deciding whether to
  * suggest a new rule — same window `/api/insights` defaults to. */
 const TREND_WINDOW_DAYS = 14;
+/** Matches GET /wellness's history window. */
+const BASELINE_WINDOW_DAYS = 30;
+/** How long an answered in-the-moment suggestion stays quiet before the
+ * same state can prompt it again. */
+const MOMENTARY_COOLDOWN_DAYS = 3;
 
 /** How many of a playlist's most recent checked plays the skip-rate
  * heuristic looks at — matches `MIN_SKIP_SAMPLE_SIZE` in
@@ -77,22 +82,45 @@ export default async function recommendationRoutes(app: FastifyInstance) {
    */
   app.get('/recommendations', { preHandler: app.authenticate }, async (request, reply) => {
     const userId = request.userId!;
-    const [readings, rules, snapshot] = await Promise.all([
-      biometricReadingRepository.listRecentNormalized(userId, TREND_WINDOW_DAYS),
+    const [baselineReadings, rules, snapshot] = await Promise.all([
+      biometricReadingRepository.listRecentNormalized(userId, BASELINE_WINDOW_DAYS),
       automationRuleRepository.listForUser(userId),
       homeSnapshotRepository.getForUser(userId),
     ]);
+    const trendCutoff = Date.now() - TREND_WINDOW_DAYS * 86_400_000;
+    const readings = baselineReadings.filter((r) => new Date(r.timestamp).getTime() >= trendCutoff);
     const wellnessTrends = computeWellnessTrends([...readings].reverse());
     const playlistSkipStats = await computePlaylistSkipStats(userId, rules);
     const cachedScenes = snapshot?.scenes.map((s) => ({ sceneId: s.sceneId, name: s.name })) ?? [];
-    const candidates = generateRecommendations({ wellnessTrends, existingRules: rules, playlistSkipStats, cachedScenes });
+    // Latest reading scored against 30 days of history — the same window
+    // /wellness uses, so the number quoted here matches the dashboard's.
+    const [latest, ...history] = baselineReadings;
+    const current = latest ? computeWellnessScores(latest, history) : null;
+    const candidates = generateRecommendations({
+      wellnessTrends,
+      existingRules: rules,
+      playlistSkipStats,
+      cachedScenes,
+      ...(current ? { currentScores: { stress: current.stress.value, recovery: current.recovery.value } } : {}),
+    });
 
     // One read of the titles already seen, then one bulk insert —
     // previously this was a `hasBeenSuggested` query *and* a `create`
     // per candidate, all sequential, on an endpoint every dashboard load
     // hits and that `LiveRefresh` now re-requests every five minutes.
-    const alreadySuggested = await recommendationRepository.listSuggestedTitles(userId);
-    const fresh = candidates.filter((candidate) => !alreadySuggested.has(candidate.title));
+    // Setup suggestions are one-off; in-the-moment ones (open a session,
+    // run a scene) may return after a cooldown — see listSuggestedTitles.
+    const [suggestedEver, suggestedRecently] = await Promise.all([
+      recommendationRepository.listSuggestedTitles(userId),
+      recommendationRepository.listSuggestedTitles(userId, {
+        answeredSince: new Date(Date.now() - MOMENTARY_COOLDOWN_DAYS * 86_400_000),
+      }),
+    ]);
+    const fresh = candidates.filter((candidate) =>
+      candidate.kind === 'open' || candidate.kind === 'run-scene'
+        ? !suggestedRecently.has(candidate.title)
+        : !suggestedEver.has(candidate.title),
+    );
     if (fresh.length > 0) {
       await recommendationRepository.createMany(
         fresh.map((candidate) => ({
@@ -104,7 +132,9 @@ export default async function recommendationRoutes(app: FastifyInstance) {
               ? { kind: 'edit-rule', ruleId: candidate.ruleId }
               : candidate.kind === 'run-scene'
                 ? { kind: 'run-scene', sceneId: candidate.sceneId, sceneName: candidate.sceneName }
-                : { kind: 'template', templateId: candidate.templateId },
+                : candidate.kind === 'open'
+                  ? { kind: 'open', href: candidate.href }
+                  : { kind: 'template', templateId: candidate.templateId },
         })),
       );
     }

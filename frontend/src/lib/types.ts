@@ -414,6 +414,7 @@ export interface RecommendationEntry {
     | { kind: "template"; templateId: string }
     | { kind: "edit-rule"; ruleId: string }
     | { kind: "run-scene"; sceneId: string; sceneName: string }
+    | { kind: "open"; href: string }
     | { templateId: string };
   createdAt: string;
   respondedAt: string | null;

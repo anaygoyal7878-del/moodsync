@@ -22,43 +22,39 @@ function trend(metric: string, overrides: Partial<TrendResult> = {}): TrendResul
 }
 
 describe('generateRecommendations', () => {
-  it('suggests Elevated Stress when stress trends up past the threshold and no rule reacts to it', () => {
+  it('suggests a breathing session when stress trends up past the threshold', () => {
     const candidates = generateRecommendations({
       wellnessTrends: [trend('stress', { current: 70, direction: 'up' })],
       existingRules: [],
     });
     expect(candidates).toHaveLength(1);
-    expect(candidates[0]).toMatchObject({ templateId: 'elevated-stress' });
+    expect(candidates[0]).toMatchObject({ kind: 'open', href: '/dashboard/meditation' });
+    expect(candidates[0]!.description).toMatch(/trended up recently \(40 → 70\)/);
   });
 
-  it('does not suggest Elevated Stress when a rule already reacts to heartRate', () => {
-    const candidates = generateRecommendations({
-      wellnessTrends: [trend('stress', { current: 70, direction: 'up' })],
-      existingRules: [rule({ conditions: [{ field: 'heartRate', operator: 'gt', value: 95 }] })],
-    });
-    expect(candidates).toHaveLength(0);
-  });
-
-  it('does not suggest Elevated Stress when the trend is below threshold or trending down', () => {
+  it('does not suggest anything for stress below threshold or trending down', () => {
     expect(generateRecommendations({ wellnessTrends: [trend('stress', { current: 50, direction: 'up' })], existingRules: [] })).toHaveLength(0);
     expect(generateRecommendations({ wellnessTrends: [trend('stress', { current: 70, direction: 'down' })], existingRules: [] })).toHaveLength(0);
   });
 
-  it('suggests Recovery when recovery trends down past the threshold and no rule reacts to it', () => {
+  it('suggests calm music when recovery trends down past the threshold', () => {
     const candidates = generateRecommendations({
       wellnessTrends: [trend('recovery', { current: 30, direction: 'down' })],
       existingRules: [],
     });
     expect(candidates).toHaveLength(1);
-    expect(candidates[0]).toMatchObject({ templateId: 'recovery' });
+    expect(candidates[0]).toMatchObject({ kind: 'open', href: '/dashboard/music' });
   });
 
-  it('does not suggest Recovery when a rule already reacts to activityLevel', () => {
+  it('never points at a rule template that no longer exists', () => {
+    // Regression: stress/recovery pointed at Hue templates removed from
+    // the UI along with Hue, so accepting led nowhere.
     const candidates = generateRecommendations({
-      wellnessTrends: [trend('recovery', { current: 30, direction: 'down' })],
-      existingRules: [rule({ conditions: [{ field: 'activityLevel', operator: 'gte', value: 60 }] })],
+      wellnessTrends: [trend('stress', { current: 80, direction: 'up' }), trend('recovery', { current: 20, direction: 'down' })],
+      existingRules: [],
+      currentScores: { stress: 100, recovery: 0 },
     });
-    expect(candidates).toHaveLength(0);
+    expect(candidates.some((c) => c.kind === 'template')).toBe(false);
   });
 
   it('can suggest both at once and returns none when nothing crosses a threshold', () => {
@@ -125,5 +121,40 @@ describe('generateRecommendations — run-scene', () => {
       cachedScenes: [{ sceneId: 'scene-1', name: 'Movie Night' }],
     });
     expect(candidates.find((c) => c.kind === 'run-scene')).toBeUndefined();
+  });
+});
+
+describe('generateRecommendations — acute state', () => {
+  // Two hard days inside a calm fortnight: the weekly averages sit just
+  // under the trend thresholds while the latest reading is extreme.
+  const diluted = [trend('stress', { current: 60, direction: 'up' }), trend('recovery', { current: 41, direction: 'down' })];
+
+  it('stayed silent on weekly averages alone — the original blind spot', () => {
+    expect(generateRecommendations({ wellnessTrends: diluted, existingRules: [] })).toHaveLength(0);
+  });
+
+  it('responds to an extreme latest reading even when the averages have not moved', () => {
+    const candidates = generateRecommendations({
+      wellnessTrends: diluted,
+      existingRules: [],
+      currentScores: { stress: 100, recovery: 0 },
+    });
+    expect(candidates.map((c) => c.href)).toEqual(['/dashboard/meditation', '/dashboard/music']);
+    // Quotes the reading that fired, not a contradictory weekly average.
+    expect(candidates[0]!.description).toMatch(/latest Stress reading is 100/);
+    expect(candidates[1]!.description).toMatch(/latest Recovery reading is 0/);
+  });
+
+  it('holds a single reading to a stricter bar than a weekly trend', () => {
+    // 70 would trigger as a weekly trend (>= 65) but not as one reading.
+    expect(
+      generateRecommendations({ wellnessTrends: [], existingRules: [], currentScores: { stress: 70, recovery: 35 } }),
+    ).toHaveLength(0);
+  });
+
+  it('ignores missing scores', () => {
+    expect(
+      generateRecommendations({ wellnessTrends: [], existingRules: [], currentScores: { stress: null, recovery: null } }),
+    ).toHaveLength(0);
   });
 });
