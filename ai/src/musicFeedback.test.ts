@@ -146,3 +146,36 @@ describe('confidenceLabel', () => {
     expect(confidenceLabel('insufficient')).toBe('Not enough data yet');
   });
 });
+
+describe('computeMusicOutcome — start-versus-end fallback', () => {
+  const at = (min: number) => new Date(START.getTime() + min * 60_000);
+
+  it('measures start against end when nothing was recorded before the session', () => {
+    // Samples only exist once the session is running — the common case.
+    // Previously this was always "not enough data".
+    const readings = [2, 4, 6, 8, 10, 12, 18, 20, 22, 24, 26, 28].map((m, i) => ({ at: at(m), bpm: i < 6 ? 78 : 69 }));
+    const outcome = computeMusicOutcome(session('RELAX'), readings);
+    expect(outcome.confidence).toBe('measured');
+    expect(outcome.heartRateDelta).toBe(-9);
+    expect(outcome.explanation.comparedWindows).toBe('The opening third of the session vs. its closing third');
+  });
+
+  it('prefers the before-window comparison when one exists', () => {
+    const outcome = computeMusicOutcome(session('RELAX'), [
+      ...samples(BEFORE_WINDOW_START, START, 80),
+      ...samples(START, END, 70),
+    ]);
+    expect(outcome.explanation.comparedWindows).toMatch(/before vs\. the/);
+  });
+
+  it('stays insufficient when in-session samples are too few', () => {
+    const outcome = computeMusicOutcome(session('RELAX'), [at(2), at(10), at(20), at(28)].map((d) => ({ at: d, bpm: 70 })));
+    expect(outcome.confidence).toBe('insufficient');
+  });
+
+  it('stays insufficient when the samples are bunched into a few minutes', () => {
+    // Nine readings within three minutes: "start" and "end" are the same moment.
+    const bunched = Array.from({ length: 9 }, (_, i) => ({ at: new Date(START.getTime() + 60_000 + i * 20_000), bpm: 70 + i }));
+    expect(computeMusicOutcome(session('RELAX'), bunched).confidence).toBe('insufficient');
+  });
+});

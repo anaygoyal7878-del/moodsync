@@ -164,11 +164,13 @@ export default async function musicSessionRoutes(app: FastifyInstance) {
   );
 
   /**
-   * Records one biometric sample during a playing session.
+   * Records one biometric sample during a playing session, for a client
+   * that measures heart rate itself (e.g. a future watch app).
    *
-   * The client samples; the server does not poll. A server-side poller
-   * would have to guess when a session is actually audible, and would
-   * keep sampling through a pause — the device already knows both.
+   * Most samples don't come through here: GET /music-sessions/live
+   * records each new wearable reading while the player is open. That is
+   * still client-driven — the server only samples while a player is
+   * actually polling, so it never guesses whether a session is audible.
    */
   app.post<{ Params: { id: string } }>(
     '/music-sessions/:id/samples',
@@ -238,6 +240,25 @@ export default async function musicSessionRoutes(app: FastifyInstance) {
 
     if (!session) return reply.send({ session: null, current, activeState: null });
 
+    // The player polls this endpoint while a session is open, so this is
+    // where samples get recorded. Nothing else did: the samples route had
+    // no client, so every session's chart was empty and its outcome rested
+    // on wearable readings happening to land in the right windows. Only a
+    // reading taken during the session counts; repeats are deduplicated.
+    const latestReading = context.latest;
+    if (latestReading?.heartRate !== undefined) {
+      const measuredAt = new Date(latestReading.timestamp);
+      if (measuredAt >= session.startedAt && measuredAt <= new Date()) {
+        await musicSessionRepository
+          .recordReadingSample(session.id, userId, {
+            at: measuredAt,
+            heartRate: Math.round(latestReading.heartRate),
+            stressScore: current.stress,
+          })
+          .catch(() => undefined);
+      }
+    }
+
     const elapsedMinutes = (Date.now() - session.startedAt.getTime()) / 60_000;
     const heartRateDelta =
       session.baselineHeartRate !== null && current.heartRate !== null
@@ -281,10 +302,19 @@ export default async function musicSessionRoutes(app: FastifyInstance) {
     // Samples from the baseline window through the end of the session.
     const windowStart = new Date(existing.startedAt.getTime() - 20 * 60_000);
     const readings = await biometricReadingRepository.listRecentNormalized(userId, 1);
-    const samples = readings
-      .filter((r) => r.heartRate !== undefined)
-      .map((r) => ({ at: new Date(r.timestamp), bpm: r.heartRate! }))
-      .filter((s) => s.at >= windowStart && s.at <= endedAt);
+    const sessionSamples = (await musicSessionRepository.listSamples(id, userId)) ?? [];
+    // Wearable readings plus the session's own samples, one point per
+    // timestamp — a sample recorded from a reading is the same measurement.
+    const byTime = new Map<number, { at: Date; bpm: number }>();
+    for (const r of readings) {
+      if (r.heartRate === undefined) continue;
+      const at = new Date(r.timestamp);
+      byTime.set(at.getTime(), { at, bpm: r.heartRate });
+    }
+    for (const s of sessionSamples) {
+      if (s.heartRate !== null) byTime.set(s.at.getTime(), { at: s.at, bpm: s.heartRate });
+    }
+    const samples = [...byTime.values()].filter((s) => s.at >= windowStart && s.at <= endedAt);
 
     const outcome = computeMusicOutcome(
       { mode: existing.mode as MusicMode, startedAt: existing.startedAt, endedAt, itemName: existing.itemName },
