@@ -60,6 +60,37 @@ export const musicSessionRepository = {
     return true;
   },
 
+  /**
+   * Records a wearable reading as a session sample, once.
+   *
+   * The player polls the live endpoint every few seconds, while a new
+   * heart-rate reading arrives far less often — so the same reading is
+   * seen many times. Keyed on the reading's own timestamp, it is stored
+   * exactly once, at the moment it was measured rather than the moment
+   * it was noticed. Returns false when the session is closed.
+   */
+  async recordReadingSample(
+    sessionId: string,
+    userId: string,
+    sample: { at: Date; heartRate: number | null; stressScore: number | null },
+  ): Promise<boolean> {
+    const session = await prisma.musicSession.findFirst({
+      where: { id: sessionId, userId, endedAt: null },
+      select: { id: true },
+    });
+    if (!session) return false;
+    const existing = await prisma.musicSessionSample.findFirst({
+      where: { sessionId, at: sample.at },
+      select: { id: true },
+    });
+    if (!existing) {
+      await prisma.musicSessionSample.create({
+        data: { sessionId, at: sample.at, heartRate: sample.heartRate, stressScore: sample.stressScore },
+      });
+    }
+    return true;
+  },
+
   /** A session's samples in time order, for the evolution chart. */
   async listSamples(sessionId: string, userId: string) {
     const session = await prisma.musicSession.findFirst({ where: { id: sessionId, userId }, select: { id: true } });

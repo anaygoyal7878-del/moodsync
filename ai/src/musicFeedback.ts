@@ -98,6 +98,9 @@ const MIN_SAMPLES_PER_WINDOW = 3;
 /** Sessions shorter than this are too brief for a heart-rate response
  * to mean anything. */
 const MIN_SESSION_MINUTES = 5;
+/** For the start-versus-end fallback, the in-session samples must span
+ * at least this long — otherwise "start" and "end" are the same moment. */
+const MIN_WITHIN_SESSION_SPAN_MINUTES = 8;
 /** Below this many bpm, a difference is within normal minute-to-minute
  * variation and isn't reported as a change. */
 const NOTABLE_BPM_DELTA = 3;
@@ -172,16 +175,40 @@ export function computeMusicOutcome(session: MusicSessionWindow, heartRateSample
   const before = samplesBetween(heartRateSamples, baselineStart, session.startedAt);
   const during = samplesBetween(heartRateSamples, session.startedAt, session.endedAt);
 
-  if (before.length < MIN_SAMPLES_PER_WINDOW || during.length < MIN_SAMPLES_PER_WINDOW) {
-    return insufficient(session, 'Not enough heart rate data yet to measure impact.');
+  let delta: number;
+  let comparedWindows: string;
+  if (before.length >= MIN_SAMPLES_PER_WINDOW && during.length >= MIN_SAMPLES_PER_WINDOW) {
+    delta = Math.round(mean(during) - mean(before));
+    comparedWindows = `${BASELINE_WINDOW_MINUTES} min before vs. the ${Math.round(durationMinutes)} min of the session`;
+  } else {
+    // Fallback: the opening of the session against its close. Samples are
+    // usually recorded only once a session is running, so a "before"
+    // window is often empty — which used to mean almost every session
+    // came back "not enough data" despite plenty of readings during it.
+    // Start-versus-end is a smaller claim than before-versus-during, and
+    // the explanation names exactly which windows were compared.
+    const inSession = heartRateSamples
+      .filter((s) => s.at >= session.startedAt && s.at <= session.endedAt)
+      .sort((x, y) => x.at.getTime() - y.at.getTime());
+    const third = Math.floor(inSession.length / 3);
+    const spanMinutes =
+      inSession.length > 1
+        ? (inSession[inSession.length - 1]!.at.getTime() - inSession[0]!.at.getTime()) / 60_000
+        : 0;
+    if (third < MIN_SAMPLES_PER_WINDOW || spanMinutes < MIN_WITHIN_SESSION_SPAN_MINUTES) {
+      return insufficient(session, 'Not enough heart rate data yet to measure impact.');
+    }
+    const opening = inSession.slice(0, third).map((s) => s.bpm);
+    const closing = inSession.slice(-third).map((s) => s.bpm);
+    delta = Math.round(mean(closing) - mean(opening));
+    comparedWindows = 'The opening third of the session vs. its closing third';
   }
 
-  const delta = Math.round(mean(during) - mean(before));
   const explanation: MusicExplanation = {
     itemName: session.itemName,
     mode: session.mode,
     metric: 'Average heart rate',
-    comparedWindows: `${BASELINE_WINDOW_MINUTES} min before vs. the ${Math.round(durationMinutes)} min of the session`,
+    comparedWindows,
     confidence: 'measured',
     caveat: CAVEAT_MEASURED,
   };
