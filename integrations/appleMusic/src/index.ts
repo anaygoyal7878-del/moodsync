@@ -1,20 +1,24 @@
 /**
- * Apple Music is NOT wired into MoodSync's `SmartHomeProviderId` union
- * (shared/src/wearables.ts) or the action-executor registry
- * (ai/src/actionExecutors.ts) — this package intentionally has no live
- * client, same "typed-interface-only stub" pattern as
- * `integrations/garmin` and `integrations/ecobee`. See
- * docs/APPLE_MUSIC_RESEARCH.md for the real finding that blocks this:
- * MusicKit's developer-JWT + user-token auth model doesn't fit the
- * `OAuthToken` Prisma model's OAuth-shaped columns (non-nullable
- * `expiresAt`, a refresh-token flow MusicKit doesn't have), and no live
- * MusicKit API testing has been done. Extending the real
- * `SmartHomeProviderId` union to include this before that's resolved
- * would let the rest of the product (dispatch, rule builder) silently
- * assume a live connection can exist — this local, disconnected status
- * type exists so nothing else in the codebase can reference it as if it
- * were real yet.
- */
+ * Historical stub — superseded, kept only because removing an exported
+ * package surface is a separate change.
+ *
+ * Apple Music *is* connectable now, through a path that sidesteps the
+ * blocker this stub described: rather than forcing MusicKit's
+ * developer-JWT + user-token model into the OAuth-shaped `OAuthToken`
+ * table, it has its own `AppleMusicConnection` model. The live pieces:
+ *
+ *  - backend/src/services/appleMusicService.ts — signs the developer
+ *    token, stores the Music User Token encrypted.
+ *  - backend/src/api/routes/integrations/appleMusic.ts — developer
+ *    token, connect, status, disconnect.
+ *  - frontend/src/lib/musicKitClient.tsx — MusicKit JS in the browser;
+ *    authorization and playback happen client-side.
+ *
+ * What remains true: Apple Music is still not in `SmartHomeProviderId`
+ * or the server-side action-executor registry, so automations and the
+ * environment composer cannot start Apple Music playback — only the
+ * browser can. Nothing references the status object below.
+ * */
 export interface AppleMusicIntegrationStatus {
   id: 'appleMusic';
   displayName: string;

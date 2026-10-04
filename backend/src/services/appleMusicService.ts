@@ -3,12 +3,24 @@ import { appleMusicConnectionRepository, type AppleMusicConnectionSummary } from
 import { env } from '../config/env.js';
 
 export class AppleMusicNotConfiguredError extends Error {
-  constructor() {
-    super(
-      'Apple Music integration is not configured on this server (missing MusicKit credentials) — ' +
-        'see docs/APPLE_MUSIC_ARCHITECTURE.md',
-    );
+  constructor(
+    message = 'Apple Music integration is not configured on this server (missing MusicKit credentials) — ' +
+      'see docs/APPLE_MUSIC_ARCHITECTURE.md',
+  ) {
+    super(message);
   }
+}
+
+/**
+ * A .p8 key stored in a single-line env var almost always arrives with
+ * literal `\n` sequences instead of line breaks — that is how most
+ * hosts and .env files hold multi-line values. `importPKCS8` needs real
+ * PEM line breaks, so without this the documented way of storing the
+ * key failed with an opaque 500 on every developer-token request.
+ * Real line breaks pass through unchanged.
+ */
+export function normalizePrivateKey(raw: string): string {
+  return raw.replace(/\\n/g, '\n').trim();
 }
 
 interface AppleMusicConfig {
@@ -21,7 +33,11 @@ function requireAppleMusicConfig(): AppleMusicConfig {
   if (!env.APPLE_MUSIC_TEAM_ID || !env.APPLE_MUSIC_KEY_ID || !env.APPLE_MUSIC_PRIVATE_KEY) {
     throw new AppleMusicNotConfiguredError();
   }
-  return { teamId: env.APPLE_MUSIC_TEAM_ID, keyId: env.APPLE_MUSIC_KEY_ID, privateKey: env.APPLE_MUSIC_PRIVATE_KEY };
+  return {
+    teamId: env.APPLE_MUSIC_TEAM_ID,
+    keyId: env.APPLE_MUSIC_KEY_ID,
+    privateKey: normalizePrivateKey(env.APPLE_MUSIC_PRIVATE_KEY),
+  };
 }
 
 /** Apple documents a maximum developer-token lifetime of 6 months (15777000
@@ -41,7 +57,18 @@ export const appleMusicService = {
    */
   async issueDeveloperToken(): Promise<{ token: string; expiresInSeconds: number }> {
     const config = requireAppleMusicConfig();
-    const privateKey = await importPKCS8(config.privateKey, 'ES256');
+    let privateKey: Awaited<ReturnType<typeof importPKCS8>>;
+    try {
+      privateKey = await importPKCS8(config.privateKey, 'ES256');
+    } catch {
+      // A key that is present but unreadable is a configuration problem,
+      // and should say so rather than surface as a generic server error.
+      // The key itself is never echoed.
+      throw new AppleMusicNotConfiguredError(
+        'APPLE_MUSIC_PRIVATE_KEY is set but could not be read as a MusicKit .p8 key — check it includes the ' +
+          'BEGIN/END PRIVATE KEY lines.',
+      );
+    }
 
     const token = await new SignJWT({})
       .setProtectedHeader({ alg: 'ES256', kid: config.keyId })

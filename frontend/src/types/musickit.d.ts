@@ -76,7 +76,10 @@ declare namespace MusicKit {
     app: { name: string; build: string };
   }
 
-  function configure(options: ConfigureOptions): MusicKitInstance;
+  /** Asynchronous in MusicKit JS v3 (the version this app loads) — it
+   * resolves to the instance. v2 returned the instance directly; typing
+   * it that way is what let the original bug through. */
+  function configure(options: ConfigureOptions): Promise<MusicKitInstance>;
   function getInstance(): MusicKitInstance;
 }
 

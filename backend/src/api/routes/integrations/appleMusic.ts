@@ -36,6 +36,19 @@ export default async function appleMusicRoutes(app: FastifyInstance) {
     return reply.code(204).send();
   });
 
+  /** Whether MoodSync holds an active connection for this user. The
+   * browser's MusicKit authorization is Apple's state, not MoodSync's —
+   * it survives a disconnect made on the Connections page — so the
+   * client checks this to keep the two in agreement. Never returns the
+   * token. */
+  app.get('/integrations/apple-music', { preHandler: app.authenticate }, async (request, reply) => {
+    const connection = await appleMusicService.getConnection(request.userId!);
+    return reply.send({
+      connected: connection?.status === 'ACTIVE',
+      storefront: connection?.storefront ?? null,
+    });
+  });
+
   app.delete('/integrations/apple-music', { preHandler: app.authenticate }, async (request, reply) => {
     const disconnected = await appleMusicService.disconnect(request.userId!);
     if (!disconnected) return reply.code(404).send({ error: 'No Apple Music connection for this user' });
