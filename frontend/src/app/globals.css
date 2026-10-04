@@ -522,6 +522,41 @@ body {
   animation: lux-fade-up 0.44s var(--ease-out-premium) 0.26s both;
 }
 
+/* ── In-flow motion ────────────────────────────────────────────────
+   Page entrance on navigation (app/dashboard/template.tsx) and the
+   reveal for content that arrives after a fetch. Both use `backwards`
+   fill, never `both`: once settled, nothing keeps a transform on the
+   element, so fixed-position descendants still position against the
+   viewport. Shorter and smaller than the stagger cascade — a route
+   change should feel like continuity, not a fresh entrance. */
+@keyframes lux-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.lux-page-enter {
+  animation: lux-page-enter 0.32s var(--ease-out-premium, cubic-bezier(0.22, 1, 0.36, 1)) backwards;
+}
+
+@keyframes lux-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+    filter: blur(2px);
+  }
+}
+.lux-reveal {
+  animation: lux-reveal 0.36s var(--ease-out-premium, cubic-bezier(0.22, 1, 0.36, 1)) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lux-page-enter,
+  .lux-reveal {
+    animation: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ms-luxury .lux-stagger-1,
   .ms-luxury .lux-stagger-2,
