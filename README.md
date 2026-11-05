@@ -8,6 +8,15 @@ It does not make hardware.
 
 [![CI](https://github.com/anaygoyal7878-del/moodsync/actions/workflows/ci.yml/badge.svg)](https://github.com/anaygoyal7878-del/moodsync/actions/workflows/ci.yml)
 
+## Demo
+
+The web app includes a demo that runs on simulated data, so no wearable or
+account is needed. Run `npm run dev:frontend` and open `/demo`.
+
+![MoodSync demo index](docs/images/demo-index.png)
+
+![Adaptive Stress Relief walkthrough](docs/images/demo-stress-relief.png)
+
 ## What it does
 
 - **Reads the body.** Pulls recovery, sleep and workout data from wearables
