@@ -106,3 +106,7 @@ genuine database.
 - `docs/DECISION_ENGINE_ARCHITECTURE.md` for how decisions are made
 - `docs/CLARA_ARCHITECTURE.md` for the messaging assistant
 - `docs/INTEGRATIONS_RESEARCH.md` for the verified state of every third party API
+
+## License
+
+MIT. See [LICENSE](LICENSE).
