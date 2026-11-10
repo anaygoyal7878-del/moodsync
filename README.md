@@ -33,6 +33,42 @@ account is needed. Run `npm run dev:frontend` and open `/demo`.
 - **Explains itself.** Weekly reports, persisted insights and recommendations
   show why the system behaved the way it did.
 
+## How it works
+
+```mermaid
+flowchart LR
+    W[Wearables<br/>WHOOP, Google Health] --> S[Sync workers]
+    S --> N[Normalize into one<br/>typed reading per day]
+    N --> DB[(PostgreSQL)]
+    DB --> D[Decision engine<br/>rules, wellness scores]
+    D --> C[Resolve conflicts<br/>rate limits, safety bounds]
+    C --> X[Action executors<br/>Philips Hue, Spotify]
+    C --> L[Plain language reason log]
+    L --> R[Weekly reports<br/>and insights]
+    DB --> CL[Clara assistant<br/>text messages and tools]
+    CL --> X
+    R --> UI[Web dashboard]
+```
+
+### Sign in and session flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as API
+    participant DB as Database
+    U->>A: Email and password
+    A->>DB: Look up user, verify argon2id hash
+    A-->>U: Short lived access token and refresh token
+    U->>A: Request with access token
+    A-->>U: Data
+    U->>A: Refresh when the token expires
+    A->>DB: Check hashed refresh token, rotate it
+    A-->>U: New access and refresh tokens
+    U->>A: Log out
+    A->>DB: Revoke refresh token
+```
+
 ## Engineering highlights
 
 - **Security by default.** Passwords use argon2id. Sessions use short lived
