@@ -87,6 +87,13 @@ sequenceDiagram
   documents, and `docs/MILESTONES.md` tracks 17 milestones built one at a
   time, tested before moving on.
 
+## What I would build next
+
+- **More wearables.** Garmin is a stub waiting on a developer program that is currently closed, so Oura or Apple Health on the web would come first.
+- **More smart home targets.** Ecobee is a stub because new developer registration is closed. Matter or Home Assistant would add thermostats and plugs without waiting on a vendor.
+- **Measure whether it helps.** The decision log already records each action and its trigger reading. The next step is comparing readings after an action to readings after no action, to see which automations actually improve recovery.
+- **Finish the production hookups.** The remaining sub milestones for Google Health and Spotify are blocked on third party app approval, not on code.
+
 ## Tech stack
 
 | Layer | Tools |
