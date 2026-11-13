@@ -15,7 +15,13 @@ account is needed. Run `npm run dev:frontend` and open `/demo`.
 
 ![MoodSync demo index](docs/images/demo-index.png)
 
-![Adaptive Stress Relief walkthrough](docs/images/demo-stress-relief.png)
+The walkthrough below is the same demo, stepping through one full cycle: a
+stress reading climbs above the user's normal range, MoodSync matches it
+against a saved rule, and the lights, music and notifications all change in
+response — with every step logged in plain language, not just applied
+silently.
+
+![Adaptive Stress Relief walkthrough](docs/images/demo-stress-relief.gif)
 
 ## What it does
 
@@ -96,15 +102,18 @@ sequenceDiagram
 
 ## Tech stack
 
-| Layer | Tools |
-|---|---|
-| Web app | Next.js 16, React 19, Tailwind CSS 4, Recharts |
-| API | Fastify 5, Zod validation, pino logging, rate limiting |
-| Data | PostgreSQL with Prisma |
-| Auth | argon2id, JWT via `jose`, rotating refresh tokens |
-| Decision engine | TypeScript, framework agnostic, unit tested |
-| Mobile | Swift package and iOS companion app |
-| Other | Supabase Edge Functions, Railway deploy configs, Vitest |
+What each layer actually does, for anyone skimming this without a
+background in any of these tools:
+
+| Layer | Tools | What it's for |
+|---|---|---|
+| Web app | Next.js 16, React 19, Tailwind CSS 4, Recharts | The dashboard and marketing site a user sees in a browser, plus the charts on it. |
+| API | Fastify 5, Zod validation, pino logging, rate limiting | The server every request goes through. Zod rejects malformed input before it reaches any logic; pino writes structured logs; rate limiting caps abuse per account. |
+| Data | PostgreSQL with Prisma | The database, and a typed layer so a query that doesn't match the schema fails at compile time, not in production. |
+| Auth | argon2id, JWT via `jose`, rotating refresh tokens | How a login becomes a session. argon2id is the password-hashing algorithm OWASP currently recommends over bcrypt; refresh tokens rotate so a stolen one has a short useful life. |
+| Decision engine | TypeScript, framework agnostic, unit tested | The actual "biometrics in, automation out" logic (`ai/`). It has no dependency on the API or the database, so it can be tested with plain inputs and outputs. |
+| Mobile | Swift package and iOS companion app | The native app that reads HealthKit data on-device and syncs it up, since Apple Health has no server-side API at all. |
+| Other | Supabase Edge Functions, Railway deploy configs, Vitest | Supabase runs one serverless function; Railway hosts the actual deployment; Vitest runs all 79+ test files in CI. |
 
 ## Repository layout
 
