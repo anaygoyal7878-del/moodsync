@@ -49,5 +49,14 @@ jobs:
       - name: Test
         run: npm run test
 
+      # The frontend build downloads Google Fonts (next/font/google), which
+      # occasionally fails from CI runners. Retry the build a couple of
+      # times so a font download blip doesn't fail an otherwise good run.
       - name: Build
-        run: npm run build
+        run: |
+          for attempt in 1 2 3; do
+            npm run build && exit 0
+            echo "Build attempt $attempt failed"
+            sleep 5
+          done
+          exit 1

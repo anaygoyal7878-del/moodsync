@@ -1,83 +1,164 @@
 # MoodSync
 
-MoodSync is the intelligence layer between a user's wearable health data and
-their existing smart home ecosystem. It does not manufacture hardware —
-it connects to wearables (Fitbit/Google Health, WHOOP, Garmin) and smart
-home platforms (Philips Hue, Spotify — see `docs/INTEGRATIONS_RESEARCH.md`
-for why Alexa and Ecobee are not in the v1 plan), and automatically
-recommends or triggers environment changes based on biometric signals.
+MoodSync connects a person's wearable health data to the smart home they
+already own. It reads biometric signals such as recovery, sleep and heart
+rate, decides what the environment should do about them, and either
+recommends or triggers the change: lights, music, notifications and more.
+It does not make hardware.
+
+[![CI](https://github.com/anaygoyal7878-del/moodsync/actions/workflows/ci.yml/badge.svg)](https://github.com/anaygoyal7878-del/moodsync/actions/workflows/ci.yml)
+
+## Demo
+
+The web app includes a demo that runs on simulated data, so no wearable or
+account is needed. Run `npm run dev:frontend` and open `/demo`.
+
+![MoodSync demo index](docs/images/demo-index.png)
+
+![Adaptive Stress Relief walkthrough](docs/images/demo-stress-relief.png)
+
+## What it does
+
+- **Reads the body.** Pulls recovery, sleep and workout data from wearables
+  (WHOOP and Google Health/Fitbit are wired up) and normalizes it into one
+  typed reading per day.
+- **Decides what to do.** A decision engine evaluates user rules and wellness
+  scores against each reading, resolves conflicts between automations,
+  applies rate limits and safety bounds, and logs a plain language reason for
+  every action it takes.
+- **Changes the environment.** Executes actions through Philips Hue and
+  Spotify, with a pluggable action executor registry for adding more.
+- **Talks like a person.** Clara, the assistant, works over text messages and
+  can read your data and take real actions through tools.
+- **Explains itself.** Weekly reports, persisted insights and recommendations
+  show why the system behaved the way it did.
+
+## How it works
+
+```mermaid
+flowchart LR
+    W[Wearables<br/>WHOOP, Google Health] --> S[Sync workers]
+    S --> N[Normalize into one<br/>typed reading per day]
+    N --> DB[(PostgreSQL)]
+    DB --> D[Decision engine<br/>rules, wellness scores]
+    D --> C[Resolve conflicts<br/>rate limits, safety bounds]
+    C --> X[Action executors<br/>Philips Hue, Spotify]
+    C --> L[Plain language reason log]
+    L --> R[Weekly reports<br/>and insights]
+    DB --> CL[Clara assistant<br/>text messages and tools]
+    CL --> X
+    R --> UI[Web dashboard]
+```
+
+### Sign in and session flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as API
+    participant DB as Database
+    U->>A: Email and password
+    A->>DB: Look up user, verify argon2id hash
+    A-->>U: Short lived access token and refresh token
+    U->>A: Request with access token
+    A-->>U: Data
+    U->>A: Refresh when the token expires
+    A->>DB: Check hashed refresh token, rotate it
+    A-->>U: New access and refresh tokens
+    U->>A: Log out
+    A->>DB: Revoke refresh token
+```
+
+## Engineering highlights
+
+- **Security by default.** Passwords use argon2id. Sessions use short lived
+  JWT access tokens with rotating, hashed, revocable refresh tokens. Third
+  party OAuth tokens are encrypted at rest with AES-256-GCM, and the key never
+  touches the database.
+- **Honest integrations.** Each provider package reports a real
+  `IntegrationStatus` based on researched API access, not wishful thinking.
+  See `docs/INTEGRATIONS_RESEARCH.md` for what is actually available and why
+  Alexa and Ecobee are limited.
+- **Tested.** 79 TypeScript test files sit next to the code they cover, and
+  the Swift companion package has its own tests.
+- **CI on every push.** GitHub Actions runs typecheck, lint, tests and build
+  on Node 22.
+- **Documented decisions.** `docs/` holds 44 architecture and research
+  documents, and `docs/MILESTONES.md` tracks 17 milestones built one at a
+  time, tested before moving on.
+
+## What I would build next
+
+- **More wearables.** Garmin is a stub waiting on a developer program that is currently closed, so Oura or Apple Health on the web would come first.
+- **More smart home targets.** Ecobee is a stub because new developer registration is closed. Matter or Home Assistant would add thermostats and plugs without waiting on a vendor.
+- **Measure whether it helps.** The decision log already records each action and its trigger reading. The next step is comparing readings after an action to readings after no action, to see which automations actually improve recovery.
+- **Finish the production hookups.** The remaining sub milestones for Google Health and Spotify are blocked on third party app approval, not on code.
+
+## Tech stack
+
+| Layer | Tools |
+|---|---|
+| Web app | Next.js 16, React 19, Tailwind CSS 4, Recharts |
+| API | Fastify 5, Zod validation, pino logging, rate limiting |
+| Data | PostgreSQL with Prisma |
+| Auth | argon2id, JWT via `jose`, rotating refresh tokens |
+| Decision engine | TypeScript, framework agnostic, unit tested |
+| Mobile | Swift package and iOS companion app |
+| Other | Supabase Edge Functions, Railway deploy configs, Vitest |
 
 ## Repository layout
 
-This is an npm-workspaces monorepo:
+This is an npm workspaces monorepo.
 
 ```
-frontend/          Next.js SaaS web app (marketing site + dashboard)
-backend/            Fastify API server (auth, REST API, orchestration)
-shared/             Types and utilities shared across every workspace
-database/            Prisma schema, migrations, seed data — the single
-                     source of truth for the data model
-ai/                  The decision engine (biometric signals -> recommended
-                     automations), framework-agnostic and independently testable
-integrations/        One package per external platform (fitbit, garmin,
-                     whoop, hue, spotify, ecobee) — typed OAuth + API clients,
-                     nothing else
-workers/             Background job processes (data sync, decision runs) —
-                     deployed and scaled independently from the API server
-tests/               Cross-cutting integration/e2e tests (unit tests live
-                     next to the code they test, inside each package)
-docs/                Architecture, research, and milestone documentation
-scripts/             Dev/ops scripts
+frontend/       Next.js web app (marketing site and dashboard)
+backend/        Fastify API server (auth, REST API, orchestration)
+shared/         Types and utilities used by every workspace
+database/       Prisma schema, migrations and seed data
+ai/             Decision engine: biometric signals to recommended automations
+integrations/   One typed OAuth and API client package per external platform
+workers/        Background jobs (data sync, decision runs), scaled separately
+ios/            Swift companion package and iOS app
+Packages/       Swift package with core MoodSync logic
+supabase/       Supabase Edge Functions
+web/            Earlier React prototype for scent and diffuser recommendations
+docs/           Architecture, research and milestone documentation
+scripts/        Dev and ops scripts
 ```
 
-**Why `integrations/` and `workers/` are top-level packages, not folders
-inside `backend/`:** both the API server and the background workers need
-the same typed platform clients, and workers need to scale independently
-from the request/response API (a Fitbit sync job shouldn't compete for
-the same process as an inbound API request). Keeping them as separate
-workspace packages makes that a deployment decision, not a refactor.
-
-## Also in this repository
-
-`Packages/` (a Swift package for a native iOS companion), `supabase/`
-(Supabase Edge Functions), and `web/` (an earlier React prototype focused
-specifically on scent/diffuser recommendations) predate this platform
-rearchitecture and are kept as-is. This monorepo (`frontend/`, `backend/`,
-`shared/`, `database/`, `ai/`, `integrations/`, `workers/`) is the current,
-actively developed product direction described in `docs/MILESTONES.md`.
+`integrations/` and `workers/` are top level packages instead of folders
+inside `backend/` because the API and the workers share the same platform
+clients, and a slow sync job should never compete with an inbound request.
+Keeping them separate makes scaling a deployment choice, not a refactor.
 
 ## Getting started
 
-See `docs/MILESTONES.md` for the build plan and current status, and
-`docs/INTEGRATIONS_RESEARCH.md` for the verified (not assumed) state of
-every third-party API this product depends on.
+Requires Node 20 or newer and a reachable PostgreSQL database.
 
 ```
 npm install
+cp .env.example .env     # then set DATABASE_URL and the secrets
 npm run db:generate
+npm run db:migrate
 npm run dev:backend
+npm run dev:frontend
 ```
 
-### Local database
+Other useful commands: `npm run typecheck`, `npm run lint`, `npm test`,
+`npm run build`.
 
-The backend needs a real Postgres reachable at `DATABASE_URL` (see
-`.env.example`) — `npm run dev:backend` will fail its env validation
-without one. Two ways to get one locally:
+If you have no local Postgres, the `embedded-postgres` npm package can run a
+real Postgres binary as a subprocess. `docs/MILESTONES.md` describes how it
+was used to verify the full signup, login, session and logout flow against a
+genuine database.
 
-- **Docker/Homebrew Postgres, if available**: point `DATABASE_URL` at it
-  and run `npx prisma migrate dev` from `database/`.
-- **No Docker/Homebrew available** (e.g. this sandboxed dev environment):
-  use the `embedded-postgres` npm package, which downloads and runs a
-  real Postgres binary as a subprocess — no system install required.
-  ```js
-  // scratch script, not part of the app — run once to init+start:
-  import EmbeddedPostgres from "embedded-postgres";
-  const pg = new EmbeddedPostgres({ databaseDir: "./pgdata", user: "moodsync", password: "moodsync", port: 5432 });
-  await pg.initialise();
-  await pg.start();
-  await pg.createDatabase("moodsync_dev");
-  ```
-  Then `DATABASE_URL="postgresql://moodsync:moodsync@localhost:5432/moodsync_dev"`,
-  same `prisma migrate dev` step. See `docs/MILESTONES.md`'s "Real
-  end-to-end verification" entry for how this was used to verify the
-  full signup/login/session/logout flow against a genuine database.
+## Where to read next
+
+- `docs/MILESTONES.md` for the build plan and current status
+- `docs/DECISION_ENGINE_ARCHITECTURE.md` for how decisions are made
+- `docs/CLARA_ARCHITECTURE.md` for the messaging assistant
+- `docs/INTEGRATIONS_RESEARCH.md` for the verified state of every third party API
+
+## License
+
+MIT. See [LICENSE](LICENSE).
